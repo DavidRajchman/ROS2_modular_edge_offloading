@@ -11,6 +11,20 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/ControlMotor.msg"
+  "msg/ControlNode.msg"
+  "msg/DynObstacle.msg"
+  "msg/Features.msg"
+  "msg/Position.msg"
+  "msg/Stage.msg"
+  "msg/StatusNode.msg"
+  "srv/BaseAngle.srv"
+  "srv/RotationLidar.srv"
+ )
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
