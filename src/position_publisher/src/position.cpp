@@ -26,7 +26,8 @@ using namespace std;
 class PositionPublisher : public rclcpp::Node {
 public:
     bool turnOnNode = true;
-    bool debug = false;
+    // bool debug = false;
+    bool debug= this->declare_parameter<bool>("DEBUG", false);
     int width, height, midMapX, midMapY;
     float mapOriginX, mapOriginY, mapRes, originX, originY;
     float poseRobX, poseRobY, poseRobPhi, poseLidX, poseLidY, poseLidPhi;
@@ -35,81 +36,96 @@ public:
     bool transformReady = false;
     string status = "OK";
 
-    // ROS 2 messages
+    // // ROS 2 messages
     visualization_msgs::msg::Marker marker;
     geometry_msgs::msg::PointStamped pointBaselink, pointLidar, pointOut, pointOut2;
     geometry_msgs::msg::QuaternionStamped quatIn, quatOut;
-    sensor_msgs::msg::PointCloud cloudIn, cloudOut;
-    std_msgs::msg::String state;
+    // sensor_msgs::msg::PointCloud cloudIn, cloudOut;
+    // std_msgs::msg::String state;
     services::msg::Position pos;
-    services::msg::StatusNode nodeStatus;
+    // services::msg::StatusNode nodeStatus;
     nav_msgs::msg::OccupancyGrid grid2;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr markerPub;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr mapPub;
     rclcpp::Publisher<services::msg::Position>::SharedPtr posPub;
-    rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
+    // rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
 
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr subTf;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr mapSub;
     rclcpp::Subscription<services::msg::ControlNode>::SharedPtr controlSub;
 
-    tf2_ros::Buffer tfBuffer;
-    std::shared_ptr<tf2_ros::TransformListener> tfListener;
 
-    PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()), tfListener(std::make_shared<tf2_ros::TransformListener>(tfBuffer)) {
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer;
+    // // tf2_ros::Buffer tfBuffer;
+    // // std::shared_ptr<tf2_ros::TransformListener> tfListener;
+
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener;
+
+    // PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()), tfListener(std::make_shared<tf2_ros::TransformListener>(tfBuffer)) {
+    PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()),tfListener(tfBuffer) {
         // initParameters();
 
         // Publishers and Subscribers
         posPub = this->create_publisher<services::msg::Position>("/robot_position", 1);
-        statusPub = this->create_publisher<services::msg::StatusNode>("/status", 1);
-        controlSub = this->create_subscription<services::msg::ControlNode>("control_topic", 1, std::bind(&PositionPublisher::controlCb, this, std::placeholders::_1));
+        // statusPub = this->create_publisher<services::msg::StatusNode>("/status", 1);
+        // controlSub = this->create_subscription<services::msg::ControlNode>("control_topic", 1, std::bind(&PositionPublisher::controlCb, this, std::placeholders::_1));
         mapSub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("map", 1, std::bind(&PositionPublisher::mapCb, this, std::placeholders::_1));
         subTf = this->create_subscription<tf2_msgs::msg::TFMessage>("tf", 1, std::bind(&PositionPublisher::tfCb, this, std::placeholders::_1));
 
         if (debug) {
-            markerPub = this->create_publisher<visualization_msgs::msg::Marker>("/poziceRobot", 1);
+            markerPub = this->create_publisher<visualization_msgs::msg::Marker>("/position_marker", 1);
             mapPub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/map3", 1);
             setupMarker();
         }
+
+        tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
         // Initialize Transform
         initializeTransform();
     }
 
-    void controlCb(const services::msg::ControlNode::SharedPtr msg) {
-        turnOnNode = msg->position_publisher;
-    }
+    // void controlCb(const services::msg::ControlNode::SharedPtr msg) {
+    //     turnOnNode = msg->position_publisher;
+    // }
 
     void tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg) {
-        if (!turnOnNode || msg->transforms[0].header.frame_id != "map" && msg->transforms[0].header.frame_id != "world") {
+        if ((!turnOnNode) || (msg->transforms[0].header.frame_id != "map" && msg->transforms[0].header.frame_id != "world")) {
             return;
         }
 
         try {
-            auto point_out = tfBuffer.transform(pointBaselink, "map", tf2::TimePointZero);
-            auto point_out2 = tfBuffer.transform(pointLidar, "map", tf2::TimePointZero);
-            auto quat_out = tfBuffer.transform(quatIn, "map", tf2::TimePointZero);
+            RCLCPP_INFO(this->get_logger(), "Tranformation");
+            geometry_msgs::msg::TransformStamped t = tfBuffer.lookupTransform("map", "base_link",tf2::TimePointZero);
+            cout << t.transform.translation.x <<endl;
+            cout << t.transform.translation.y <<endl;
+            
+        //     auto point_out = tfBuffer.transform(pointBaselink, "map", tf2::TimePointZero);
+        //     auto point_out2 = tfBuffer.transform(pointLidar, "map", tf2::TimePointZero);
+        //     auto quat_out = tfBuffer.transform(quatIn, "map", tf2::TimePointZero);
 
-            // Position and orientation
-            poseRobX = point_out.point.x;
-            poseRobY = point_out.point.y;
-            poseRobPhi = tf2::getYaw(quat_out.quaternion);
+        //     // Position and orientation
+        //     poseRobX = point_out.point.x;
+        //     poseRobY = point_out.point.y;
+        //     poseRobPhi = tf2::getYaw(quat_out.quaternion);
 
-            poseLidX = point_out2.point.x;
-            poseLidY = point_out2.point.y;
-            poseLidPhi = poseRobPhi;
+        //     poseLidX = point_out2.point.x;
+        //     poseLidY = point_out2.point.y;
+        //     poseLidPhi = poseRobPhi;
 
-            if (mapData) {
-                calculateGridPosition();
-                posPub->publish(pos);
+        //     if (mapData) {
+        //         calculateGridPosition();
+        //         posPub->publish(pos);
 
-                if (debug) {
-                    marker.pose.position.x = poseRobX;
-                    marker.pose.position.y = poseRobY;
-                    markerPub->publish(marker);
-                }
-            }
+        //         if (debug) {
+        //             marker.pose.position.x = poseRobX;
+        //             marker.pose.position.y = poseRobY;
+        //             markerPub->publish(marker);
+        //         }
+        //     }
         } catch (tf2::TransformException &ex) {
             RCLCPP_WARN(this->get_logger(), "Transform failure: %s", ex.what());
         }
@@ -136,11 +152,11 @@ public:
         }
     }
 
-    void publishStatus() {
-        nodeStatus.node = "position";
-        nodeStatus.status = status;
-        statusPub->publish(nodeStatus);
-    }
+    // void publishStatus() {
+    //     nodeStatus.node = "position";
+    //     nodeStatus.status = status;
+    //     statusPub->publish(nodeStatus);
+    // }
 
 private:
     void initializeTransform() {
@@ -186,7 +202,7 @@ private:
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PositionPublisher>();
-    node->publishStatus();
+    // node->publishStatus();
     RCLCPP_INFO(node->get_logger(), "Position publisher OK");
 
     rclcpp::spin(node);
