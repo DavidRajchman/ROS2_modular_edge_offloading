@@ -33,36 +33,4 @@ def generate_launch_description():
             output='screen',
         ),
 
-    # Spustí teleop uzel (ovládání robota pomocí klávesnice)
-    # Node(
-    #     package='turtlebot3_teleop',
-    #     executable='teleop_keyboard',
-    #     name='teleop_keyboard',
-    #     output='screen',
-    #     # prefix='xterm -e',
-    # ),
-
     ])
-
-    # return LaunchDescription([
-    #     # Spustí turtlebot3 world
-    #     IncludeLaunchDescription(
-    #         PythonLaunchDescriptionSource(gazebo_launch_file)
-    #     ),
-        
-    #     # Spustí teleop uzel (ovládání robota pomocí klávesnice)
-    #     Node(
-    #         package='turtlebot3_teleop',
-    #         executable='teleop_keyboard',
-    #         name='teleop_keyboard',
-    #         output='screen',
-    #     ),
-        
-    #     # Spustí rviz2 pro vizualizaci
-    #     Node(
-    #         package='rviz2',
-    #         executable='rviz2',
-    #         name='rviz2',
-    #         output='screen',
-    #     ),
-    # ])
