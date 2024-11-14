@@ -8,9 +8,13 @@
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
 #include <rosgraph_msgs/msg/clock.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include "services/msg/position.hpp"
 #include "services/msg/control_node.hpp"
 
@@ -74,11 +78,13 @@ private:
     void lidarTfCb();
     void tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg);
     void mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
-    void timeCb(const rosgraph_msgs::msg::Clock::SharedPtr msg);
+    // void timeCb(const rosgraph_msgs::msg::Clock::SharedPtr msg);
     void setupMarker();
     void calculateGridPosition();
     void createLidarTransformation();
     void createPositionMessage();
+    // double quaternionToYaw(geometry_msgs::msg::Quaternion msg);
+    double quaternionToYaw(double x, double y, double z, double w);
 
     rclcpp::TimerBase::SharedPtr timer_;
 
