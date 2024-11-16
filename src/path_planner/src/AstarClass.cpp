@@ -94,6 +94,14 @@ void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
         for (unsigned int j = 0; j < widthMap; ++j)
         {
             grid[i][j] = msg->data[i * widthMap + j];
+            if(grid[i][j] == -1 ){
+                msg->data[i * widthMap + j]=static_cast<int8_t>(101);
+                RCLCPP_DEBUG_STREAM(get_logger(), "obstacle x: "<< i << " y: "<<j);      
+            }
+            else if (grid[i][j] >=80){
+                RCLCPP_DEBUG_STREAM(get_logger(), "obstacle2 x: "<< i << " y: "<<j);      
+
+            }
         }
     }
     cv::Mat mat(grid.size(), grid[0].size(), CV_8S, &msg->data[0]);
@@ -142,13 +150,12 @@ void Astar::publishPath() {
 }
 
 void Astar::createDelatatedMap(vector<int8_t>& mapMsg){
-    cv::Mat matInput(grid.size(), grid[0].size(), CV_8S, &mapMsg[0]);
+    cv::Mat matInput(grid.size(), grid[0].size(), CV_8U, &mapMsg[0]);
     // cv::Mat inputImage = grid;
     // if (inputImage.empty()) {
     //     std::cerr << "Chyba při načítání obrázku!\n";
     //     return -1;
     // }
-
     // creating kernel for dilatation
     cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, //shape of kernel ELLIPSE
                                                 cv::Size(2 * DILATATION + 1, 2 * DILATATION + 1), // size of kernel
@@ -157,15 +164,19 @@ void Astar::createDelatatedMap(vector<int8_t>& mapMsg){
     // Aplikujeme dilataci
     cv::Mat dilatedImage;
     cv::dilate(matInput, dilatedImage, element);
-
-    RCLCPP_DEBUG_STREAM(get_logger(), "zkouska dilatation: " << dilatedImage.at<int>(0,0) );
+    // RCLCPP_DEBUG_STREAM(get_logger(), "access: " << (int)dilatedImage.at<unsigned char>(0,0));
     
-    vector<vector<bool>> gridDilated;
+    // RCLCPP_INFO(get_logger(), "before mat to vector" );
+    gridDil.resize(heightMap, std::vector<bool>(widthMap));
+    // vector<vector<bool>> gridDilated(grid.size(), vector<bool>(grid[0].size(),false));
     for (int x =0; x<static_cast<int>(grid.size());x++){
         for (int y=0; y<static_cast<int>(grid[x].size());y++){
-            gridDilated[x][y] = dilatedImage.at<int>(x, y)>=0 && dilatedImage.at<int>(x, y)<=80 ? false : true; 
+            // RCLCPP_DEBUG_STREAM(get_logger(), "transform : "<< x<<" "<<y);
+            gridDil[x][y] = dilatedImage.at<unsigned char>(x,y)<=80 ? false : true; 
         }
     }
+    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][11] ); //ano
+    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][12] ); //ne
 }
 
 
