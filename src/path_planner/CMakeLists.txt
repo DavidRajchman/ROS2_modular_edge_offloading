@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(path_planner)
 
+set(OpenCV_DIR /usr/lib/x86_64-linux-gnu/cmake/opencv4)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -17,11 +19,16 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(services REQUIRED)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+find_package(OpenCV REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 add_executable(astar src/Astar.cpp src/AstarClass.cpp)
-ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2)
+ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2 OpenCV)
+
+# target_link_libraries(astar ${OpenCV_LIBS})
 
 
 install(TARGETS

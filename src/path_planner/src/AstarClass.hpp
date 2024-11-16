@@ -20,6 +20,7 @@
 #include <queue>
 #include <iostream>
 #include <vector>
+#include <opencv2/opencv.hpp>
 
 
 using namespace std;
@@ -45,6 +46,7 @@ public:
 private:
     //parameters from yaml file
     double CAR_WIDTH, LOOK_DISTANCE, PENALTY_CHANGE_HIGH, PENALTY_CHANGE_LOW, PENALTY_INPUT_OUTPUT, PENALTY_LAST_CHANGE;
+    int DILATATION;
     
     //parameters from messages
     unsigned int widthMap, heightMap;
@@ -53,6 +55,7 @@ private:
     int mapOriginX, mapOriginY;
     float poseRobX, poseRobY, poseRobPhi;
     vector<vector<int8_t>> grid;
+    vector<vector<bool>> gridDil;
     double goalX, goalY, goalPhi, mapGoalPhi;
     int mapGoalX, mapGoalY;
     vector<pair<int,int>> path;
@@ -76,14 +79,15 @@ private:
     
     //
     void publishPath();
+    void createDelatatedMap(vector<int8_t>& mapMsg);
     vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
     double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
-    vector<pair<int, int>> makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
+    void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
     // vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
     //                     const pair<int, int>& start, const tuple<int, int, double>& goal, int lastChangeDir);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
                         const tuple<int, int, double>& goal, int lastChangeDir);
-    vector<pair<int, int>> astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
+    void astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
                                     const tuple<int, int, double>& goal);     
     // vector<pair<int, int>> astar(const vector<vector<int8_t>> grid,  
     //                                 const tuple<int, int, double>& goal); 

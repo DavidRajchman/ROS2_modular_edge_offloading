@@ -11,6 +11,7 @@ Astar::Astar() : Node("astar") {
     PENALTY_CHANGE_LOW = this->declare_parameter("PENALTY_CHANGE_LOW", 0.1);
     PENALTY_INPUT_OUTPUT = this->declare_parameter("PENALTY_INPUT_OUTPUT", 0.1);
     PENALTY_LAST_CHANGE = this->declare_parameter("PENALTY_LAST_CHANGE", 0.1);
+    DILATATION = this->declare_parameter("DILATATION", 5);
 
 
     // Publishers and Subscribers
@@ -44,6 +45,30 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapGoalX << " map y: " << mapGoalY << " map phi: " << mapGoalPhi);
 
     //TODO run A*
+    
+    // checkpoints.push_back({this->mapRobY, this->mapRobX, this->poseRobPhi});
+
+    // for (const auto& point : this->checkPoints) {
+    //     double pointX = std::round(point[0] / this->mapRes) + this->mapOriginX;
+    //     double pointY = std::round(point[1] / this->mapRes) + this->mapOriginY;
+    //     checkpoints.push_back({pointY, pointX, point[2]});
+    // }
+    // checkpoints.push_back({this->goalY, this->goalX, yaw});
+
+    // Kopie gridu
+    auto gridCopy = this->grid;
+    path.clear();
+
+    RCLCPP_DEBUG(get_logger(), "before A*");
+    astar(gridCopy, {mapRobX,mapRobY}, {mapGoalX, mapGoalY, mapGoalPhi});
+    RCLCPP_DEBUG(get_logger(), "after A*");
+    // Druhý algoritmus A* přes všechny kontrolní body
+    // for (size_t i = 0; i < static_cast<int>c.size() - 1; ++i) {
+    //     this->astar(gridCopy, checkpoints[i], checkpoints[i + 1]);
+    //     RCLCPP_INFO(this->get_logger(), "Checkpoint n.%zu reached", i + 1);
+    // }
+
+    this->publishPath();
 } 
 
 void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { 
@@ -71,6 +96,8 @@ void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
             grid[i][j] = msg->data[i * widthMap + j];
         }
     }
+    cv::Mat mat(grid.size(), grid[0].size(), CV_8S, &msg->data[0]);
+    createDelatatedMap(msg->data);
     RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "width: "<< widthMap << " height: " << heightMap << " resolution: "<<mapRes);
 }
 
@@ -114,10 +141,49 @@ void Astar::publishPath() {
     RCLCPP_DEBUG(this->get_logger(), "Path published.");
 }
 
+void Astar::createDelatatedMap(vector<int8_t>& mapMsg){
+    cv::Mat matInput(grid.size(), grid[0].size(), CV_8S, &mapMsg[0]);
+    // cv::Mat inputImage = grid;
+    // if (inputImage.empty()) {
+    //     std::cerr << "Chyba při načítání obrázku!\n";
+    //     return -1;
+    // }
+
+    // creating kernel for dilatation
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, //shape of kernel ELLIPSE
+                                                cv::Size(2 * DILATATION + 1, 2 * DILATATION + 1), // size of kernel
+                                                cv::Point(DILATATION, DILATATION)); // definition of center
+
+    // Aplikujeme dilataci
+    cv::Mat dilatedImage;
+    cv::dilate(matInput, dilatedImage, element);
+
+    RCLCPP_DEBUG_STREAM(get_logger(), "zkouska dilatation: " << dilatedImage.at<int>(0,0) );
+    
+    vector<vector<bool>> gridDilated;
+    for (int x =0; x<static_cast<int>(grid.size());x++){
+        for (int y=0; y<static_cast<int>(grid[x].size());y++){
+            gridDilated[x][y] = dilatedImage.at<int>(x, y)>=0 && dilatedImage.at<int>(x, y)<=80 ? false : true; 
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
 vector<geometry_msgs::msg::PoseStamped> Astar::convertGridPathToPoses (const vector<pair<int, int>> path) {
+    RCLCPP_INFO(get_logger(), "Grid to poses");
+    
     vector<geometry_msgs::msg::PoseStamped> poses;
 
     for(pair<int,int> gridPose : path){
+        RCLCPP_DEBUG_STREAM(get_logger(), "convert x: "<<gridPose.first<<" y: "<<gridPose.second);
+        
         geometry_msgs::msg::PoseStamped pose;
         pose.pose.position.x = (gridPose.first - mapOriginX)* mapRes;
         pose.pose.position.y = (gridPose.second - mapOriginY)* mapRes;
@@ -130,7 +196,7 @@ vector<geometry_msgs::msg::PoseStamped> Astar::convertGridPathToPoses (const vec
 
         poses.push_back(pose);
 
-        RCLCPP_DEBUG_STREAM(get_logger(), "map x: "<< gridPose.first<< "map y: " << gridPose.second );
+        RCLCPP_DEBUG_STREAM(get_logger(), "map x: "<< gridPose.first<< " map y: " << gridPose.second );
         RCLCPP_DEBUG_STREAM(get_logger(), "x: "<< pose.pose.position.x << "y: " << pose.pose.position.y );
     }
     return poses;
@@ -207,18 +273,23 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
 }
 
 
-vector<pair<int, int>> Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
+void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
                                         const pair<int, int>& start, const pair<int, int>& goal) {
-    vector<pair<int, int>> path;
+    RCLCPP_INFO(get_logger(), "making path");
+    // vector<pair<int, int>> path;
     int x = goal.first;
     int y = goal.second;
 
-    if (way[x][y][0] == -1 && way[x][y][1] == -1) {
-        return path;
-    }
+    // if (way[x][y][0] == -1 && way[x][y][1] == -1) {
+    //     return;
+    // }
 
     while (x != start.first || y != start.second) {
-        path.emplace_back(x, y);
+        // path.emplace_back(x, y);
+        RCLCPP_DEBUG_STREAM(get_logger(), "path x: "<<x<<" path y: "<<y);
+        
+        // path.emplace_back(x, y);
+        path.push_back(make_pair(x, y));
         int newX = way[x][y][0];
         int newY = way[x][y][1];
         x = newX;
@@ -226,11 +297,11 @@ vector<pair<int, int>> Astar::makePath(const vector<vector<std::array<int, 2>>>&
     }
 
     reverse(path.begin(), path.end());
-    return path;
+    // return path;
 }
 
 
-vector<pair<int, int>> Astar::astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
+void Astar::astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
                                     const tuple<int, int, double>& goal) {
     vector<std::vector<double>> price(grid.size(), vector<double>(grid[0].size(), 1e9));
     vector<std::vector<array<int, 2>>> way(grid.size(), vector<array<int, 2>>(grid[0].size(), {-1, -1}));
@@ -242,6 +313,7 @@ vector<pair<int, int>> Astar::astar(const vector<vector<int8_t>> grid, const pai
     while (!priorityQ.empty()) {
         NodeStar node = priorityQ.top();
         priorityQ.pop();
+        RCLCPP_DEBUG_STREAM(get_logger(), "node x: " << node.x << " node y: " << node.y);
 
         if (node.x == get<0>(goal) && node.y == get<1>(goal)) {
             return makePath(way, start, {node.x, node.y});
@@ -268,7 +340,7 @@ vector<pair<int, int>> Astar::astar(const vector<vector<int8_t>> grid, const pai
         }
     }
 
-    return {}; 
+    // return {}; 
 
 }
 
