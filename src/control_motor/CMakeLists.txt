@@ -7,9 +7,15 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(services REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+add_executable(motor src/motor.cpp )
+ament_target_dependencies(motor rclcpp std_msgs services)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
