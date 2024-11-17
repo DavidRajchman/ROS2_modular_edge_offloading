@@ -85,9 +85,9 @@ private:
     void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
     // vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
     //                     const pair<int, int>& start, const tuple<int, int, double>& goal, int lastChangeDir);
-    vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
+    vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
                         const tuple<int, int, double>& goal, int lastChangeDir);
-    void astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
+    void astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
                                     const tuple<int, int, double>& goal);     
     // vector<pair<int, int>> astar(const vector<vector<int8_t>> grid,  
     //                                 const tuple<int, int, double>& goal); 

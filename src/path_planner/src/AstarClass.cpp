@@ -11,7 +11,7 @@ Astar::Astar() : Node("astar") {
     PENALTY_CHANGE_LOW = this->declare_parameter("PENALTY_CHANGE_LOW", 0.1);
     PENALTY_INPUT_OUTPUT = this->declare_parameter("PENALTY_INPUT_OUTPUT", 0.1);
     PENALTY_LAST_CHANGE = this->declare_parameter("PENALTY_LAST_CHANGE", 0.1);
-    DILATATION = this->declare_parameter("DILATATION", 5);
+    DILATATION = this->declare_parameter("DILATATION", 1);
 
 
     // Publishers and Subscribers
@@ -60,7 +60,7 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     path.clear();
 
     RCLCPP_DEBUG(get_logger(), "before A*");
-    astar(gridCopy, {mapRobX,mapRobY}, {mapGoalX, mapGoalY, mapGoalPhi});
+    astar(gridDil, {mapRobX,mapRobY}, {mapGoalX, mapGoalY, mapGoalPhi});
     RCLCPP_DEBUG(get_logger(), "after A*");
     // Druhý algoritmus A* přes všechny kontrolní body
     // for (size_t i = 0; i < static_cast<int>c.size() - 1; ++i) {
@@ -220,11 +220,12 @@ double Astar::heuristic(const pair<int, int>& node, const pair<int, int>& goal) 
 
 
 vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
-                            const vector<vector<int8_t>>& grid, 
+                            const vector<vector<bool>>& grid, 
                             vector<vector<array<int, 2>>>& way, 
                             // const pair<int, int>& start,
                             const tuple<int, int, double>& goal,
                             int lastChangeDir) {
+    RCLCPP_INFO(get_logger(), "get neighbor");                            
     vector<pair<int, int>> movesAll = {{-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}};
     vector<pair<int, int>> moves = movesAll;
 
@@ -247,10 +248,17 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
     for (int i = 0; i < static_cast<int>(moves.size()); ++i) {
         int newX = node.x + moves[i].first;
         int newY = node.y + moves[i].second;
+        RCLCPP_DEBUG_STREAM(get_logger(), "neighbor x: " << newX<< " y: " << newY);
+        
 
-        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newX][newY]) {
+        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newY][newX]) {
             continue;
         }
+        RCLCPP_DEBUG_STREAM(get_logger(), "no obstacle: " << grid[newY][newX]);
+
+        // else if( grid[newX][newY] == true){
+        //     continue;
+        // }
 
         // Penále za změny směru
         double penalty = 0.0;
@@ -312,7 +320,7 @@ void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
 }
 
 
-void Astar::astar(const vector<vector<int8_t>> grid, const pair<int, int>& start, 
+void Astar::astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
                                     const tuple<int, int, double>& goal) {
     vector<std::vector<double>> price(grid.size(), vector<double>(grid[0].size(), 1e9));
     vector<std::vector<array<int, 2>>> way(grid.size(), vector<array<int, 2>>(grid[0].size(), {-1, -1}));
