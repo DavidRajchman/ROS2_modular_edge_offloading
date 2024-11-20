@@ -1,3 +1,4 @@
 # commands for motor
-string motor
-int32 power
+string mode
+int8 forwarding
+int8 steering

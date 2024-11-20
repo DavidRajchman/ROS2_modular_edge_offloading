@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <array>
 
 using namespace std;
 
@@ -29,6 +30,7 @@ public:
     int serial_port;
     Status status = Status::OK;
     int curSpeed = 0;
+    char command[7];
 
     rclcpp::Subscription<services::msg::ControlMotor>::SharedPtr subControl;
     rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
@@ -68,54 +70,109 @@ public:
 
         // subscribers and publishers
         subControl = this->create_subscription<services::msg::ControlMotor>("controlMotor", 5,std::bind(&ControlMotor::motorCb, this, std::placeholders::_1));
-
         statusPub = this->create_publisher<services::msg::StatusNode>("/status", 1);
 
         sleep(3);
     }
 
     void motorCb(const services::msg::ControlMotor::SharedPtr msg) {
-        if (msg->motor == "steering") {
-            changeSteer(msg->power);
-        } else if (msg->motor == "forwarding") {
-            changeSpeed(msg->power);
-        } else if (msg->motor == "autonomous") {
-            changeAutonomousMode(msg->power != 0);
-        } else {
+        if(msg -> mode == "manual" ||  msg -> mode == "auto"){
+            changeAutonomousMode(msg -> mode);
+        } 
+        else if(msg -> mode == ""){
+            controlSpeedAndSteer(msg->forwarding, msg->steering);
+        } 
+        else {
             RCLCPP_WARN(this->get_logger(), "Undefined command");
         }
     }
+    void createCommand(int speed, int steer){
+        string strSpeed= to_string(speed);
+        string strSteer= to_string(steer);
+        // char command[7] ;
 
-    void changeSpeed(int speed) {
-        speed = speed * (-1);
-        curSpeed = speed;
-        std::string stringSpeed = std::to_string(speed);
-        char command[7] = {'v', ' ', ' ', ' ', ' ', ' ', '\n'};
-        for (size_t i = 0; i < stringSpeed.size(); i++) {
-            command[i + 2] = stringSpeed[i];
-        }
+        command[0] = speed >=0 ? '0' : '1';
+        command[1] = strSpeed[strSpeed.size()-1];
+        command[2] = strSpeed[strSpeed.size()-2];
+        command[3] = steer >=0 ? '0' : '1';
+        command[4] = strSteer[strSteer.size()-1];
+        command[5] = strSteer[strSteer.size()-2];
+        command[6] = '\n';
+
+    }
+
+    void createCommand(string mode){
+        command[0] = '9';
+        command[1] = mode=="auto" ? '9' : '0';
+        command[2] = mode=="auto" ? '9' : '0';
+        command[3] = '9';
+        command[4] = mode=="auto" ? '9' : '0';
+        command[5] = mode=="auto" ? '9' : '0';
+        command[6] = '\n';
+
+    }
+
+    void controlSpeedAndSteer(int speed, int steer) {
+        speed = clamp99(speed);
+        steer = clamp99(steer);
+        createCommand(speed, steer);
+        // speed = speed * (-1);
+        // curSpeed = speed;
+        // string stringSpeed = to_string(speed);
+        // char command[7] = {'v', ' ', ' ', ' ', ' ', ' ', '\n'};
+        // for (size_t i = 0; i < stringSpeed.size(); i++) {
+            // command[i + 2] = stringSpeed[i];
+        write(serial_port, command, sizeof(command));
+        usleep(10000);
+    }
+
+    int clamp99(int number){
+        if(number >99)
+            return 99;
+        else if (number <-99)
+            return -99;
+        else
+            return number;
+    }
+
+
+    void changeAutonomousMode(string mode) {
+        createCommand(mode);
         write(serial_port, command, sizeof(command));
         usleep(50000);
     }
 
-    void changeSteer(int steer) {
-        steer = steer * (-1);
-        if (lastSteer == steer) return;
-        lastSteer = steer;
-        std::string stringSteer = std::to_string(steer);
-        char command[7] = {'s', ' ', ' ', ' ', ' ', ' ', '\n'};
-        for (size_t i = 0; i < stringSteer.size(); i++) {
-            command[i + 2] = stringSteer[i];
-        }
-        write(serial_port, command, sizeof(command));
-        usleep(50000);
-    }
 
-    void changeAutonomousMode(bool power) {
-        const signed char msg[] = {power ? 'm' : 'n', '\n'};
-        write(serial_port, msg, sizeof(msg));
-        usleep(100000);
-    }
+    // void changeSpeed(int speed) {
+    //     speed = speed * (-1);
+    //     curSpeed = speed;
+    //     std::string stringSpeed = std::to_string(speed);
+    //     char command[7] = {'v', ' ', ' ', ' ', ' ', ' ', '\n'};
+    //     for (size_t i = 0; i < stringSpeed.size(); i++) {
+    //         command[i + 2] = stringSpeed[i];
+    //     }
+    //     write(serial_port, command, sizeof(command));
+    //     usleep(50000);
+    // }
+
+    // void changeSteer(int steer) {
+    //     steer = steer * (-1);
+    //     if (lastSteer == steer) return;
+    //     lastSteer = steer;
+    //     std::string stringSteer = std::to_string(steer);
+    //     char command[7] = {'s', ' ', ' ', ' ', ' ', ' ', '\n'};
+    //     for (size_t i = 0; i < stringSteer.size(); i++) {
+    //         command[i + 2] = stringSteer[i];
+    //     }
+    //     write(serial_port, command, sizeof(command));
+    //     usleep(50000);
+    // }
+
+    // void changeAutonomousMode(bool power) {
+    //     const signed char msg[] = {power ? 'm' : 'n', '\n'};
+    //     write(serial_port, msg, sizeof(msg));
+    //     usleep(100000);
+    // }
 
     void publishStatus() {
         nodeStatus.node = "motor";
