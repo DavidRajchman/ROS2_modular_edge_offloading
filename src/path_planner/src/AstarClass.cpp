@@ -251,10 +251,10 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
         RCLCPP_DEBUG_STREAM(get_logger(), "neighbor x: " << newX<< " y: " << newY);
         
 
-        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newY][newX]) {
+        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newX][newY]) {
             continue;
         }
-        RCLCPP_DEBUG_STREAM(get_logger(), "no obstacle: " << grid[newY][newX]);
+        RCLCPP_DEBUG_STREAM(get_logger(), "no obstacle: " << grid[newX][newY]);
 
         // else if( grid[newX][newY] == true){
         //     continue;

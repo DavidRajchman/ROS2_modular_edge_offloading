@@ -146,8 +146,8 @@ void PositionPublisher::createPositionMessage()
 
 void PositionPublisher::calculateGridPosition()
 {
-    mapRobX = round(poseRobX / mapRes) + mapOriginX;
-    mapRobY = round(poseRobY / mapRes) + mapOriginY;
+    mapRobY = round(poseRobX / mapRes) + mapOriginX;
+    mapRobX = round(poseRobY / mapRes) + mapOriginY;
     mapLidX = round(poseLidX / mapRes) + mapOriginX;
     mapLidY = round(poseLidY / mapRes) + mapOriginY;
 }
