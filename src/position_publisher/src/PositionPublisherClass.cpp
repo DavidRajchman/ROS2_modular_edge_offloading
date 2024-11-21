@@ -10,13 +10,14 @@ PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(th
     tfLidar = std::make_shared<geometry_msgs::msg::TransformStamped>();
     tf = std::make_shared<tf2_msgs::msg::TFMessage>();
 
-    sleep(1);
+    auto qos_profile = rclcpp::QoS(0).reliability(rclcpp::ReliabilityPolicy::BestEffort);
+
 
     // Publishers and Subscribers
     posPub = this->create_publisher<services::msg::Position>("/robot_position", 1);
     tfPub = this->create_publisher<tf2_msgs::msg::TFMessage>("/tf", 1);
     mapSub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("/map", 1, std::bind(&PositionPublisher::mapCb, this, std::placeholders::_1));
-    tfSub = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", 1, std::bind(&PositionPublisher::tfCb, this, std::placeholders::_1));
+    tfSub = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", qos_profile, std::bind(&PositionPublisher::tfCb, this, std::placeholders::_1));
     // timeSub = this->create_subscription<rosgraph_msgs::msg::Clock>("/clock", 1, std::bind(&PositionPublisher::timeCb, this, std::placeholders::_1));
     if (debug)
     {
