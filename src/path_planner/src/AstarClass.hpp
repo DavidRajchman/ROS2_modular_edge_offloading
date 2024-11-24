@@ -56,7 +56,8 @@ private:
     float poseRobX, poseRobY, poseRobPhi;
     vector<vector<int8_t>> grid;
     vector<vector<bool>> gridDil;
-    double goalX, goalY, goalPhi, mapGoalPhi;
+    double goalX, goalY, goalPhi;
+    pair<int, int> mapGoalPhi;
     int mapGoalX, mapGoalY;
     vector<pair<int,int>> path;
     vector<array<double, 3>> checkpoints;
@@ -79,6 +80,7 @@ private:
     
     //
     void publishPath();
+    pair<int, int> yawToGridDirection(double angle);
     void createDelatatedMap(vector<int8_t>& mapMsg);
     vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
     double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
@@ -86,9 +88,9 @@ private:
     // vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
     //                     const pair<int, int>& start, const tuple<int, int, double>& goal, int lastChangeDir);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
-                        const tuple<int, int, double>& goal, int lastChangeDir);
+                        const tuple<int, int, pair<int,int>>& goal, int lastChangeDir);
     void astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
-                                    const tuple<int, int, double>& goal);     
+                                    const tuple<int, int, pair<int,int>>& goal);     
     // vector<pair<int, int>> astar(const vector<vector<int8_t>> grid,  
     //                                 const tuple<int, int, double>& goal); 
 

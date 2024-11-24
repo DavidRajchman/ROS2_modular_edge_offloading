@@ -22,6 +22,25 @@ Astar::Astar() : Node("astar") {
     pose_sub = this->create_subscription<services::msg::Position>("robot_position", 1, std::bind(&Astar::poseCb, this, std::placeholders::_1));
 }
 
+pair<int, int> Astar::yawToGridDirection(double angle){
+    //
+    vector<pair<int,int>> moves = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1,0}, {1,1}, {0,1}, {-1,0}};
+    //bias to <0, PI>
+    angle = angle + M_PI/2;
+
+    //normalization
+    angle = angle / M_PI;
+
+    // to interval <0,8>
+    angle *= 8;
+
+    int index = floor(angle);
+
+    return moves[index];
+
+
+}
+
 
 void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     RCLCPP_INFO(get_logger(), "goal received");
@@ -40,9 +59,9 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     
     mapGoalX = (goalX - originX)/mapRes;
     mapGoalY = (goalY - originY)/mapRes;
-    mapGoalPhi = goalPhi;
+    mapGoalPhi = yawToGridDirection(goalPhi);
     RCLCPP_DEBUG_STREAM(get_logger(), "x: " << goalX << " y: " << goalY << " phi: " << goalPhi);
-    RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapGoalX << " map y: " << mapGoalY << " map phi: " << mapGoalPhi);
+    // RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapGoalX << " map y: " << mapGoalY << " map phi: " << mapGoalPhi);
 
     //TODO run A*
     
@@ -223,7 +242,7 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
                             const vector<vector<bool>>& grid, 
                             vector<vector<array<int, 2>>>& way, 
                             // const pair<int, int>& start,
-                            const tuple<int, int, double>& goal,
+                            const tuple<int, int, pair<int,int>>& goal,
                             int lastChangeDir) {
     RCLCPP_INFO(get_logger(), "get neighbor");                            
     vector<pair<int, int>> movesAll = {{-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}};
@@ -274,7 +293,17 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
 
         // Penále za vstupní směr blízko cíle
         if (abs(newX - goalX) <= 8 && std::abs(newY - goalY) <= 8) {
-            int index2 = static_cast<int>((((get<2>(goal) + M_PI) / (2 * M_PI)) * 8) - 2) % 8;
+
+            int index2 = 0;
+            auto it = find(movesAll.begin(), movesAll.end(), get<2>(goal));
+            if (it != movesAll.end()) {
+                index2 = distance(movesAll.begin(), it);
+                RCLCPP_DEBUG_STREAM(get_logger(), " index of direction in array is: " << index2 );
+                
+            } else {
+                RCLCPP_WARN(get_logger(), "direction not found in array");
+            }
+            // int index2 = static_cast<int>((((get<2>(goal) + M_PI) / (2 * M_PI)) * 8) - 2) % 8;
             int distInd = min({abs(index2 - i), abs((index2 + 8) - i), abs(index2 - (i + 8))});
             penalty += distInd * PENALTY_INPUT_OUTPUT;
         }
@@ -321,7 +350,7 @@ void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
 
 
 void Astar::astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
-                                    const tuple<int, int, double>& goal) {
+                                    const tuple<int, int, pair<int,int>>& goal) {
     vector<std::vector<double>> price(grid.size(), vector<double>(grid[0].size(), 1e9));
     vector<std::vector<array<int, 2>>> way(grid.size(), vector<array<int, 2>>(grid[0].size(), {-1, -1}));
     priority_queue<NodeStar, vector<NodeStar>, greater<>> priorityQ;
