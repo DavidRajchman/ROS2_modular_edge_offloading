@@ -17,24 +17,25 @@ Astar::Astar() : Node("astar") {
     // Publishers and Subscribers
     path_pub = this->create_publisher<nav_msgs::msg::Path>("/path", 1);
 
-    map_sub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("map", 1, std::bind(&Astar::mapCb, this, std::placeholders::_1));
-    goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", 1, std::bind(&Astar::goalCb, this, std::placeholders::_1));
-    pose_sub = this->create_subscription<services::msg::Position>("robot_position", 1, std::bind(&Astar::poseCb, this, std::placeholders::_1));
+    map_sub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("map", 1, bind(&Astar::mapCb, this, std::placeholders::_1));
+    goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", 1, bind(&Astar::goalCb, this, std::placeholders::_1));
+    pose_sub = this->create_subscription<services::msg::Position>("robot_position", 1, bind(&Astar::poseCb, this, std::placeholders::_1));
 }
 
 pair<int, int> Astar::yawToGridDirection(double angle){
     //
     vector<pair<int,int>> moves = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1,0}, {1,1}, {0,1}, {-1,0}};
-    //bias to <0, PI>
-    angle = angle + M_PI/2;
+    //bias to <0, 2PI>
+    angle = angle + M_PI;
 
     //normalization
-    angle = angle / M_PI;
+    angle = angle / (2*M_PI);
 
     // to interval <0,8>
     angle *= 8;
 
-    int index = floor(angle);
+    int index = round(angle);
+    index = index % 8;
 
     return moves[index];
 
@@ -61,7 +62,7 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     mapGoalY = (goalY - originY)/mapRes;
     mapGoalPhi = yawToGridDirection(goalPhi);
     RCLCPP_DEBUG_STREAM(get_logger(), "x: " << goalX << " y: " << goalY << " phi: " << goalPhi);
-    // RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapGoalX << " map y: " << mapGoalY << " map phi: " << mapGoalPhi);
+    RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapGoalX << " map y: " << mapGoalY << " map phi1: " << mapGoalPhi.first <<" map phi 2: "<<mapGoalPhi.second);
 
     //TODO run A*
     
@@ -78,8 +79,12 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     auto gridCopy = this->grid;
     path.clear();
 
+    RCLCPP_INFO(get_logger(), "start");
+    RCLCPP_DEBUG_STREAM(get_logger(), "x: " << poseRobX << " y: " << poseRobY << " phi: " << poseRobPhi);
+    RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapRobX << " map y: " << mapRobY << " map phi1: " << mapRobPhi.first <<" map phi 2: "<<mapRobPhi.second);
+
     RCLCPP_DEBUG(get_logger(), "before A*");
-    astar(gridDil, {mapRobX,mapRobY}, {mapGoalX, mapGoalY, mapGoalPhi});
+    astar(gridDil, {mapRobX,mapRobY, mapRobPhi}, {mapGoalX, mapGoalY, mapGoalPhi});
     RCLCPP_DEBUG(get_logger(), "after A*");
     // Druhý algoritmus A* přes všechny kontrolní body
     // for (size_t i = 0; i < static_cast<int>c.size() - 1; ++i) {
@@ -115,10 +120,10 @@ void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
             grid[i][j] = msg->data[i * widthMap + j];
             if(grid[i][j] == -1 ){
                 msg->data[i * widthMap + j]=static_cast<int8_t>(101);
-                RCLCPP_DEBUG_STREAM(get_logger(), "obstacle x: "<< i << " y: "<<j);      
+                // RCLCPP_DEBUG_STREAM(get_logger(), "obstacle x: "<< i << " y: "<<j);      
             }
             else if (grid[i][j] >=80){
-                RCLCPP_DEBUG_STREAM(get_logger(), "obstacle2 x: "<< i << " y: "<<j);      
+                // RCLCPP_DEBUG_STREAM(get_logger(), "obstacle2 x: "<< i << " y: "<<j);      
 
             }
         }
@@ -137,6 +142,7 @@ void Astar::poseCb(const services::msg::Position::SharedPtr msg) {
 
     mapRobX = msg->map_rob_x;
     mapRobY = msg->map_rob_y;
+    mapRobPhi = yawToGridDirection(poseRobPhi);
 
     mapOriginX = msg->map_origin_x;
     mapOriginY = msg->map_origin_y;
@@ -212,7 +218,7 @@ vector<geometry_msgs::msg::PoseStamped> Astar::convertGridPathToPoses (const vec
     vector<geometry_msgs::msg::PoseStamped> poses;
 
     for(pair<int,int> gridPose : path){
-        RCLCPP_DEBUG_STREAM(get_logger(), "convert x: "<<gridPose.first<<" y: "<<gridPose.second);
+        // RCLCPP_DEBUG_STREAM(get_logger(), "convert x: "<<gridPose.first<<" y: "<<gridPose.second);
         
         geometry_msgs::msg::PoseStamped pose;
         pose.pose.position.x = (gridPose.first - mapOriginX)* mapRes;
@@ -226,8 +232,8 @@ vector<geometry_msgs::msg::PoseStamped> Astar::convertGridPathToPoses (const vec
 
         poses.push_back(pose);
 
-        RCLCPP_DEBUG_STREAM(get_logger(), "map x: "<< gridPose.first<< " map y: " << gridPose.second );
-        RCLCPP_DEBUG_STREAM(get_logger(), "x: "<< pose.pose.position.x << "y: " << pose.pose.position.y );
+        // RCLCPP_DEBUG_STREAM(get_logger(), "map x: "<< gridPose.first<< " map y: " << gridPose.second );
+        // RCLCPP_DEBUG_STREAM(get_logger(), "x: "<< pose.pose.position.x << "y: " << pose.pose.position.y );
     }
     return poses;
 }
@@ -242,9 +248,10 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
                             const vector<vector<bool>>& grid, 
                             vector<vector<array<int, 2>>>& way, 
                             // const pair<int, int>& start,
+                            const tuple<int, int, pair<int,int>>& start,
                             const tuple<int, int, pair<int,int>>& goal,
                             int lastChangeDir) {
-    RCLCPP_INFO(get_logger(), "get neighbor");                            
+    // RCLCPP_INFO(get_logger(), "get neighbor");                            
     vector<pair<int, int>> movesAll = {{-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}};
     vector<pair<int, int>> moves = movesAll;
 
@@ -260,6 +267,13 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
             moves = {moves[(index - 1 + 8) % 8], moves[index], moves[(index + 1) % 8]};
         }
     }
+    else{
+        auto it = find(moves.begin(), moves.end(), get<2>(start));
+        if (it != moves.end()) {
+            int index = distance(moves.begin(), it);
+            moves = {moves[(index - 1 + 8) % 8], moves[index], moves[(index + 1) % 8]};
+        } 
+    }
     // int startX = start.first;
     // int startY = start.second;
 
@@ -267,13 +281,13 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
     for (int i = 0; i < static_cast<int>(moves.size()); ++i) {
         int newX = node.x + moves[i].first;
         int newY = node.y + moves[i].second;
-        RCLCPP_DEBUG_STREAM(get_logger(), "neighbor x: " << newX<< " y: " << newY);
+        // RCLCPP_DEBUG_STREAM(get_logger(), "neighbor x: " << newX<< " y: " << newY);
         
 
-        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newX][newY]) {
+        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newY][newX]) {
             continue;
         }
-        RCLCPP_DEBUG_STREAM(get_logger(), "no obstacle: " << grid[newX][newY]);
+        // RCLCPP_DEBUG_STREAM(get_logger(), "no obstacle: " << grid[newX][newY]);
 
         // else if( grid[newX][newY] == true){
         //     continue;
@@ -287,21 +301,39 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node,
             penalty = PENALTY_CHANGE_LOW;
         }
 
+        int startX = get<0>(start);
+        int startY = get<1>(start);
+
+        // Penále za výstupní směr blízko startu
+        if (abs(newX - startX) <= 8 && abs(newY - startY) <= 8) {
+
+            int index2 = 0;
+            auto it = find(movesAll.begin(), movesAll.end(), get<2>(start));
+            if (it != movesAll.end()) {
+                index2 = distance(movesAll.begin(), it);
+                // RCLCPP_DEBUG_STREAM(get_logger(), " index of direction in array is: " << index2 );
+                
+            } else {
+                // RCLCPP_WARN(get_logger(), "direction not found in array");
+            }
+            int distInd = min({abs(index2 - i), abs((index2 + 8) - i), abs(index2 - (i + 8))});
+            penalty += distInd * PENALTY_INPUT_OUTPUT;
+        }
+
         int goalX = get<0>(goal);
         int goalY = get<1>(goal);
 
-
         // Penále za vstupní směr blízko cíle
-        if (abs(newX - goalX) <= 8 && std::abs(newY - goalY) <= 8) {
+        if (abs(newX - goalX) <= 8 && abs(newY - goalY) <= 8) {
 
             int index2 = 0;
             auto it = find(movesAll.begin(), movesAll.end(), get<2>(goal));
             if (it != movesAll.end()) {
                 index2 = distance(movesAll.begin(), it);
-                RCLCPP_DEBUG_STREAM(get_logger(), " index of direction in array is: " << index2 );
+                // RCLCPP_DEBUG_STREAM(get_logger(), " index of direction in array is: " << index2 );
                 
             } else {
-                RCLCPP_WARN(get_logger(), "direction not found in array");
+                // RCLCPP_WARN(get_logger(), "direction not found in array");
             }
             // int index2 = static_cast<int>((((get<2>(goal) + M_PI) / (2 * M_PI)) * 8) - 2) % 8;
             int distInd = min({abs(index2 - i), abs((index2 + 8) - i), abs(index2 - (i + 8))});
@@ -334,7 +366,7 @@ void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
 
     while (x != start.first || y != start.second) {
         // path.emplace_back(x, y);
-        RCLCPP_DEBUG_STREAM(get_logger(), "path x: "<<x<<" path y: "<<y);
+        // RCLCPP_DEBUG_STREAM(get_logger(), "path x: "<<x<<" path y: "<<y);
         
         // path.emplace_back(x, y);
         path.push_back(make_pair(x, y));
@@ -349,26 +381,26 @@ void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
 }
 
 
-void Astar::astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
+void Astar::astar(const vector<vector<bool>> grid, const tuple<int, int, pair<int,int>>& start, 
                                     const tuple<int, int, pair<int,int>>& goal) {
     vector<std::vector<double>> price(grid.size(), vector<double>(grid[0].size(), 1e9));
     vector<std::vector<array<int, 2>>> way(grid.size(), vector<array<int, 2>>(grid[0].size(), {-1, -1}));
     priority_queue<NodeStar, vector<NodeStar>, greater<>> priorityQ;
 
-    price[start.first][start.second] = 0;
-    double cost = heuristic(start, {get<0>(goal), get<1>(goal)});
-    priorityQ.push({cost, start.first, start.second,-1, -1, 0});
+    price[get<0>(start)][get<1>(start)] = 0;
+    double cost = heuristic(make_pair(get<0>(start), get<1>(start)), {get<0>(goal), get<1>(goal)});
+    priorityQ.push({cost, get<0>(start), get<1>(start),-1, -1, 0});
     while (!priorityQ.empty()) {
         NodeStar node = priorityQ.top();
         priorityQ.pop();
-        RCLCPP_DEBUG_STREAM(get_logger(), "node x: " << node.x << " node y: " << node.y);
+        // RCLCPP_DEBUG_STREAM(get_logger(), "node x: " << node.x << " node y: " << node.y);
 
         if (node.x == get<0>(goal) && node.y == get<1>(goal)) {
-            return makePath(way, start, {node.x, node.y});
+            return makePath(way, make_pair(get<0>(start),get<1>(start)), {node.x, node.y});
         }
 
         // vector<NodeStar> neighbors = getNeighbor(node, grid, way, start, goal, node.lastChangeDir);
-        vector<NodeStar> neighbors = getNeighbor(node, grid, way, goal, node.lastChangeDir);
+        vector<NodeStar> neighbors = getNeighbor(node, grid, way, start, goal, node.lastChangeDir);
         // NodeStar neighbors = getNeighbor(node, grid, way, goal, node.lastChangeDir);
         for (const auto& neighbor : neighbors) {
             double newCost = price[node.x][node.y] + neighbor.cost;

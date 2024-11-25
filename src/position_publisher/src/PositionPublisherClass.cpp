@@ -76,7 +76,7 @@ void PositionPublisher::tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg)
         // tf2::fromMsg(quat_msg, quat_tf);
         // quat_msg = tf2::toMsg(quat_tf);
 
-        RCLCPP_INFO_STREAM(get_logger(), "yaw: "<<poseRobPhi);
+        // RCLCPP_INFO_STREAM(get_logger(), "yaw: "<<poseRobPhi);
         
 
         calculateGridPosition();
@@ -136,8 +136,8 @@ void PositionPublisher::createPositionMessage()
     pos.pose_rob_phi = poseRobPhi;
 
     // robot position in grid
-    pos.map_rob_x = mapRobX;
-    pos.map_rob_y = mapRobY;
+    pos.map_rob_x = mapRobY;
+    pos.map_rob_y = mapRobX;
 
     // map origin
     pos.map_origin_x = mapOriginX;

@@ -57,7 +57,7 @@ private:
     vector<vector<int8_t>> grid;
     vector<vector<bool>> gridDil;
     double goalX, goalY, goalPhi;
-    pair<int, int> mapGoalPhi;
+    pair<int, int> mapGoalPhi, mapRobPhi;
     int mapGoalX, mapGoalY;
     vector<pair<int,int>> path;
     vector<array<double, 3>> checkpoints;
@@ -88,8 +88,8 @@ private:
     // vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
     //                     const pair<int, int>& start, const tuple<int, int, double>& goal, int lastChangeDir);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
-                        const tuple<int, int, pair<int,int>>& goal, int lastChangeDir);
-    void astar(const vector<vector<bool>> grid, const pair<int, int>& start, 
+                        const tuple<int, int, pair<int,int>>& start, const tuple<int, int, pair<int,int>>& goal, int lastChangeDir);
+    void astar(const vector<vector<bool>> grid, const tuple<int, int, pair<int,int>>& start, 
                                     const tuple<int, int, pair<int,int>>& goal);     
     // vector<pair<int, int>> astar(const vector<vector<int8_t>> grid,  
     //                                 const tuple<int, int, double>& goal); 
