@@ -14,6 +14,8 @@
 #include <thread>
 #include <array>
 
+#include "controlMotorMessage.hpp"
+
 using namespace std;
 
 enum class Status {
@@ -24,6 +26,7 @@ enum class Status {
 
 class ControlMotor : public rclcpp::Node {
 public:
+    // MotorUart myClass = nullptr;
     char forwarding;
     char steering;
     char lastSteer = 0;
@@ -31,12 +34,14 @@ public:
     Status status = Status::OK;
     int curSpeed = 0;
     char command[7];
-
     rclcpp::Subscription<services::msg::ControlMotor>::SharedPtr subControl;
     rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
     services::msg::StatusNode nodeStatus;
 
     ControlMotor() : Node("control_motor") {
+        // auto log = this->get_logger();
+        // myClass = make_shared<MotorUart>();
+        // logger = get_logger();
         // open connection with microcontroller
         struct termios tty;
         serial_port = open("/dev/arduino", O_RDWR); //TODO jetson

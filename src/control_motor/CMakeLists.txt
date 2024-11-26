@@ -14,7 +14,8 @@ find_package(services REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(motor src/motor.cpp )
+add_executable(motor src/motor.cpp src/controlMotorMessage.cpp  )
+# add_executable(motor src/try.cpp  )
 ament_target_dependencies(motor rclcpp std_msgs services)
 
 if(BUILD_TESTING)
