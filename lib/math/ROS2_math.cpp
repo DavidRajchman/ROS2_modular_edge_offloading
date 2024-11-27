@@ -37,3 +37,39 @@ double quaternionToYaw(double x, double y, double z, double w){
     m.getRPY(roll, pitch, yaw);
     return yaw;
 }
+
+pair<int, int> yawToGridDirection(double angle){
+    //
+    vector<pair<int,int>> moves = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1,0}, {1,1}, {0,1}, {-1,0}};
+    //bias to <0, 2PI>
+    angle = angle + M_PI;
+
+    //normalization
+    angle = angle / (2*M_PI);
+
+    // to interval <0,8>
+    angle *= 8;
+
+    int index = round(angle);
+    index = index % 8;
+
+    return moves[index];
+}
+
+int yawToGridIndex(double angle){
+    //
+    vector<pair<int,int>> moves = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1,0}, {1,1}, {0,1}, {-1,0}};
+    //bias to <0, 2PI>
+    angle = angle + M_PI;
+
+    //normalization
+    angle = angle / (2*M_PI);
+
+    // to interval <0,8>
+    angle *= 8;
+
+    int index = round(angle);
+    index = index % 8;
+
+    return index;
+}

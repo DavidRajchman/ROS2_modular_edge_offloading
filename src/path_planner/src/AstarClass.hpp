@@ -21,6 +21,7 @@
 #include <iostream>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "../../../../lib/math/ROS2_math.hpp"
 
 
 using namespace std;
@@ -80,20 +81,15 @@ private:
     
     //
     void publishPath();
-    pair<int, int> yawToGridDirection(double angle);
+    // pair<int, int> yawToGridDirection(double angle);
     void createDelatatedMap(vector<int8_t>& mapMsg);
     vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
     double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
     void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
-    // vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<int8_t>>& grid, vector<vector<array<int, 2>>>& way, 
-    //                     const pair<int, int>& start, const tuple<int, int, double>& goal, int lastChangeDir);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
                         const tuple<int, int, pair<int,int>>& start, const tuple<int, int, pair<int,int>>& goal, int lastChangeDir);
     void astar(const vector<vector<bool>> grid, const tuple<int, int, pair<int,int>>& start, 
                                     const tuple<int, int, pair<int,int>>& goal);     
-    // vector<pair<int, int>> astar(const vector<vector<int8_t>> grid,  
-    //                                 const tuple<int, int, double>& goal); 
 
-    double quaternionToYaw(double x, double y, double z, double w);
 };
 #endif

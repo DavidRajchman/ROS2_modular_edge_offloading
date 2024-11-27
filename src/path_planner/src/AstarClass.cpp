@@ -22,25 +22,7 @@ Astar::Astar() : Node("astar") {
     pose_sub = this->create_subscription<services::msg::Position>("robot_position", 1, bind(&Astar::poseCb, this, std::placeholders::_1));
 }
 
-pair<int, int> Astar::yawToGridDirection(double angle){
-    //
-    vector<pair<int,int>> moves = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1,0}, {1,1}, {0,1}, {-1,0}};
-    //bias to <0, 2PI>
-    angle = angle + M_PI;
 
-    //normalization
-    angle = angle / (2*M_PI);
-
-    // to interval <0,8>
-    angle *= 8;
-
-    int index = round(angle);
-    index = index % 8;
-
-    return moves[index];
-
-
-}
 
 
 void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
@@ -424,15 +406,4 @@ void Astar::astar(const vector<vector<bool>> grid, const tuple<int, int, pair<in
 
 }
 
-
-double Astar::quaternionToYaw(double x, double y, double z, double w){
-
-tf2::Quaternion q(x,y,z,w);
-tf2::Matrix3x3 m(q);
-
-double roll, pitch, yaw;
-m.getRPY(roll, pitch, yaw);
-return yaw;
-
-}
 
