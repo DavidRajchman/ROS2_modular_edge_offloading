@@ -10,13 +10,16 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(services REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(motor src/motor.cpp ../../lib/topicClasses/MotorUart.cpp ../../lib/math/ROS2_math.cpp  )
+add_executable(motor src/motor.cpp ../../lib/topicClasses/MotorUart.cpp ../../lib/math/ROS2_math.cpp)
 # add_executable(motor src/try.cpp  )
-ament_target_dependencies(motor rclcpp std_msgs services)
+ament_target_dependencies(motor rclcpp std_msgs services tf2 tf2_ros)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

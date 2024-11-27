@@ -27,3 +27,13 @@ char clamp0_99(int value){
 char clamp0_99(char value){
     return clamp0_99(static_cast<int>(value));
 }
+
+double quaternionToYaw(double x, double y, double z, double w){
+
+    tf2::Quaternion q(x,y,z,w);
+    tf2::Matrix3x3 m(q);
+
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    return yaw;
+}

@@ -17,10 +17,9 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include "services/msg/position.hpp"
 #include "services/msg/control_node.hpp"
+#include "../../../lib/math/ROS2_math.hpp"
 
 #include <iostream>
-// #include <vector>
-// #include <math.h>
 #include <string>
 #include <cstdio>
 
@@ -28,8 +27,6 @@ using namespace std;
 
 class PositionPublisher : public rclcpp::Node {
 public:
-    // PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()), tfListener(std::make_shared<tf2_ros::TransformListener>(tfBuffer)) {
-    // PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()),tfListener(tfBuffer);
     PositionPublisher();
 
 private:
@@ -78,13 +75,10 @@ private:
     void lidarTfCb();
     void tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg);
     void mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
-    // void timeCb(const rosgraph_msgs::msg::Clock::SharedPtr msg);
     void setupMarker();
     void calculateGridPosition();
     void createLidarTransformation();
     void createPositionMessage();
-    // double quaternionToYaw(geometry_msgs::msg::Quaternion msg);
-    double quaternionToYaw(double x, double y, double z, double w);
 
     rclcpp::TimerBase::SharedPtr timer_;
 

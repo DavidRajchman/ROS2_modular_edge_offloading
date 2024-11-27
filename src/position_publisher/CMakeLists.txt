@@ -26,7 +26,7 @@ find_package(services REQUIRED)
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 #   $<INSTALL_INTERFACE:include>)
 # target_compile_features(position PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-add_executable(position src/PositionPublisher.cpp src/PositionPublisherClass.cpp)
+add_executable(position src/PositionPublisher.cpp src/PositionPublisherClass.cpp ../../lib/math/ROS2_math.cpp)
 ament_target_dependencies(position rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2)
 
 # add_executable(publisher src/publisher.cpp)

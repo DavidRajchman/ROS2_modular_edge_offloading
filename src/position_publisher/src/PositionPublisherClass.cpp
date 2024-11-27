@@ -10,6 +10,7 @@ PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(th
     tfLidar = std::make_shared<geometry_msgs::msg::TransformStamped>();
     tf = std::make_shared<tf2_msgs::msg::TFMessage>();
 
+    //setting "UDP" connection
     auto qos_profile = rclcpp::QoS(0).reliability(rclcpp::ReliabilityPolicy::BestEffort);
 
 
@@ -18,7 +19,6 @@ PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(th
     tfPub = this->create_publisher<tf2_msgs::msg::TFMessage>("/tf", 1);
     mapSub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("/map", 1, std::bind(&PositionPublisher::mapCb, this, std::placeholders::_1));
     tfSub = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", qos_profile, std::bind(&PositionPublisher::tfCb, this, std::placeholders::_1));
-    // timeSub = this->create_subscription<rosgraph_msgs::msg::Clock>("/clock", 1, std::bind(&PositionPublisher::timeCb, this, std::placeholders::_1));
     if (debug)
     {
         markerPub = this->create_publisher<visualization_msgs::msg::Marker>("/position_marker", 1);
@@ -52,32 +52,6 @@ void PositionPublisher::tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg)
             (double)tfRob.transform.rotation.z,
             (double)tfRob.transform.rotation.w
         );
-
-        
-        // tf2::Quaternion q(
-        //     tfRob.transform.rotation.x,
-        //     tfRob.transform.rotation.y,
-        //     tfRob.transform.rotation.z,
-        //     tfRob.transform.rotation.w);
-        // tf2::Matrix3x3 m(q);
-        // double roll, pitch, yaw;
-        // m.getRPY(roll, pitch, yaw);
-        
-
-
-        // // double poseRobPhi = quaternionToYaw(quat_msg);
-        // tf2::Quaternion quat_tf;
-        // geometry_msgs::msg::Quaternion quat_msg;
-        // quat_msg.x = tfRob.transform.rotation.x;
-        // quat_msg.y = tfRob.transform.rotation.y;
-        // quat_msg.z = tfRob.transform.rotation.z;
-        // quat_msg.w = tfRob.transform.rotation.w;
-        // tf2::convert(quat_msg , quat_tf);
-        // tf2::fromMsg(quat_msg, quat_tf);
-        // quat_msg = tf2::toMsg(quat_tf);
-
-        // RCLCPP_INFO_STREAM(get_logger(), "yaw: "<<poseRobPhi);
-        
 
         calculateGridPosition();
         createPositionMessage();
@@ -152,16 +126,4 @@ void PositionPublisher::calculateGridPosition()
     mapLidY = round(poseLidY / mapRes) + mapOriginY;
 }
 
-double PositionPublisher::quaternionToYaw(double x, double y, double z, double w){
-// double PositionPublisher::quaternionToYaw(geometry_msgs::msg::Quaternion::SharedPtr msg){
-
-    // tf2::Quaternion q = msg;
-    tf2::Quaternion q(x,y,z,w);
-    tf2::Matrix3x3 m(q);
-
-    double roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);
-    return yaw;
-    // return 2.0;
-}
 
