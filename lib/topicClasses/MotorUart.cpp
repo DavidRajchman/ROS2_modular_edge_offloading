@@ -1,30 +1,12 @@
-#include "controlMotorMessage.hpp"
-#include <rclcpp/rclcpp.hpp>
+#include "MotorUart.hpp"
 
 
 MotorUart::MotorUart(rclcpp::Logger logger) : logger(logger) {
-    cout<<"hi"<<endl;
+    // cout<<"hi"<<endl;
     // this -> logger = logger;
     setConnection();
 }
 
-char MotorUart::clamp99_99(char value){
-    if(value >=100)
-        return 99;
-    else if(value <=-100)
-        return -99;
-    else
-        return value;
-}
-
-char MotorUart::clamp0_99(char value){
-    if(value >=100)
-        return 99;
-    else if(value <0)
-        return 0;
-    else
-        return value;
-}
 
 void MotorUart::setSpeed(char speed){
     speed = clamp99_99(speed);

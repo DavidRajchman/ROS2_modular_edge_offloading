@@ -1,28 +1,23 @@
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/int32.hpp>
-#include <std_msgs/msg/string.hpp>
+// #include <std_msgs/msg/int32.hpp>
+// #include <std_msgs/msg/string.hpp>
 #include <services/msg/control_motor.hpp>
 #include <services/msg/status_node.hpp>
+#include "../../../lib/topicClasses/MotorUart.hpp"
 
-#include <fcntl.h>
-#include <errno.h>
-#include <termios.h>
-#include <unistd.h>
-#include <cstring>
-#include <iostream>
-#include <string>
-#include <thread>
-#include <array>
+// #include <fcntl.h>
+// #include <errno.h>
+// #include <termios.h>
+// #include <unistd.h>
+// #include <cstring>
+// #include <iostream>
+// #include <string>
+// #include <thread>
+// #include <array>
 
-#include "controlMotorMessage.hpp"
 
 using namespace std;
 
-enum class Status {
-    OK,
-    NO_CONNECTION,
-    ERROR
-};
 
 class ControlMotor : public rclcpp::Node {
 public:

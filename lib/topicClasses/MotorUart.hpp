@@ -6,6 +6,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <services/msg/control_motor.hpp>
 #include <services/msg/status_node.hpp>
+#include "../math/ROS2_math.hpp"
 
 #include <fcntl.h>
 #include <errno.h>
@@ -48,8 +49,7 @@ public:
 private:
     rclcpp::Logger logger ;
     void setConnection(string dev = "/dev/arduino");
-    char clamp99_99(char value);
-    char clamp0_99(char value);
+
 
     char speed;
     char steer;
