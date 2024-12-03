@@ -19,6 +19,8 @@
 #include "services/msg/control_node.hpp"
 #include "../../../lib/math/ROS2_math.hpp"
 
+#include "../../../lib/topicClasses/RobotPositionMessage.hpp"
+
 #include <iostream>
 #include <string>
 #include <cstdio>

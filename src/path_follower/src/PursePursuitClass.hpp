@@ -27,7 +27,6 @@ struct MotorMsg{
 class PurePursuit : public rclcpp::Node {
 public:
     PurePursuit();
-//     void control_callback(const services::msg::ControlNode::SharedPtr msg);
 
 private:
     //parameters
@@ -58,9 +57,6 @@ private:
     void controlMotor(int speed, int steer);
     void followPath();
     void findAngle(float Kp, double pursuitX, double pursuitY);
-    // rclcpp::Subscription<services::msg::ControlNode>::SharedPtr control_sub_;
-//     rclcpp::Client<services::srv::BaseAngle>::SharedPtr angle_base_client_;
-//     rclcpp::Client<services::msg::ControlMotor>::SharedPtr control_motor_client_;
 
 };
 

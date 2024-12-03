@@ -16,6 +16,7 @@ float64 pose_rob_phi
 # vehicle position in grid
 int32 map_rob_x
 int32 map_rob_y
+int32 map_phi_index
 
 # lidar position in grid
 # int32 map_lid_x
