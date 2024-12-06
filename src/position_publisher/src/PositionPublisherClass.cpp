@@ -1,6 +1,7 @@
 #include "PositionPublisherClass.hpp"
 
-PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()), tfListener(tfBuffer)
+PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(this->get_clock()), tfListener(tfBuffer),
+           robotPositionMsg(this->get_logger(), this->create_publisher<services::msg::Position>("/robot_position", 1))         
 {
     this->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
@@ -15,7 +16,7 @@ PositionPublisher::PositionPublisher() : Node("position_publisher"), tfBuffer(th
 
 
     // Publishers and Subscribers
-    posPub = this->create_publisher<services::msg::Position>("/robot_position", 1);
+    // posPub = this->create_publisher<services::msg::Position>("/robot_position", 1);
     tfPub = this->create_publisher<tf2_msgs::msg::TFMessage>("/tf", 1);
     mapSub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("/map", 1, std::bind(&PositionPublisher::mapCb, this, std::placeholders::_1));
     tfSub = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", qos_profile, std::bind(&PositionPublisher::tfCb, this, std::placeholders::_1));
@@ -43,18 +44,23 @@ void PositionPublisher::tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg)
         time = msg->transforms[0].header.stamp;
         geometry_msgs::msg::TransformStamped tfRob = tfBuffer.lookupTransform("map", "base_footprint", tf2::TimePointZero);
         RCLCPP_INFO_ONCE(this->get_logger(), "Transformation received");
-        poseRobX = tfRob.transform.translation.x;
-        poseRobY = tfRob.transform.translation.y;
-        // poseRobPhi=quaternionToYaw(tfRob.transform.rotation);
-        poseRobPhi=quaternionToYaw(
+        // poseRobX = tfRob.transform.translation.x;
+        // poseRobY = tfRob.transform.translation.y;
+        double poseRobPhi=quaternionToYaw(
             (double)tfRob.transform.rotation.x,
             (double)tfRob.transform.rotation.y,
             (double)tfRob.transform.rotation.z,
             (double)tfRob.transform.rotation.w
         );
+        robotPositionMsg.setPosition(
+            tfRob.transform.translation.x,
+            tfRob.transform.translation.y,
+            poseRobPhi
+        );
 
-        calculateGridPosition();
-        createPositionMessage();
+        // calculateGridPosition();
+        robotPositionMsg.publishMsg();
+        // createPositionMessage(tfRob.transform.translation.x, tfRob.transform.translation.y);
 
         posPub->publish(pos);
         RCLCPP_INFO_ONCE(get_logger(), "Robot position published");
@@ -69,23 +75,27 @@ void PositionPublisher::tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg)
 
 void PositionPublisher::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 {
-    mapWidth = msg->info.width;
-    mapHeight = msg->info.height;
-    originX = -msg->info.origin.position.x;
-    originY = -msg->info.origin.position.y;
-    mapRes = msg->info.resolution;
+    double mapRes = msg->info.resolution;
+    double mapWidth = msg->info.width;
+    double mapHeight = msg->info.height;
+    double mapOriginX = round(-msg->info.origin.position.x / mapRes);
+    double mapOriginY = round(-msg->info.origin.position.y / mapRes);
 
-    mapOriginX = round(originX / mapRes);
-    mapOriginY = round(originY / mapRes);
-    mapData = true;
+    robotPositionMsg.setMapDimensions(mapWidth, mapHeight, mapRes);
+    robotPositionMsg.setMapOrigin(mapOriginX, mapOriginY);
 
-    if (debug)
-    {
-        grid2 = *msg;
-        int index = mapRobX + mapWidth * mapRobY;
-        grid2.data[index] = 100;
-        mapPub->publish(grid2);
-    }
+    // double originY = -msg->info.origin.position.y;
+    // mapOriginX = round(originX / mapRes);
+    // mapOriginY = round(originY / mapRes);
+    // mapData = true;
+
+    // if (debug)
+    // {
+    //     grid2 = *msg;
+    //     int index = mapRobX + mapWidth * mapRobY;
+    //     grid2.data[index] = 100;
+    //     mapPub->publish(grid2);
+    // }
 }
 
 void PositionPublisher::setupMarker()
@@ -102,28 +112,33 @@ void PositionPublisher::setupMarker()
     marker.pose.orientation.w = 1.0;
 }
 
-void PositionPublisher::createPositionMessage()
-{
-    // robot position
-    pos.pose_rob_x = poseRobX;
-    pos.pose_rob_y = poseRobY;
-    pos.pose_rob_phi = poseRobPhi;
+// void PositionPublisher::createPositionMessage()
+// {
+//     // robot position
+//     pos.pose_rob_x = poseRobX;
+//     pos.pose_rob_y = poseRobY;
+//     pos.pose_rob_phi = poseRobPhi;
 
-    // robot position in grid
-    pos.map_rob_x = mapRobY;
-    pos.map_rob_y = mapRobX;
+//     // robot position in grid
+//     pos.map_rob_x = mapRobY;
+//     pos.map_rob_y = mapRobX;
 
-    // map origin
-    pos.map_origin_x = mapOriginX;
-    pos.map_origin_y = mapOriginY;
-}
+//     // map origin
+//     pos.map_origin_x = mapOriginX;
+//     pos.map_origin_y = mapOriginY;
+// }
 
-void PositionPublisher::calculateGridPosition()
-{
-    mapRobY = round(poseRobX / mapRes) + mapOriginX;
-    mapRobX = round(poseRobY / mapRes) + mapOriginY;
-    mapLidX = round(poseLidX / mapRes) + mapOriginX;
-    mapLidY = round(poseLidY / mapRes) + mapOriginY;
-}
+// void PositionPublisher::calculateGridPosition(double x, double y, double angle)
+// {
+//     //original code
+//     // int mapY = round(x / mapRes) + mapOriginX;
+//     // int mapX = round(y / mapRes) + mapOriginY;
+
+//     int mapX = round(x / mapRes) + mapOriginX;
+//     int mapY = round(y / mapRes) + mapOriginY;
+//     //TODO index phi
+
+//     robotPositionMsg.setMapPosition(mapX, mapY, yawToGridIndex(angle)); //TODO
+// }
 
 

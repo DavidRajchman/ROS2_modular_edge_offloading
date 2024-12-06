@@ -4,6 +4,9 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_ros/buffer.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <opencv2/opencv.hpp>
+
 // #include <iostream>
 
 using namespace std;
@@ -15,9 +18,11 @@ char clamp0_99(int value);
 char clamp0_99(char value);
 
 double quaternionToYaw(double x, double y, double z, double w);
+tuple<double, double, double, double> yawToQuaternion(double yaw);
 
 pair<int, int> yawToGridDirection(double angle);
 int yawToGridIndex(double angle);
 
+vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation = 5, int obstacleLimit = 80);
 
 #endif

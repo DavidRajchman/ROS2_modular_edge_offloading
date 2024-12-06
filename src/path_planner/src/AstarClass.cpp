@@ -1,6 +1,10 @@
 #include "AstarClass.hpp"
 
-Astar::Astar() : Node("astar") {
+Astar::Astar() : 
+    Node("astar"),
+    mapMsg(this->get_logger()),
+    positionMsg(this->get_logger()) 
+{
     this->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
 
@@ -21,7 +25,6 @@ Astar::Astar() : Node("astar") {
     goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", 1, bind(&Astar::goalCb, this, std::placeholders::_1));
     pose_sub = this->create_subscription<services::msg::Position>("robot_position", 1, bind(&Astar::poseCb, this, std::placeholders::_1));
 }
-
 
 
 
@@ -79,19 +82,20 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
 
 void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { 
     RCLCPP_DEBUG_ONCE(get_logger(), "map received");
+    mapMsg.receiveMsg(msg);
 
-    widthMap = msg->info.width;
-    heightMap = msg->info.height;
-    mapRes = msg->info.resolution;
+    // widthMap = msg->info.width;
+    // heightMap = msg->info.height;
+    // mapRes = msg->info.resolution;
 
-    originX = msg -> info.origin.position.x;
-    originY = msg -> info.origin.position.y;
-    originPhi = quaternionToYaw(
-            static_cast<double> (msg -> info.origin.orientation.x),
-            static_cast<double> (msg -> info.origin.orientation.y),
-            static_cast<double> (msg -> info.origin.orientation.z),
-            static_cast<double> (msg -> info.origin.orientation.w)
-        );
+    // originX = msg -> info.origin.position.x;
+    // originY = msg -> info.origin.position.y;
+    // originPhi = quaternionToYaw(
+    //         static_cast<double> (msg -> info.origin.orientation.x),
+    //         static_cast<double> (msg -> info.origin.orientation.y),
+    //         static_cast<double> (msg -> info.origin.orientation.z),
+    //         static_cast<double> (msg -> info.origin.orientation.w)
+    //     );
 
     // transformation from 1D array to 2D array
     grid.resize(heightMap, std::vector<int8_t>(widthMap));
@@ -110,28 +114,31 @@ void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
             }
         }
     }
-    cv::Mat mat(grid.size(), grid[0].size(), CV_8S, &msg->data[0]);
-    createDelatatedMap(msg->data);
+    // cv::Mat mat(grid.size(), grid[0].size(), CV_8S, &msg->data[0]);
+    auto [sizeX, sizeY, resolution] = mapMsg.getMapDimensions();
+    gridDil = createDelatatedMap(msg->data, sizeX, sizeY, DILATATION);
     RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "width: "<< widthMap << " height: " << heightMap << " resolution: "<<mapRes);
 }
 
 void Astar::poseCb(const services::msg::Position::SharedPtr msg) {
     RCLCPP_DEBUG_ONCE(get_logger(), "pose received");
+
+    positionMsg.receiveMsg(msg);
     
-    poseRobX = msg->pose_rob_x;
-    poseRobY = msg->pose_rob_y;
-    poseRobPhi = msg->pose_rob_phi;
+    // poseRobX = msg->pose_rob_x;
+    // poseRobY = msg->pose_rob_y;
+    // poseRobPhi = msg->pose_rob_phi;
 
-    mapRobX = msg->map_rob_x;
-    mapRobY = msg->map_rob_y;
-    mapRobPhi = yawToGridDirection(poseRobPhi);
+    // mapRobX = msg->map_rob_x;
+    // mapRobY = msg->map_rob_y;
+    // mapRobPhi = yawToGridDirection(poseRobPhi);
 
-    mapOriginX = msg->map_origin_x;
-    mapOriginY = msg->map_origin_y;
+    // mapOriginX = msg->map_origin_x;
+    // mapOriginY = msg->map_origin_y;
 
-    RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "x: "<< poseRobX << " y: " << poseRobY << " phi: "<< poseRobPhi);
-    RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "map x: "<< mapRobX << " map y: " << mapRobY );
-    RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "map origin x: "<< mapOriginX << " map origin y: " << mapOriginY );
+    // RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "x: "<< poseRobX << " y: " << poseRobY << " phi: "<< poseRobPhi);
+    // RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "map x: "<< mapRobX << " map y: " << mapRobY );
+    // RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "map origin x: "<< mapOriginX << " map origin y: " << mapOriginY );
 
 }
 
@@ -155,40 +162,6 @@ void Astar::publishPath() {
 
     RCLCPP_DEBUG(this->get_logger(), "Path published.");
 }
-
-void Astar::createDelatatedMap(vector<int8_t>& mapMsg){
-    cv::Mat matInput(grid.size(), grid[0].size(), CV_8U, &mapMsg[0]);
-    // cv::Mat inputImage = grid;
-    // if (inputImage.empty()) {
-    //     std::cerr << "Chyba při načítání obrázku!\n";
-    //     return -1;
-    // }
-    // creating kernel for dilatation
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, //shape of kernel ELLIPSE
-                                                cv::Size(2 * DILATATION + 1, 2 * DILATATION + 1), // size of kernel
-                                                cv::Point(DILATATION, DILATATION)); // definition of center
-
-    // Aplikujeme dilataci
-    cv::Mat dilatedImage;
-    cv::dilate(matInput, dilatedImage, element);
-    // RCLCPP_DEBUG_STREAM(get_logger(), "access: " << (int)dilatedImage.at<unsigned char>(0,0));
-    
-    // RCLCPP_INFO(get_logger(), "before mat to vector" );
-    gridDil.resize(heightMap, std::vector<bool>(widthMap));
-    // vector<vector<bool>> gridDilated(grid.size(), vector<bool>(grid[0].size(),false));
-    for (int x =0; x<static_cast<int>(grid.size());x++){
-        for (int y=0; y<static_cast<int>(grid[x].size());y++){
-            // RCLCPP_DEBUG_STREAM(get_logger(), "transform : "<< x<<" "<<y);
-            gridDil[x][y] = dilatedImage.at<unsigned char>(x,y)<=80 ? false : true; 
-        }
-    }
-    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][11] ); //ano
-    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][12] ); //ne
-}
-
-
-
-
 
 
 

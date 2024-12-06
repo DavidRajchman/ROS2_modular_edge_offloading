@@ -34,12 +34,13 @@ public:
 private:
     //class attributes
     bool debug= this->declare_parameter<bool>("DEBUG", false);
-    int mapWidth, mapHeight, midMapX, midMapY;
-    float mapOriginX, mapOriginY, originX, originY;
+    // int mapWidth, mapHeight, midMapX, midMapY;
+    // float mapOriginX, mapOriginY, originX, originY;
+    float mapOriginX, mapOriginY;
     float mapRes;
-    float poseRobX, poseRobY, poseRobPhi;
-    float poseLidX, poseLidY, poseLidPhi;
-    int32_t mapRobX, mapRobY, mapLidX, mapLidY;
+    // float poseRobX, poseRobY, poseRobPhi;
+    // float poseLidX, poseLidY, poseLidPhi;
+    // int32_t mapRobX, mapRobY, mapLidX, mapLidY;
     bool mapData = false;
 
     //ROS messages
@@ -78,11 +79,16 @@ private:
     void tfCb(const tf2_msgs::msg::TFMessage::SharedPtr msg);
     void mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
     void setupMarker();
-    void calculateGridPosition();
+    void calculateGridPosition(double x, double y, double angle);
     void createLidarTransformation();
     void createPositionMessage();
 
-    rclcpp::TimerBase::SharedPtr timer_;
+    // rclcpp::TimerBase::SharedPtr timer_;
+
+    //class for publisher
+    RobotPositionMessage robotPositionMsg;
+
+    
 
 };
 
