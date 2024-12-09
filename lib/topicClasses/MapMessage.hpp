@@ -25,6 +25,7 @@ public:
 
     void setMap(vector<int8_t> inputMap);
     vector<int8_t> getMap();
+    vector<vector<char>> get2DMap();
 
     //publishing and receiving messages
     void publishMsg();

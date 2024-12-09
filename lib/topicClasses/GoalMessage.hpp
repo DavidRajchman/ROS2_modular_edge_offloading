@@ -9,10 +9,10 @@
 using namespace std;
 
 
-class MarkerMessage {
+class GoalMessage {
 public:
-    MarkerMessage(rclcpp::Logger logger);
-    MarkerMessage(rclcpp::Logger logger, rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher);
+    GoalMessage(rclcpp::Logger logger);
+    GoalMessage(rclcpp::Logger logger, rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher);
 
     void setPosition(double x, double y, double phi);
     void setPosition(int mapX, int mapY, int indexPhi, int mapOriginX, int mapOriginY, double resolution);

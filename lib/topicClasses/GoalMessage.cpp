@@ -1,26 +1,26 @@
 #include "GoalMessage.hpp"
 
 
-MarkerMessage::MarkerMessage(rclcpp::Logger logger) : logger(logger){}
-MarkerMessage::MarkerMessage(rclcpp::Logger logger, rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher): logger(logger), publisher(publisher), clock(RCL_SYSTEM_TIME){}
+GoalMessage::GoalMessage(rclcpp::Logger logger) : logger(logger){}
+GoalMessage::GoalMessage(rclcpp::Logger logger, rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher): logger(logger), publisher(publisher), clock(RCL_SYSTEM_TIME){}
 
-void MarkerMessage::setPosition(double x, double y, double phi){
+void GoalMessage::setPosition(double x, double y, double phi){
     this -> x = x; 
     this -> y = y; 
     this -> phi = phi; 
 }
 
-void MarkerMessage::setPosition(int x, int y, int phi, int mapOriginX, int mapOriginY, double resolution){
+void GoalMessage::setPosition(int x, int y, int phi, int mapOriginX, int mapOriginY, double resolution){
     auto [poseX, poseY, posePhi]= gridPositionToPosition(x,y,phi, mapOriginX, mapOriginY, resolution);
     setPosition(poseX, poseY, posePhi);
 }
 
-tuple<double, double, double> MarkerMessage::getPosition(){
+tuple<double, double, double> GoalMessage::getPosition(){
     return {x,y,phi};
 }
 
 
-void MarkerMessage::receiveMsg(geometry_msgs::msg::PoseStamped::SharedPtr message){
+void GoalMessage::receiveMsg(geometry_msgs::msg::PoseStamped::SharedPtr message){
     x = message -> pose.position.x;
     y = message -> pose.position.y;
     phi = quaternionToYaw(
@@ -31,12 +31,12 @@ void MarkerMessage::receiveMsg(geometry_msgs::msg::PoseStamped::SharedPtr messag
     );
 }
 
-void MarkerMessage::publishMsg(geometry_msgs::msg::PoseStamped::SharedPtr message){
+void GoalMessage::publishMsg(geometry_msgs::msg::PoseStamped::SharedPtr message){
     receiveMsg(message);
     publishMsg();
 }
 
-void MarkerMessage::publishMsg(){
+void GoalMessage::publishMsg(){
     geometry_msgs::msg::PoseStamped msg;
 
     msg.header.stamp = clock.now();

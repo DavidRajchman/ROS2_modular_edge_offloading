@@ -6,25 +6,15 @@
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 #include <nav_msgs/msg/path.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Matrix3x3.h>
-#include <services/srv/base_angle.hpp>
 #include <services/srv/rotation_lidar.hpp>
 #include <services/msg/position.hpp>
-#include <services/msg/control_node.hpp>
-#include <services/msg/status_node.hpp>
-#include <Eigen/Dense>
-#include <queue>
-#include <iostream>
-#include <vector>
 #include <opencv2/opencv.hpp>
 #include "../../../../lib/math/ROS2_math.hpp"
 #include "../../../../lib/topicClasses/MapMessage.hpp"
 #include "../../../../lib/topicClasses/RobotPositionMessage.hpp"
 #include "../../../../lib/topicClasses/PathMessage.hpp"
+#include "../../../../lib/topicClasses/GoalMessage.hpp"
 
 
 using namespace std;
@@ -71,6 +61,7 @@ private:
     MapMessage mapMsg;
     RobotPositionMessage positionMsg;
     PathMessage pathMsg;
+    GoalMessage goalMsg;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub;
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub;
@@ -87,15 +78,12 @@ private:
     
     //
     void publishPath();
-    // pair<int, int> yawToGridDirection(double angle);
-    // void createDelatatedMap(vector<int8_t>& mapMsg);
-    // vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
     double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
     void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
-                        const tuple<int, int, pair<int,int>>& start, const tuple<int, int, pair<int,int>>& goal, int lastChangeDir);
-    void astar(const vector<vector<bool>> grid, const tuple<int, int, pair<int,int>>& start, 
-                                    const tuple<int, int, pair<int,int>>& goal);     
+                        const tuple<int, int, int>& start, const tuple<int, int, int>& goal, int lastChangeDir);
+    void astar(const vector<vector<bool>> grid, const tuple<int, int, int>& start, 
+                                    const tuple<int, int, int>& goal);     
 
 };
 #endif

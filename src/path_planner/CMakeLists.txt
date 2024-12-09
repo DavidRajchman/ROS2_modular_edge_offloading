@@ -23,10 +23,8 @@ find_package(services REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(OpenCV REQUIRED)
 
-add_executable(astar src/Astar.cpp src/AstarClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MapMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp ../../lib/topicClasses/PathMessage.cpp )
+add_executable(astar src/Astar.cpp src/AstarClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MapMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp ../../lib/topicClasses/PathMessage.cpp ../../lib/topicClasses/GoalMessage.cpp )
 ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2 OpenCV)
-
-# target_link_libraries(astar ${OpenCV_LIBS})
 
 
 install(TARGETS

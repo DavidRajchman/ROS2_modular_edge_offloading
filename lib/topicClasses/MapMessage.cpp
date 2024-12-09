@@ -1,5 +1,7 @@
 #include "MapMessage.hpp"
 
+using namespace std;
+
 
 MapMessage::MapMessage(rclcpp::Logger logger) : logger(logger) {}
 MapMessage::MapMessage(rclcpp::Logger logger,  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr publisher) : logger(logger), publisher(publisher), clock(RCL_SYSTEM_TIME) {}
@@ -113,6 +115,17 @@ void MapMessage::setMap(vector<int8_t> inputMap){
 vector<int8_t> MapMessage::getMap(){
     return map;
 }
+
+vector<vector<char>> MapMessage::get2DMap(){
+    vector<vector<char>> grid;
+    for (int i = 0; i < mapSizeX; ++i){
+        for (int j = 0; j < mapSizeY; ++j){
+            grid[i][j] = map[i * mapSizeX + j];
+        }
+    }
+    return grid;
+}
+
 
 
 
