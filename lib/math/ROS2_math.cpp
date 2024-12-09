@@ -84,6 +84,11 @@ int yawToGridIndex(double angle){
     return index;
 }
 
+double gridIndexToYaw(int index){
+    return (index * M_PI / 4) - M_PI;
+}
+
+
 
 vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation, int obstacleLimit ){
     
@@ -111,4 +116,19 @@ vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int s
     return dilatatedGrid;
     // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][11] ); //ano
     // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][12] ); //ne
+}
+
+
+tuple<double, double, double> gridPositionToPosition(int mapX, int mapY, int indexPhi, int mapOriginX, int mapOriginY, double resolution){
+    double x = (mapX - mapOriginX) * resolution;
+    double y = (mapY - mapOriginY) * resolution;
+    double phi = gridIndexToYaw(indexPhi);
+    return {x, y, phi};
+}
+
+tuple<int, int, int> positionToGridPosition(double x, double y, double phi, int mapOriginX, int mapOriginY, double resolution){
+    int mapX = round(x / resolution) + mapOriginX;
+    int mapY = round(y / resolution) + mapOriginY;
+    int indexPhi = yawToGridIndex(phi);
+    return {mapX, mapY, indexPhi};
 }

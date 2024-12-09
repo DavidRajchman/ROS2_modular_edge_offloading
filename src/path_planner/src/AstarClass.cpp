@@ -3,7 +3,8 @@
 Astar::Astar() : 
     Node("astar"),
     mapMsg(this->get_logger()),
-    positionMsg(this->get_logger()) 
+    positionMsg(this->get_logger()),
+    pathMsg(this->get_logger(), this->create_publisher<nav_msgs::msg::Path>("/path", 1))
 {
     this->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
@@ -19,7 +20,7 @@ Astar::Astar() :
 
 
     // Publishers and Subscribers
-    path_pub = this->create_publisher<nav_msgs::msg::Path>("/path", 1);
+    // path_pub = this->create_publisher<nav_msgs::msg::Path>("/path", 1);
 
     map_sub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("map", 1, bind(&Astar::mapCb, this, std::placeholders::_1));
     goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", 1, bind(&Astar::goalCb, this, std::placeholders::_1));
@@ -150,9 +151,9 @@ void Astar::publishPath() {
     header.stamp = this->get_clock()->now();
     header.frame_id = "map";
 
-    vector<geometry_msgs::msg::PoseStamped> poses = convertGridPathToPoses(path);
+    // vector<geometry_msgs::msg::PoseStamped> poses = convertGridPathToPoses(path);
     path2Pub.header = header;
-    path2Pub.poses = poses;
+    // path2Pub.poses = poses;
 
     path_pub->publish(path2Pub);
 
@@ -167,31 +168,7 @@ void Astar::publishPath() {
 
 
 
-vector<geometry_msgs::msg::PoseStamped> Astar::convertGridPathToPoses (const vector<pair<int, int>> path) {
-    RCLCPP_INFO(get_logger(), "Grid to poses");
-    
-    vector<geometry_msgs::msg::PoseStamped> poses;
 
-    for(pair<int,int> gridPose : path){
-        // RCLCPP_DEBUG_STREAM(get_logger(), "convert x: "<<gridPose.first<<" y: "<<gridPose.second);
-        
-        geometry_msgs::msg::PoseStamped pose;
-        pose.pose.position.x = (gridPose.first - mapOriginX)* mapRes;
-        pose.pose.position.y = (gridPose.second - mapOriginY)* mapRes;
-        pose.pose.position.z = 0.0;
-
-        pose.pose.orientation.x = 0.0;
-        pose.pose.orientation.y = 0.0;
-        pose.pose.orientation.z = 0.0;
-        pose.pose.orientation.w = 1.0;
-
-        poses.push_back(pose);
-
-        // RCLCPP_DEBUG_STREAM(get_logger(), "map x: "<< gridPose.first<< " map y: " << gridPose.second );
-        // RCLCPP_DEBUG_STREAM(get_logger(), "x: "<< pose.pose.position.x << "y: " << pose.pose.position.y );
-    }
-    return poses;
-}
 
 
 double Astar::heuristic(const pair<int, int>& node, const pair<int, int>& goal) {

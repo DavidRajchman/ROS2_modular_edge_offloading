@@ -47,10 +47,8 @@ void RobotPositionMessage::setMapPosition(double poseX, double poseY, double pos
         RCLCPP_WARN(logger, "Not initiated map origin y");
         return;
     }
-
-    int mapX = round(poseX / mapResolution) + mapOriginX;
-    int mapY = round(poseY / mapResolution) + mapOriginY;
-    int indexPhi = yawToGridIndex(posePhi);
+    
+    auto [mapX, mapY, indexPhi] =positionToGridPosition(poseX, poseY, posePhi, mapOriginX, mapOriginY, mapResolution);
     setMapPosition(mapX, mapY, indexPhi);
 }
 

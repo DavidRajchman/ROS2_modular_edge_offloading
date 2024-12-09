@@ -7,7 +7,6 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <opencv2/opencv.hpp>
 
-// #include <iostream>
 
 using namespace std;
 
@@ -22,6 +21,10 @@ tuple<double, double, double, double> yawToQuaternion(double yaw);
 
 pair<int, int> yawToGridDirection(double angle);
 int yawToGridIndex(double angle);
+double gridIndexToYaw(int index);
+
+tuple<double, double, double> gridPositionToPosition(int mapX, int mapY, int indexPhi, int originX, int originY, double resolution);
+tuple<int, int, int> positionToGridPosition(double x, double y, double phi, int mapOriginX, int mapOriginY, double resolution);
 
 vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation = 5, int obstacleLimit = 80);
 

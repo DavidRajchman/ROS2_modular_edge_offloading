@@ -24,6 +24,7 @@
 #include "../../../../lib/math/ROS2_math.hpp"
 #include "../../../../lib/topicClasses/MapMessage.hpp"
 #include "../../../../lib/topicClasses/RobotPositionMessage.hpp"
+#include "../../../../lib/topicClasses/PathMessage.hpp"
 
 
 using namespace std;
@@ -69,6 +70,7 @@ private:
     // Publishers and Subscribers
     MapMessage mapMsg;
     RobotPositionMessage positionMsg;
+    PathMessage pathMsg;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub;
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub;
@@ -87,7 +89,7 @@ private:
     void publishPath();
     // pair<int, int> yawToGridDirection(double angle);
     // void createDelatatedMap(vector<int8_t>& mapMsg);
-    vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
+    // vector<geometry_msgs::msg::PoseStamped>convertGridPathToPoses(const vector<pair<int, int>> path);
     double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
     void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
