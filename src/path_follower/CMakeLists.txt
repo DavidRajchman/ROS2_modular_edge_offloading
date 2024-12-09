@@ -13,12 +13,20 @@ find_package(visualization_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(services REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+find_package(OpenCV REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(pursuit src/PursePursuit.cpp src/PursePursuitClass.cpp)
-ament_target_dependencies(pursuit rclcpp std_msgs nav_msgs visualization_msgs  services )
+add_executable(pursuit src/PursePursuit.cpp src/PursePursuitClass.cpp ../../lib/math/ROS2_math.cpp )
+ament_target_dependencies(pursuit rclcpp std_msgs nav_msgs visualization_msgs  services tf2 tf2_ros OpenCV)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

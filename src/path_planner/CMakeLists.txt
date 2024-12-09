@@ -25,7 +25,7 @@ find_package(OpenCV REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
-add_executable(astar src/Astar.cpp src/AstarClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MapMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp ../../lib/topicClasses/PathMessage.cpp)
+add_executable(astar src/Astar.cpp src/AstarClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MapMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp ../../lib/topicClasses/PathMessage.cpp )
 ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2 OpenCV)
 
 # target_link_libraries(astar ${OpenCV_LIBS})
