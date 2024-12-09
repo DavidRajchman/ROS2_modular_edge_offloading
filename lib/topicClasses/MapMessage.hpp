@@ -17,6 +17,7 @@ public:
     //map origin in grid
     void setMapOrigin(double originX, double originY, double originPhi);
     tuple<double, double, double> getMapOrigin();
+    tuple<int, int, int> getMapOriginGrid();
 
     //map dimensions
     void setMapDimensions(int sizeX, int sizeY, double resolution);

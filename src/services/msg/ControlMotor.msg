@@ -1,4 +1,4 @@
 # commands for motor
-string mode
-int8 forwarding
-int8 steering
+string mode         #"auto" or "manual"
+int8 forwarding     # <-99, 99> 
+int8 steering       # <-99, 99>

@@ -15,6 +15,13 @@ tuple<double, double, double> MapMessage::getMapOrigin(){
     return {originX, originY, originPhi};
 }
 
+tuple<int, int, int> MapMessage::getMapOriginGrid(){
+    // mapOriginX = round(-originX / mapResolution);
+    // mapOriginY = round(-originY / mapResolution);
+    return positionToGridPosition(-originX, -originY, originPhi, 0, 0, mapResolution);
+}
+
+
 //map dimensions
 void MapMessage::setMapDimensions(int sizeX, int sizeY, double resolution){
     this -> mapSizeX = sizeX ;

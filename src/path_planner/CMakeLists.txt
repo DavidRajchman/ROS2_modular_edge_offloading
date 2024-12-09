@@ -22,9 +22,7 @@ find_package(services REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(OpenCV REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+
 add_executable(astar src/Astar.cpp src/AstarClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MapMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp ../../lib/topicClasses/PathMessage.cpp )
 ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2 OpenCV)
 
@@ -33,17 +31,11 @@ ament_target_dependencies(astar rclcpp std_msgs nav_msgs visualization_msgs tf2_
 
 install(TARGETS
   astar
-  # publisher
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
