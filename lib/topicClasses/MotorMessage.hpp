@@ -27,6 +27,7 @@ public:
     string getMode();
 
     void publishMsg();
+    void publishMsg(char speed, char steer);
     void publishMode(string mode);
     void publishMsg(services::msg::ControlMotor::SharedPtr message);
     void receiveMsg(services::msg::ControlMotor::SharedPtr message);

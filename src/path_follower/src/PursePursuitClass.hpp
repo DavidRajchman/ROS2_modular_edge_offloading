@@ -8,10 +8,11 @@
 #include <nav_msgs/msg/path.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <services/msg/control_motor.hpp>
-#include <services/srv/base_angle.hpp>
-#include <services/msg/status_node.hpp>
-#include <services/msg/control_node.hpp>
 #include <services/msg/position.hpp>
+#include "../../../../lib/topicClasses/PathMessage.hpp"
+#include "../../../../lib/topicClasses/RobotPositionMessage.hpp"
+#include "../../../../lib/topicClasses/MotorMessage.hpp"
+
 
 #include <vector>
 #include <string>
@@ -34,14 +35,13 @@ private:
     double poseRobX, poseRobY, poseRobPhi;
     int indexFollow;
     vector<pair<float, float>> path;
-    vector<pair<float, float>> pathFollow;
+    vector<tuple<double, double, double>> pathFollow;
 
     bool DEBUG;
     double MAX_DIST, LOOK_DISTANCE;
     double KP_LOW, KP_HIGH;
     double sumAngle = 0;
 
-    MotorMsg motorMsg;
 
     // subscribers and publishers
     rclcpp::Subscription<services::msg::Position>::SharedPtr poseSub;
@@ -53,10 +53,15 @@ private:
     void pathCb(const nav_msgs::msg::Path::SharedPtr msg);
 
     //methods
-    void publishMode(string mode);
-    void controlMotor(int speed, int steer);
+    // void publishMode(string mode);
+    // void controlMotor(int speed, int steer);
     void followPath();
     void findAngle(float Kp, double pursuitX, double pursuitY);
+
+    //classes for messages
+    RobotPositionMessage positionMsg;
+    PathMessage pathMsg;
+    MotorMessage motorMsg; 
 
 };
 

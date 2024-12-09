@@ -23,6 +23,7 @@ void PathMessage::publishMsg(){
    publisher -> publish(msg);
 }
 
+
 void PathMessage::publishMsg(const nav_msgs::msg::Path::SharedPtr message){
     receiveMsg(message);
     publishMsg();

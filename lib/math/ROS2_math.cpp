@@ -28,6 +28,27 @@ char clamp0_99(char value){
     return clamp0_99(static_cast<int>(value));
 }
 
+double clampPI_PI(double value){
+    while (value <= -M_PI || value >= M_PI) {
+        if (value <= -M_PI) {
+            value += 2 * M_PI;
+        } else {
+            value -= 2 * M_PI;
+        }
+    }
+    return value;
+}
+double clampPI_PI(float value){
+    while (value <= -M_PI || value >= M_PI) {
+        if (value <= -M_PI) {
+            value += 2 * M_PI;
+        } else {
+            value -= 2 * M_PI;
+        }
+    }
+    return value;
+}
+
 double quaternionToYaw(double x, double y, double z, double w){
 
     tf2::Quaternion q(x,y,z,w);

@@ -16,6 +16,9 @@ char clamp99_99(char value);
 char clamp0_99(int value);
 char clamp0_99(char value);
 
+double clampPI_PI(double value);
+double clampPI_PI(float value);
+
 double quaternionToYaw(double x, double y, double z, double w);
 tuple<double, double, double, double> yawToQuaternion(double yaw);
 

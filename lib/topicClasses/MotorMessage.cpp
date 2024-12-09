@@ -45,6 +45,12 @@ void MotorMessage::publishMsg(){
     publisher -> publish(msg);
 }
 
+void MotorMessage::publishMsg(char speed, char steer){
+    setSpeed(speed);
+    setSteer(steer);
+    publishMsg();
+}
+
 void MotorMessage::publishMode(string mode){
     setMode(mode);
 
