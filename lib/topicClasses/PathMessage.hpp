@@ -24,8 +24,11 @@ public:
     vector<tuple<int, int, int>>getPathGrid();
     void setPath(vector<tuple<double, double, double>> path);
     void setPath(vector<tuple<int, int, int>> pathGrid, int mapOriginX, int mapOriginY, double resolution);
+    void setPath(vector<pair<int, int>> pathGrid, int mapOriginX, int mapOriginY, double resolution);
     // void setPath(double x, double y, double phi=0.0);
     // void setPath(int x, int y, int indexPhi, int mapOriginX, int mapOriginY, double resolution);
+    static void setMapDimensions(int mapOriginX, int mapOriginY, double mapResolution);
+    static tuple<int, int, double> getMapDimensions();
 
 private:
     rclcpp::Logger logger;
@@ -36,14 +39,13 @@ private:
     void clearPath();
     // void addPoint(double x, double y, double phi = 0.0);
     void addPoint(tuple<double, double, double> point);
-    void setMapDimensions(int mapOriginX, int mapOriginY, double mapResolution);
     vector<geometry_msgs::msg::PoseStamped> pathToPoseStamped();
     vector<tuple<double, double, double>> PoseStampedToPath(vector<geometry_msgs::msg::PoseStamped> poses);
 
     vector<tuple<double, double, double>> path;
-    int mapOriginX;
-    int mapOriginY;
-    double mapResolution;
+    static int mapOriginX;
+    static int mapOriginY;
+    static double mapResolution;
     
 
 };

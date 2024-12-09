@@ -4,7 +4,9 @@
 PathMessage::PathMessage(rclcpp::Logger logger) : logger(logger) {}
 PathMessage::PathMessage(rclcpp::Logger logger,  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr publisher) : logger(logger), publisher(publisher), clock(RCL_SYSTEM_TIME) {}
 
-
+int PathMessage::mapOriginX = 0;
+int PathMessage::mapOriginY = 0;
+double PathMessage::mapResolution = 0.05;
 
 void PathMessage::publishMsg(){
    nav_msgs::msg::Path msg;
@@ -63,6 +65,14 @@ void PathMessage::setPath(vector<tuple<int, int, int>> pathGrid, int mapOriginX,
     setPath(path);
 }
 
+void PathMessage::setPath(vector<pair<int, int>> pathGrid2, int mapOriginX, int mapOriginY, double resolution){
+    vector<tuple<int,int,int>> pathGrid3;
+    for(pair<int, int> point2 :pathGrid2){
+        pathGrid3.push_back({point2.first, point2.second, 0});
+    }
+    setPath(pathGrid3, mapOriginX, mapOriginY, resolution);
+}
+
 
 void PathMessage::clearPath(){
     path.clear();
@@ -72,10 +82,10 @@ void PathMessage::addPoint(tuple<double, double, double> point){
     path.push_back(point);
 }
 
-void PathMessage::setMapDimensions(int mapOriginX, int mapOriginY, double mapResolution){
-    this->mapOriginX = mapOriginX;
-    this->mapOriginY = mapOriginY;
-    this->mapResolution = mapResolution;
+void PathMessage::setMapDimensions(int originX, int originY, double resolution){
+    mapOriginX = originX;
+    mapOriginY = originY;
+    mapResolution = resolution;
 }
 
 vector<geometry_msgs::msg::PoseStamped> PathMessage::pathToPoseStamped () {
@@ -124,6 +134,10 @@ vector<tuple<double, double, double>> PathMessage::PoseStampedToPath(vector<geom
         simplePoses.push_back({x,y,yaw});
     }
     return simplePoses;
+}
+
+tuple<int, int, double> PathMessage::getMapDimensions(){
+    return {mapOriginX, mapOriginY, mapResolution};
 }
 
 

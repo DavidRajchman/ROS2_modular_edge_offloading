@@ -65,9 +65,9 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     auto gridCopy = this->grid;
     path.clear();
 
-    RCLCPP_INFO(get_logger(), "start");
-    RCLCPP_DEBUG_STREAM(get_logger(), "x: " << poseRobX << " y: " << poseRobY << " phi: " << poseRobPhi);
-    RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapRobX << " map y: " << mapRobY << " map phi1: " << mapRobPhi.first <<" map phi 2: "<<mapRobPhi.second);
+    // RCLCPP_INFO(get_logger(), "start");
+    // RCLCPP_DEBUG_STREAM(get_logger(), "x: " << poseRobX << " y: " << poseRobY << " phi: " << poseRobPhi);
+    // RCLCPP_DEBUG_STREAM(get_logger(), "map x: " << mapRobX << " map y: " << mapRobY << " map phi1: " << mapRobPhi.first <<" map phi 2: "<<mapRobPhi.second);
 
     RCLCPP_DEBUG(get_logger(), "before A*");
     astar(gridDil, {mapRobX,mapRobY, mapRobPhi}, {mapGoalX, mapGoalY, mapGoalPhi});
@@ -144,18 +144,22 @@ void Astar::poseCb(const services::msg::Position::SharedPtr msg) {
 }
 
 void Astar::publishPath() {
-    nav_msgs::msg::Path path2Pub;
-    std_msgs::msg::Header header;
+    auto [originX, originY, resolution]=mapMsg.getMapDimensions();
+    pathMsg.setPath(path, originX, originY, resolution);
+    pathMsg.publishMsg();
 
-    // header
-    header.stamp = this->get_clock()->now();
-    header.frame_id = "map";
+    // nav_msgs::msg::Path path2Pub;
+    // std_msgs::msg::Header header;
 
-    // vector<geometry_msgs::msg::PoseStamped> poses = convertGridPathToPoses(path);
-    path2Pub.header = header;
-    // path2Pub.poses = poses;
+    // // header
+    // header.stamp = this->get_clock()->now();
+    // header.frame_id = "map";
 
-    path_pub->publish(path2Pub);
+    // // vector<geometry_msgs::msg::PoseStamped> poses = convertGridPathToPoses(path);
+    // path2Pub.header = header;
+    // // path2Pub.poses = poses;
+
+    // path_pub->publish(path2Pub);
 
     // Aktualizace stavu
     closedPath = true;
