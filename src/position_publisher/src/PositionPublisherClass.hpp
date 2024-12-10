@@ -26,7 +26,7 @@ public:
 
 private:
     //class attributes
-    float mapOriginX, mapOriginY, mapRes;
+    // float mapOriginX, mapOriginY, mapRes;
     bool mapData = false;
     
     

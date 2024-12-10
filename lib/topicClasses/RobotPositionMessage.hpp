@@ -72,7 +72,7 @@ private:
     //dimensions of map
     int mapSizeX = -1;
     int mapSizeY = -1;
-    int mapResolution = -1;
+    double mapResolution = -1;
 };
 
 #endif

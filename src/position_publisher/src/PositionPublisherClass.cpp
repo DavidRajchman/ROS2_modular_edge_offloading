@@ -65,6 +65,9 @@ void PositionPublisher::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
     auto [sizeX, sizeY, resolution] = mapMessage.getMapDimensions();
     auto [mapOriginX, mapOriginY, mapOriginPhi] = mapMessage.getMapOriginGrid();
 
+    RCLCPP_DEBUG_STREAM(this->get_logger(), "sizeX: "<<sizeX<<" sizeY: "<<sizeY<<" resolution: "<<resolution);
+    RCLCPP_DEBUG_STREAM(this->get_logger(), "orinX: "<<mapOriginX<<" orinY: "<<mapOriginY<<" orinPhi: "<<mapOriginPhi);
+
     robotPositionMsg.setMapDimensions(sizeX, sizeY, resolution);
     robotPositionMsg.setMapOrigin(mapOriginX, mapOriginY);
 }

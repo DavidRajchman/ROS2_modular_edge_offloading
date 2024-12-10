@@ -47,14 +47,16 @@ void RobotPositionMessage::setMapPosition(double poseX, double poseY, double pos
         RCLCPP_WARN(logger, "Not initiated map origin y");
         return;
     }
-    
+    // RCLCPP_DEBUG_STREAM(logger, "x: "<<poseX<<" y: "<<poseY<<" phi: "<<posePhi );
+    // RCLCPP_DEBUG_STREAM(logger, "orinx: "<<mapOriginX<<" oriny: "<<mapOriginY<<" res: "<<mapResolution );
     auto [mapX, mapY, indexPhi] =positionToGridPosition(poseX, poseY, posePhi, mapOriginX, mapOriginY, mapResolution);
     setMapPosition(mapX, mapY, indexPhi);
 }
 
 void RobotPositionMessage::setMapPosition(int mapX, int mapY, int indexDirection){
-    setMapOriginX(mapX);
-    setMapOriginY(mapY);
+    // RCLCPP_DEBUG_STREAM(logger, "mapx: "<<mapX<<" mapY: "<<mapY<<" phi: "<<indexDirection );
+    setMapX(mapX);
+    setMapY(mapY);
     setIndexDirecion(indexDirection);
 }
 
@@ -103,10 +105,13 @@ void RobotPositionMessage::setMapOrigin(int originX, int originY){
 
 void RobotPositionMessage::setMapOriginX(int originX){
     this -> mapOriginX = originX;
+    RCLCPP_DEBUG_STREAM(logger, "setting origin x: "<<mapOriginX);
+
 }
 
 void RobotPositionMessage::setMapOriginY(int originY){
     this -> mapOriginY = originY;
+    RCLCPP_DEBUG_STREAM(logger, "setting origin y: "<<mapOriginY);
 }
 
 pair<int, int> RobotPositionMessage::getMapOrigin(){
@@ -117,6 +122,7 @@ void RobotPositionMessage::setMapDimensions(int sizeX, int sizeY,double resoluti
     this -> mapSizeX = sizeX;
     this -> mapSizeY = sizeY;
     this -> mapResolution = resolution;
+    RCLCPP_DEBUG_STREAM(logger, "setting dimensions x: "<<mapSizeX<<" mapsizeY: "<<mapSizeY<<" map resolution: "<<mapResolution );
 }
 
 
