@@ -36,7 +36,7 @@ tuple<double, double, double> RobotPositionMessage::getPosition(){
 void RobotPositionMessage::setMapPosition(double poseX, double poseY, double posePhi){
     
     if(mapResolution == -1 ){
-        RCLCPP_WARN(logger, "Not initiated map resolution");
+        RCLCPP_WARN_ONCE(logger, "Not initiated map resolution");
         return;
     }
     else if (mapOriginX == -1){
@@ -105,13 +105,13 @@ void RobotPositionMessage::setMapOrigin(int originX, int originY){
 
 void RobotPositionMessage::setMapOriginX(int originX){
     this -> mapOriginX = originX;
-    RCLCPP_DEBUG_STREAM(logger, "setting origin x: "<<mapOriginX);
+    RCLCPP_DEBUG_STREAM_ONCE(logger, "robot position: setting origin x: "<<mapOriginX);
 
 }
 
 void RobotPositionMessage::setMapOriginY(int originY){
     this -> mapOriginY = originY;
-    RCLCPP_DEBUG_STREAM(logger, "setting origin y: "<<mapOriginY);
+    RCLCPP_DEBUG_STREAM_ONCE(logger, "robot position: setting origin y: "<<mapOriginY);
 }
 
 pair<int, int> RobotPositionMessage::getMapOrigin(){
@@ -122,7 +122,7 @@ void RobotPositionMessage::setMapDimensions(int sizeX, int sizeY,double resoluti
     this -> mapSizeX = sizeX;
     this -> mapSizeY = sizeY;
     this -> mapResolution = resolution;
-    RCLCPP_DEBUG_STREAM(logger, "setting dimensions x: "<<mapSizeX<<" mapsizeY: "<<mapSizeY<<" map resolution: "<<mapResolution );
+    RCLCPP_DEBUG_STREAM_ONCE(logger, "robot position: setting dimensions x: "<<mapSizeX<<" mapsizeY: "<<mapSizeY<<" map resolution: "<<mapResolution );
 }
 
 
@@ -154,9 +154,21 @@ void RobotPositionMessage::publishMsg(services::msg::Position::SharedPtr message
 }
 
 void RobotPositionMessage::receiveMsg(services::msg::Position::SharedPtr message){
-    setPosition(message->pose_rob_x, message->pose_rob_y, message->pose_rob_phi);
-    setMapPosition(message->map_rob_x, message->map_rob_y, message -> map_phi_index);
-    setMapOrigin(message-> map_origin_x, message-> map_origin_x);
+    poseRobX = message->pose_rob_x;
+    poseRobY = message->pose_rob_y;
+    poseRobPhi = message->pose_rob_phi;
+
+    mapRobX = message->map_rob_x;
+    mapRobY = message->map_rob_y;
+    indexPhi = message->map_phi_index;
+
+    mapOriginX = message->map_origin_x;
+    mapOriginY = message->map_origin_y;
+
+    
+    // setMapOrigin(message-> map_origin_x, message-> map_origin_y);
+    // setPosition(message->pose_rob_x, message->pose_rob_y, message->pose_rob_phi);
+    // setMapPosition(message->map_rob_x, message->map_rob_y, message -> map_phi_index);
 }
 
 

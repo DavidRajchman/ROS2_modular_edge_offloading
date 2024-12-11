@@ -113,7 +113,7 @@ double gridIndexToYaw(int index){
 
 vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation, int obstacleLimit ){
     
-    cv::Mat matInput(sizeX, sizeY, CV_8U, &mapMsg[0]);
+    cv::Mat matInput(sizeY, sizeX, CV_8U, &mapMsg[0]);
     // creating kernel for dilatation
     cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, //shape of kernel ELLIPSE
                                                 cv::Size(2 * dilatation + 1, 2 * dilatation + 1), // size of kernel

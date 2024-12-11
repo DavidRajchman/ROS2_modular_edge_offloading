@@ -5,7 +5,6 @@
 #include <std_msgs/msg/int32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <services/msg/control_motor.hpp>
-#include <services/msg/status_node.hpp>
 #include "../math/ROS2_math.hpp"
 
 #include <fcntl.h>

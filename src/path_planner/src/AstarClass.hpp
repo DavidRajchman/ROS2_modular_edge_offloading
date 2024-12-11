@@ -39,23 +39,23 @@ public:
 
 private:
     //parameters from yaml file
-    double CAR_WIDTH, LOOK_DISTANCE, PENALTY_CHANGE_HIGH, PENALTY_CHANGE_LOW, PENALTY_INPUT_OUTPUT, PENALTY_LAST_CHANGE;
+    double CAR_WIDTH, LOOK_DISTANCE, PENALTY_CHANGE_HIGH, PENALTY_CHANGE_LOW, PENALTY_OUTPUT_OUTPUT, PENALTY_INPUT_OUTPUT, PENALTY_LAST_CHANGE;
     int DILATATION;
     
     //parameters from messages
-    unsigned int widthMap, heightMap;
-    float mapRes;
-    int mapRobX, mapRobY;
-    int mapOriginX, mapOriginY;
-    float poseRobX, poseRobY, poseRobPhi;
-    vector<vector<int8_t>> grid;
-    vector<vector<bool>> gridDil;
-    double goalX, goalY, goalPhi;
-    pair<int, int> mapGoalPhi, mapRobPhi;
-    int mapGoalX, mapGoalY;
+    // unsigned int widthMap, heightMap;
+    // float mapRes;
+    // int mapRobX, mapRobY;
+    // int mapOriginX, mapOriginY;
+    // float poseRobX, poseRobY, poseRobPhi;
+    // vector<vector<int8_t>> grid;
+    // vector<vector<bool>> gridDil;
+    // double goalX, goalY, goalPhi;
+    // pair<int, int> mapGoalPhi, mapRobPhi;
+    // int mapGoalX, mapGoalY;
     vector<pair<int,int>> path;
-    vector<array<double, 3>> checkpoints;
-    double originX, originY, originPhi;
+    // vector<array<double, 3>> checkpoints;
+    // double originX, originY, originPhi;
 
     // Publishers and Subscribers
     MapMessage mapMsg;
@@ -78,12 +78,11 @@ private:
     
     //
     void publishPath();
-    double heuristic (const std::pair<int, int>& node, const std::pair<int, int>& goal);
-    void makePath(const vector<vector<std::array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
+    double heuristic (const pair<int, int>& node, const pair<int, int>& goal);
+    void makePath(const vector<vector<array<int, 2>>>& way,const pair<int, int>& start, const pair<int, int>& goal);
     vector<NodeStar> getNeighbor(const NodeStar& node, const vector<vector<bool>>& grid, vector<vector<array<int, 2>>>& way, 
                         const tuple<int, int, int>& start, const tuple<int, int, int>& goal, int lastChangeDir);
-    void astar(const vector<vector<bool>> grid, const tuple<int, int, int>& start, 
-                                    const tuple<int, int, int>& goal);     
+    void astar(const vector<vector<bool>> grid, const tuple<int, int, int>& start, const tuple<int, int, int>& goal);     
 
 };
 #endif

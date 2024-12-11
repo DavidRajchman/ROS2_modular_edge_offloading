@@ -98,6 +98,7 @@ vector<geometry_msgs::msg::PoseStamped> PathMessage::pathToPoseStamped () {
         // RCLCPP_DEBUG_STREAM(get_logger(), "convert x: "<<gridPose.first<<" y: "<<gridPose.second);
         
         geometry_msgs::msg::PoseStamped pose;
+        pose.header.frame_id="map";
         pose.pose.position.x = get<0>(point);
         pose.pose.position.y = get<1>(point);
         pose.pose.position.z = 0.0;

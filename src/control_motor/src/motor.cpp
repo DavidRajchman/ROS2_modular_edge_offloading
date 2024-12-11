@@ -2,7 +2,7 @@
 // #include <std_msgs/msg/int32.hpp>
 // #include <std_msgs/msg/string.hpp>
 #include <services/msg/control_motor.hpp>
-#include <services/msg/status_node.hpp>
+// #include <services/msg/status_node.hpp>
 #include "../../../lib/topicClasses/MotorUart.hpp"
 
 // #include <fcntl.h>
@@ -30,7 +30,7 @@ public:
     int curSpeed = 0;
     char command[7];
     rclcpp::Subscription<services::msg::ControlMotor>::SharedPtr subControl;
-    rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
+    // rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
     services::msg::StatusNode nodeStatus;
 
     ControlMotor() : Node("control_motor"), motor(this ->get_logger() ) {
@@ -39,7 +39,7 @@ public:
 
         // subscribers and publishers
         subControl = this->create_subscription<services::msg::ControlMotor>("controlMotor", 5,std::bind(&ControlMotor::motorCb, this, std::placeholders::_1));
-        statusPub = this->create_publisher<services::msg::StatusNode>("/status", 1);
+        // statusPub = this->create_publisher<services::msg::StatusNode>("/status", 1);
 
         sleep(1);
     }
