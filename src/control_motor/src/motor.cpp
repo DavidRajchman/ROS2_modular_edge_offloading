@@ -31,7 +31,7 @@ public:
     char command[7];
     rclcpp::Subscription<services::msg::ControlMotor>::SharedPtr subControl;
     // rclcpp::Publisher<services::msg::StatusNode>::SharedPtr statusPub;
-    services::msg::StatusNode nodeStatus;
+    // services::msg::StatusNode nodeStatus;
 
     ControlMotor() : Node("control_motor"), motor(this ->get_logger() ) {
         //class for communication with teensy (motor) 
@@ -48,11 +48,14 @@ private:
     MotorUart motor;
 
     void motorCb(const services::msg::ControlMotor::SharedPtr msg) {
-        if(msg->mode == "")
+        // RCLCPP_INFO(this -> get_logger(), msg->mode);
+        if(msg->mode == ""){
+            RCLCPP_INFO(this -> get_logger(), "Control msg");
             motor.publishControl(static_cast<char>(msg->forwarding),static_cast<char>(msg->steering));
+        }
         else if(msg->mode == "manual")
             motor.publishMode(0);
-        else if(msg->mode == "automatic")
+        else if(msg->mode == "auto")
             motor.publishMode(1);
         else if(msg->mode == "lidar")
             motor.setLidarSpeed(static_cast<char>(msg->forwarding));

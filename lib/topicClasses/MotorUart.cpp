@@ -4,7 +4,7 @@
 MotorUart::MotorUart(rclcpp::Logger logger) : logger(logger) {
     // cout<<"hi"<<endl;
     // this -> logger = logger;
-    setConnection();
+    setConnection("/dev/teensy");
 }
 
 
