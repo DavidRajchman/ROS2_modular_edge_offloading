@@ -10,15 +10,18 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     slam_params_file = LaunchConfiguration('slam_params_file')
+    # config_file = os.path.join(home_dir = os.path.expanduser("~"),'autonomous-driving-ros2/src/slam/config/mapper_params_online_async.yaml')
+    config_file = os.path.join(os.path.expanduser("~"),'autonomous-driving-ros2','src','slam','config','mapper_params_online_async.yaml')
+    # config_file = "/home/vehicle2/autonomous-driving-ros2/src/slam/config/mapper_params_online_async.yaml"
+    print(config_file)
 
     declare_use_sim_time_argument = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='Use simulation/Gazebo clock')
     declare_slam_params_file_cmd = DeclareLaunchArgument(
         'slam_params_file',
-        default_value=os.path.join(get_package_share_directory("slam_toolbox"),
-                                   'config', 'mapper_params_online_async.yaml'),
+        default_value=config_file,
         description='Full path to the ROS2 parameters file to use for the slam_toolbox node')
 
     start_async_slam_toolbox_node = Node(

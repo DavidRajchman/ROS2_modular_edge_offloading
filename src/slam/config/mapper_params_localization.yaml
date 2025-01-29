@@ -12,10 +12,12 @@ slam_toolbox:
     map_frame: map
     base_frame: base_footprint
     scan_topic: /scan
-    mode: mapping #localization
+    # mode: mapping
+
+    mode: localization
+    map_file_name: mapa2
 
     # if you'd like to start localizing on bringup in a map and pose
-    #map_file_name: test_steve
     #map_start_pose: [5.0, 1.0, 0.0]
 
     debug_logging: false
