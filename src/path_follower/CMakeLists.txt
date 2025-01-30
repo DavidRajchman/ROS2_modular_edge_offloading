@@ -22,6 +22,10 @@ find_package(OpenCV REQUIRED)
 add_executable(pursuit src/PursePursuit.cpp src/PursePursuitClass.cpp ../../lib/math/ROS2_math.cpp ../../lib/topicClasses/MotorMessage.cpp ../../lib/topicClasses/PathMessage.cpp ../../lib/topicClasses/RobotPositionMessage.cpp)
 ament_target_dependencies(pursuit rclcpp std_msgs nav_msgs visualization_msgs  services tf2 tf2_ros OpenCV)
 
+install(TARGETS
+  pursuit
+  DESTINATION lib/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

@@ -32,11 +32,12 @@ void PurePursuit::poseCb(const services::msg::Position::SharedPtr msg)
 
 void PurePursuit::pathCb(const nav_msgs::msg::Path::SharedPtr msg)
 {
+    RCLCPP_INFO(this -> get_logger(),"path received");
     pathMsg.receiveMsg(msg);
     pathFollow = pathMsg.getPath(); 
-
+    RCLCPP_INFO(this -> get_logger(),"path received2");
     followPath();
-
+    RCLCPP_INFO(this -> get_logger(),"path received3");
     control=true;
     motorMsg.publishMode("auto");
 }
@@ -47,15 +48,18 @@ void PurePursuit::followPath()
     int i = 0;
     float distance = 0;
     int pathSize = static_cast<int>(pathFollow.size());
+    RCLCPP_INFO_STREAM(this -> get_logger(),"before while1 "<< MAX_DIST << " "<< distance);
+    RCLCPP_INFO_STREAM(this -> get_logger(),"before while2 "<< pathFollow.size());
 
-    while (distance < MAX_DIST && !path.empty())
+    while (distance < MAX_DIST && !pathFollow.empty())
     {
-        distance = sqrt(pow(poseRobX - path[0].first, 2) + pow(poseRobY - path[0].second, 2));
+        RCLCPP_INFO(this -> get_logger(),"in while loop");
+        distance = sqrt(pow(poseRobX - get<0>(pathFollow[0]), 2) + pow(poseRobY - get<1>(pathFollow[0]), 2));
 
         // remove point from queue
         if (distance < MAX_DIST)
         {
-            path.erase(path.begin());
+            pathFollow.erase(pathFollow.begin());
         }
 
         double pursuitX, pursuitY;
@@ -90,9 +94,9 @@ void PurePursuit::followPath()
 
             i++;
         }
-
+        RCLCPP_INFO(this->get_logger(), "before stop condition");
         // stop condition
-        if (path.empty())
+        if (pathFollow.empty())
         {
             RCLCPP_INFO(this->get_logger(), "Following finished.");
 
@@ -100,8 +104,9 @@ void PurePursuit::followPath()
             motorMsg.publishMode("manual");
             return;
         }
-
+        RCLCPP_INFO(this->get_logger(), "before find angle");
         findAngle(KP_HIGH, pursuitX, pursuitY);
+        RCLCPP_INFO(this->get_logger(), "after find angle");
     }
 }
 
