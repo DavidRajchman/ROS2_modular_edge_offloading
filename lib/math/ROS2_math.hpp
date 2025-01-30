@@ -29,6 +29,8 @@ double gridIndexToYaw(int index);
 tuple<double, double, double> gridPositionToPosition(int mapX, int mapY, int indexPhi, int originX, int originY, double resolution);
 tuple<int, int, int> positionToGridPosition(double x, double y, double phi, int mapOriginX, int mapOriginY, double resolution);
 
-vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation = 5, int obstacleLimit = 80);
+vector<vector<bool>> dilatation(vector<int8_t> data, int sizeX, int sizeY, int DILATATION, int obstacleLimit = 80);
+void print2DArray(vector<vector<bool>> array);
+
 
 #endif

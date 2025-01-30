@@ -109,35 +109,34 @@ double gridIndexToYaw(int index){
     return (index * M_PI / 4) - M_PI;
 }
 
+vector<vector<bool>> dilatation(vector<int8_t> data, int sizeX, int sizeY, int DILATATION, int obstacleLimit) {
+    //create 2D boolean dilatated array map from 1D data (map data from ROS msg)
 
+    //creating cv matrix suitable for dilatation
+    cv::Mat image(sizeY, sizeX, CV_8U, data.data());
 
-vector<vector<bool>> createDelatatedMap(vector<int8_t>& mapMsg, int sizeX, int sizeY, int dilatation, int obstacleLimit ){
-    
-    cv::Mat matInput(sizeY, sizeX, CV_8U, &mapMsg[0]);
     // creating kernel for dilatation
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, //shape of kernel ELLIPSE
-                                                cv::Size(2 * dilatation + 1, 2 * dilatation + 1), // size of kernel
-                                                cv::Point(dilatation, dilatation)); // definition of center
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(DILATATION, DILATATION));
 
-    // Aplikujeme dilataci
-    cv::Mat dilatedImage;
-    cv::dilate(matInput, dilatedImage, element);
-    // RCLCPP_DEBUG_STREAM(get_logger(), "access: " << (int)dilatedImage.at<unsigned char>(0,0));
+    // application of dilatation
+    cv::Mat dilated;
+    cv::dilate(image, dilated, kernel);
+
+    // print result
+    // cout << "Původní matice:\n" << image << "\n\n";
+    // cout << "Matice po dilataci:\n" << dilated << "\n";
     
-    // RCLCPP_INFO(get_logger(), "before mat to vector" );
+    //converting to boolean 2D array
     vector<vector<bool>> dilatatedGrid;
-    dilatatedGrid.resize(sizeX, std::vector<bool>(sizeY));
-    // vector<vector<bool>> dilatatedGridated(grid.size(), vector<bool>(grid[0].size(),false));
-    for (int x =0; x<static_cast<int>(sizeX);x++){
-        for (int y=0; y<static_cast<int>(sizeY);y++){
-            // RCLCPP_DEBUG_STREAM(get_logger(), "transform : "<< x<<" "<<y);
-            dilatatedGrid[x][y] = dilatedImage.at<unsigned char>(x,y)<=obstacleLimit ? false : true; 
+    dilatatedGrid.resize(sizeX, std::vector<bool>(sizeY,false));
+    for (int x =0; x<sizeY;x++){
+        for (int y=0; y<sizeX;y++){
+            dilatatedGrid[y][x] = dilated.at<unsigned char>(x,y)<=obstacleLimit ? false : true; 
         }
     }
     return dilatatedGrid;
-    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][11] ); //ano
-    // RCLCPP_ERROR_STREAM(get_logger(), "zkouska dilatation: " << gridDil[70][12] ); //ne
 }
+
 
 
 tuple<double, double, double> gridPositionToPosition(int mapX, int mapY, int indexPhi, int mapOriginX, int mapOriginY, double resolution){
@@ -152,4 +151,16 @@ tuple<int, int, int> positionToGridPosition(double x, double y, double phi, int 
     int mapY = round(y / resolution) + mapOriginY;
     int indexPhi = yawToGridIndex(phi);
     return {mapX, mapY, indexPhi};
+}
+
+void print2DArray(vector<vector<bool>> array){
+    cout << "printed array:" << endl;
+    cout << "size x:"<< static_cast<int>(array.size())<<" size y: "<< static_cast<int>(array[0].size()) << "\n";
+    for(int x =0; x < static_cast<int>(array.size()); x++ ){
+        cout<<"line "<< x <<": [";
+        for(int y = 0; y < static_cast<int>(array[0].size()); y++ ){
+            cout << static_cast<int>(array[x][y]) << (y != (static_cast<int>(array[0].size()-1))? ", ":"" );
+        }
+        cout<<"]\n";
+    } 
 }

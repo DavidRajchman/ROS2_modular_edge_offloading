@@ -17,7 +17,7 @@ Astar::Astar() :
     PENALTY_INPUT_OUTPUT = this->declare_parameter("PENALTY_OUTPUT_OUTPUT", 200);
     PENALTY_INPUT_OUTPUT = this->declare_parameter("PENALTY_INPUT_OUTPUT", 1'000);
     PENALTY_LAST_CHANGE = this->declare_parameter("PENALTY_LAST_CHANGE", 5'000);
-    DILATATION = this->declare_parameter("DILATATION", 1);
+    DILATATION = this->declare_parameter("DILATATION", 3);
 
     // Publishers and Subscribers
     map_sub = this->create_subscription<nav_msgs::msg::OccupancyGrid>("map", 1, bind(&Astar::mapCb, this, std::placeholders::_1));
@@ -42,28 +42,18 @@ void Astar::goalCb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     RCLCPP_DEBUG_STREAM(get_logger(), "goalX: "<< poseX << " goalY: " << poseY << " goalPhi: "<< posePhi);
     RCLCPP_DEBUG_STREAM(get_logger(), "goalmapX: "<< get<0>(goalPosition) << " goalmapY: " << get<1>(goalPosition) << " goalmapPhi: "<<get<2>(goalPosition));
 
-    RCLCPP_DEBUG(get_logger(), "before A*");
-    vector<int8_t> data = mapMsg.getMap();
-    vector<vector<bool>> gridDil = createDelatatedMap(data, sizeX, sizeY, DILATATION);
-    astar(gridDil, startPosition, goalPosition);
-    RCLCPP_DEBUG(get_logger(), "after A*");
 
+    vector<int8_t> data = mapMsg.getMap();
+    vector<vector<bool>> gridDil = dilatation(data, sizeX, sizeY, DILATATION);
+    // print2DArray(gridDil);
+    astar(gridDil, startPosition, goalPosition);
+    
     this->publishPath();
 } 
 
 void Astar::mapCb(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { 
     RCLCPP_DEBUG_ONCE(get_logger(), "map received");
     mapMsg.receiveMsg(msg);
-
-    // auto [sizeX, sizeY, resolution] = mapMsg.getMapDimensions();
-    // auto [mapOriginX, mapOriginY, mapOriginPhi] = mapMsg.getMapOriginGrid();
-
-    // RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "originx: "<< mapOriginX << " originy: " << mapOriginY );
-
-    // positionMsg.setMapDimensions(sizeX, sizeY, resolution);
-    // positionMsg.setMapOrigin(mapOriginX, mapOriginY);
-
-    // RCLCPP_DEBUG_STREAM_ONCE(get_logger(), "width: "<< widthMap << " height: " << heightMap << " resolution: "<<mapRes);
 }
 
 void Astar::poseCb(const services::msg::Position::SharedPtr msg) {
@@ -114,23 +104,17 @@ vector<NodeStar> Astar::getNeighbor(const NodeStar& node, const vector<vector<bo
         indexMoves = {(get<2>(start) - 1 + 8) % 8, get<2>(start), (get<2>(start) + 1 ) % 8};
 
         moves = {moves[(get<2>(start) -1 +8) % 8], moves[get<2>(start)], moves[(get<2>(start) + 1) % 8]};
-        // moves =  {moves[get<2>(start)]};
         RCLCPP_DEBUG_STREAM_ONCE(this->get_logger(), "start phi: " << get<2>(start));
-        // RCLCPP_DEBUG_STREAM_ONCE(this->get_logger(), "moves: " << moves[0].first <<" "<<moves[0].second<<"\n"
-        //                                                 << moves[1].first <<" "<<moves[1].second<<"\n"
-        //                                                 << moves[2].first <<" "<<moves[2].second);
 
     }
 
     vector<NodeStar> ret;
     for(int indexMove: indexMoves){
-    // for (int i = 0; i < static_cast<int>(indexMoves.size()); ++i) {
         pair<int, int> move = {movesAll[indexMove]};
         int newX = node.x + move.first;
         int newY = node.y + move.second;
 
-        if (newX < 0 || newY < 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newY][newX]) {
-            // RCLCPP_DEBUG_STREAM(this->get_logger(), "obstacle on: "<<newX<<" "<<newY);
+        if (newX < 0 || newY< 0 || newX >= static_cast<int>(grid.size()) || newY >= static_cast<int>(grid[0].size()) || grid[newX][newY]) {
             continue;
         }
 
@@ -198,14 +182,8 @@ void Astar::makePath(const vector<vector<std::array<int, 2>>>& way,
 void Astar::astar(const vector<vector<bool>> grid, const tuple<int, int, int>& start, const tuple<int, int, int>& goal) {
     
     vector<vector<double>> price(grid.size(), vector<double>(grid[0].size(), 1e9));
-    RCLCPP_DEBUG(get_logger(), "before init");
     vector<std::vector<array<int, 2>>> way(grid.size(), vector<array<int, 2>>(grid[0].size(), {-1, -1}));
     priority_queue<NodeStar, vector<NodeStar>, greater<>> priorityQ;
-    RCLCPP_DEBUG(get_logger(), "after init");
-
-    // auto [sizeX, sizeY, resolution] = mapMsg.getMapDimensions();
-    // RCLCPP_DEBUG(get_logger(), "before dilatation");
-    // RCLCPP_DEBUG(get_logger(), "after dilatation");
 
     price[get<0>(start)][get<1>(start)] = 0;
     double cost = heuristic(make_pair(get<0>(start), get<1>(start)), {get<0>(goal), get<1>(goal)});

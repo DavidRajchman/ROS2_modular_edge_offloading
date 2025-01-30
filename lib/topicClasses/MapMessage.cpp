@@ -117,10 +117,16 @@ vector<int8_t> MapMessage::getMap(){
 }
 
 vector<vector<char>> MapMessage::get2DMap(){
+    // cout<<"getting 2D map" <<" X: "<< mapSizeX << " Y: "<< mapSizeY << endl;
     vector<vector<char>> grid;
-    for (int i = 0; i < mapSizeX; ++i){
-        for (int j = 0; j < mapSizeY; ++j){
-            grid[i][j] = map[i * mapSizeX + j];
+    grid.resize(mapSizeX, std::vector<char>(mapSizeY,-1));
+    // cout<< "size: "<< map.size() <<endl;
+
+    for (int i = 0; i < mapSizeY; ++i){
+        for (int j = 0; j < mapSizeX; ++j){
+            // cout<< "index: "<< i * mapSizeY + j <<endl;
+            // cout<< "value: "<< static_cast<int>(map[0]) <<endl;
+            grid[j][i] = static_cast<char>(map[i * mapSizeX + j]);
         }
     }
     return grid;
