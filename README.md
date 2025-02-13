@@ -36,6 +36,9 @@ docker compose logs -f <name_container>
 
 #names of the available containers
 <name_container> = {gz-ros2, ros2}
+
+#control simulation using teleop_twist_keyboard
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args --remap cmd_vel:=model/vehicle_blue/cmd_vel
 ```
 
 
