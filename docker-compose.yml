@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   gz-ros2:
     build:
@@ -16,6 +14,7 @@ services:
     tty: true  # Aby byl kontejner interaktivní
     # command: ros2 launch sim sim_launch.py
     command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && ros2 launch sim sim_launch.py"
+    # command: bash
 
   ros2:
     build:

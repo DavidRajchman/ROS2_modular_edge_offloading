@@ -10,7 +10,8 @@ ros-jazzy-demo-nodes-cpp \
 ros-jazzy-ros-gz-bridge \
 ros-jazzy-ros-gz-sim \
 ros-jazzy-ament-cmake \
-nano
+nano \
+tmux
 
 
 RUN apt-get install lsb-release gnupg
@@ -30,7 +31,7 @@ RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 # # Inicializace rosdep
 WORKDIR /home/ubuntu/ros_ws
 RUN rm -rf build/ install/ log/
-RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build"
+RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install"
 RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
 RUN /bin/bash -c "source /home/ubuntu/ros_ws/install/setup.bash"
 
