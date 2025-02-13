@@ -95,7 +95,7 @@
     </model>
 
     <model name='vehicle_blue'>
-      <pose>0 2 0.325 0 -0 0</pose>
+      <pose>0 0 0.12 0 00 0</pose>
     
     <!--baselink  -->
       <link name='chassis'>
