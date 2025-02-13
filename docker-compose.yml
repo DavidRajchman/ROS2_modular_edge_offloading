@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  gz-ros2:
+    build:
+      context: ./gazebo/
+      dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./gazebo/src:/home/ubuntu
+    privileged: true
+    # stdin_open: true  # Abychom udrželi interaktivní terminál
+    tty: true  # Aby byl kontejner interaktivní
+    # command: ros2 launch sim sim_launch.py
+    command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && ros2 launch sim sim_launch.py"
+
+  ros2:
+    build:
+      context: ./ros/
+      dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./gazebo/src/ros_ws/src:/home/ubuntu/ros_ws/src
+    privileged: true
+    # stdin_open: true  # Abychom udrželi interaktivní terminál
+    tty: true  # Aby byl kontejner interaktivní
+    # command: ros2 launch sim sim_launch.py
+    command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
+
