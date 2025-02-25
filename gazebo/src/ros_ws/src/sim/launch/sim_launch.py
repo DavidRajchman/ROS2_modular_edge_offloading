@@ -19,7 +19,7 @@ def generate_launch_description():
     gazebo_sim = launch.actions.IncludeLaunchDescription(
             # PythonLaunchDescriptionSource([LaunchConfiguration('ros_gz_sim'), '/', other_launch_file])
             PythonLaunchDescriptionSource(ros_gz_sim_launch_file),
-            launch_arguments={'gz_args': '/home/ubuntu/ros_ws/src/sim/description/robot.sdf'}.items()
+            launch_arguments={'gz_args': '/home/ubuntu/ros_ws/src/sim/description/world.sdf'}.items()
         )
     gazebo_bridge = Node(
             package='demo_nodes_cpp',

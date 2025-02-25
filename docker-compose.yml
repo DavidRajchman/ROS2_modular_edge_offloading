@@ -25,7 +25,7 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-root
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./gazebo/src/ros_ws/src:/home/ubuntu/ros_ws/src
+      - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
     privileged: true
     # stdin_open: true  # Abychom udrželi interaktivní terminál
     tty: true  # Aby byl kontejner interaktivní

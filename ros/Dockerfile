@@ -8,8 +8,11 @@ COPY ./src /home/ubuntu/
 RUN apt update && apt install -y \
 ros-jazzy-demo-nodes-cpp \
 ros-jazzy-rviz2 \
+ros-jazzy-teleop-twist-keyboard \
+ros-jazzy-slam-toolbox \
 nano
 
+RUN apt install -y tmux
 
 
 # Nastavení prostředí pro ROS 2
