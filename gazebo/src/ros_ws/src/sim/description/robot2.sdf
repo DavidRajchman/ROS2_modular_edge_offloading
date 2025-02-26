@@ -9,6 +9,8 @@
     <plugin name='gz::sim::systems::UserCommands' filename='gz-sim-user-commands-system'/>
     <plugin name='gz::sim::systems::SceneBroadcaster' filename='gz-sim-scene-broadcaster-system'/>
     <plugin name='gz::sim::systems::Imu' filename='gz-sim-imu-system'/>
+   
+    <!--</plugin> -->
     <plugin name='gz::sim::systems::Sensors' filename='gz-sim-sensors-system'>
       <render_engine>ogre2</render_engine>
     </plugin>
@@ -76,6 +78,22 @@
       <self_collide>false</self_collide>
     </model>
     <model name='vehicle_blue'>
+     <plugin name='gz::sim::systems::OdometryPublisher' filename='gz-sim-odometry-publisher-system'>
+        <odom_frame>odom</odom_frame>
+        <robot_base_frame>base_footprint</robot_base_frame>
+        <odom_topic> /odom </odom_topic>
+        <tf_topic> /tf </tf_topic>
+     </plugin>
+      <!-- <plugin
+          filename="libignition-gazebo-joint-state-publisher-system.so"
+          name="ignition::gazebo::systems::JointStatePublisher">
+        <joint_name>front_left_wheel_steering_joint</joint_name>
+        <topic>/joint_states</topic>
+      </plugin> -->
+
+
+    <!-- <plugin name='gz::sim::systems::OdometryPublisher' filename='gz-sim-odometry-system'>
+    </plugin> -->
       <pose>-1.0050843463060843e-08 1.9999999956562211 0.11749918777045329 3.6974277195371779e-08 -8.5537341693054732e-08 -5.1596372465247239e-12</pose>
       <link name='chassis'>
         <pose>0.16 0 0 0 0 0</pose>
@@ -547,13 +565,14 @@
         </visual>
         <sensor name='gpu_lidar' type='gpu_lidar'>
           <pose>0 0 0 0 0 0</pose>
-          <topic>lidar</topic>
+          <topic>scan</topic>
+          <gz_frame_id>laser</gz_frame_id>
           <update_rate>10</update_rate>
           <enable_metrics>false</enable_metrics>
           <lidar>
             <scan>
               <horizontal>
-                <samples>640</samples>
+                <samples>120</samples>
                 <resolution>1</resolution>
                 <min_angle>-3.1415000000000002</min_angle>
                 <max_angle>3.1415000000000002</max_angle>
@@ -609,14 +628,15 @@
         <sensor name='camera' type='camera'>
           <pose>0 0 0 0 0 0</pose>
           <topic>camera/image_raw</topic>
+          <gz_frame_id>camera</gz_frame_id>
           <update_rate>10</update_rate>
           <enable_metrics>false</enable_metrics>
           <camera>
             <pose>0 0 0 0 0 0</pose>
             <horizontal_fov>1.089</horizontal_fov>
             <image>
-              <width>640</width>
-              <height>480</height>
+              <width>10</width>
+              <height>10</height>
               <format>RGB_INT8</format>
               <anti_aliasing>4</anti_aliasing>
             </image>
@@ -684,6 +704,7 @@
         <sensor name='imu_sensor' type='imu'>
           <pose>0 0 0 0 0 0</pose>
           <topic>imu</topic>
+          <gz_frame_id>imu</gz_frame_id>
           <update_rate>30</update_rate>
           <enable_metrics>false</enable_metrics>
           <imu>
@@ -816,6 +837,7 @@
         </axis>
         <pose>0 0 0 0 0 0</pose>
       </joint>
+
       <joint name='front_right_wheel_steering_joint' type='revolute'>
         <parent>chassis</parent>
         <child>front_right_wheel_steering_link</child>
@@ -988,6 +1010,7 @@
         <max_velocity>5</max_velocity>
         <min_acceleration>-7</min_acceleration>
         <max_acceleration>7</max_acceleration>
+        <topic>cmd_vel</topic>
       </plugin>
       <static>false</static>
       <self_collide>false</self_collide>

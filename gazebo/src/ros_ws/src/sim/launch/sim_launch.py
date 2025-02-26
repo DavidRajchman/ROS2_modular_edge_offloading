@@ -19,7 +19,7 @@ def generate_launch_description():
     gazebo_sim = launch.actions.IncludeLaunchDescription(
             # PythonLaunchDescriptionSource([LaunchConfiguration('ros_gz_sim'), '/', other_launch_file])
             PythonLaunchDescriptionSource(ros_gz_sim_launch_file),
-            launch_arguments={'gz_args': '/home/ubuntu/ros_ws/src/sim/description/world.sdf'}.items()
+            launch_arguments={'gz_args': '/home/ubuntu/ros_ws/src/sim/description/robot2.sdf'}.items()
         )
     gazebo_bridge = Node(
             package='demo_nodes_cpp',
@@ -48,7 +48,7 @@ def generate_launch_description():
                 namespace='ros_gz_bridge',
                 executable='parameter_bridge',
                 name='gz_bridge_lidar',
-                arguments=[ '/lidar@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan']
+                arguments=[ '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan']
             )
         ]
     )
@@ -79,6 +79,19 @@ def generate_launch_description():
         ]
     )
 
+    # gazebo_bridge_odom = TimerAction(
+    #     period=5.0,  # Zpoždění v sekundách
+    #     actions=[
+    #         Node(
+    #             package='ros_gz_bridge',
+    #             namespace='ros_gz_bridge',
+    #             executable='parameter_bridge',
+    #             name='gz_bridge_odom',
+    #             arguments=[ '/model/vehicle_blue/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry']
+    #         )
+    #     ]
+    # )
+
     gazebo_bridge_odom = TimerAction(
         period=5.0,  # Zpoždění v sekundách
         actions=[
@@ -87,7 +100,7 @@ def generate_launch_description():
                 namespace='ros_gz_bridge',
                 executable='parameter_bridge',
                 name='gz_bridge_odom',
-                arguments=[ '/model/vehicle_blue/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry']
+                arguments=[ '/odom@nav_msgs/msg/Odometry[gz.msgs.OdometryWithCovariance']
             )
         ]
     )
@@ -100,10 +113,35 @@ def generate_launch_description():
                 namespace='ros_gz_bridge',
                 executable='parameter_bridge',
                 name='gz_bridge_cmd',
-                arguments=[ '/model/vehicle_blue/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist']
+                arguments=[ '/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist']
             )
         ]
     )
+
+    gazebo_bridge_tf = TimerAction(
+        period=5.0,  # Zpoždění v sekundách
+        actions=[
+            Node(
+                package='ros_gz_bridge',
+                namespace='ros_gz_bridge',
+                executable='parameter_bridge',
+                name='gz_bridge_cmd',
+                arguments=[ '/tf@tf2_msgs/msg/TFMessage]gz.msgs.Pose_V']
+            )
+        ]
+    )
+    # gazebo_bridge_joint = TimerAction(
+    #     period=5.0,  # Zpoždění v sekundách
+    #     actions=[
+    #         Node(
+    #             package='ros_gz_bridge',
+    #             namespace='ros_gz_bridge',
+    #             executable='parameter_bridge',
+    #             name='gz_bridge_joint',
+    #             arguments=[ '/joint_states@sensor_msgs/msg/JointState@gz.msgs.Model']
+    #         )
+    #     ]
+    # )
 
     return LaunchDescription([
         gazebo_sim,
@@ -112,7 +150,8 @@ def generate_launch_description():
         gazebo_bridge_cam,
         gazebo_bridge_imu,
         gazebo_bridge_odom,
-        gazebo_bridge_cmd
+        gazebo_bridge_cmd,
+        # gazebo_bridge_joint
 
         
     ])
