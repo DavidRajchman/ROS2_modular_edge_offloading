@@ -12,7 +12,8 @@ ros-jazzy-teleop-twist-keyboard \
 ros-jazzy-slam-toolbox \
 nano
 
-RUN apt install -y tmux
+RUN apt install -y tmux \
+ros-jazzy-robot-localization
 
 
 # Nastavení prostředí pro ROS 2
