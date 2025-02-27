@@ -78,11 +78,13 @@
       <self_collide>false</self_collide>
     </model>
     <model name='vehicle_blue'>
+      <pose> 0 0 0.13 0 0 0</pose>
      <plugin name='gz::sim::systems::OdometryPublisher' filename='gz-sim-odometry-publisher-system'>
         <odom_frame>odom</odom_frame>
         <robot_base_frame>base_footprint</robot_base_frame>
         <odom_topic> /odom </odom_topic>
         <tf_topic> /tf </tf_topic>
+        <xyz_offset> 0.155 0 0 </xyz_offset>
      </plugin>
       <!-- <plugin
           filename="libignition-gazebo-joint-state-publisher-system.so"
@@ -90,11 +92,7 @@
         <joint_name>front_left_wheel_steering_joint</joint_name>
         <topic>/joint_states</topic>
       </plugin> -->
-
-
-    <!-- <plugin name='gz::sim::systems::OdometryPublisher' filename='gz-sim-odometry-system'>
-    </plugin> -->
-      <pose>-1.0050843463060843e-08 1.9999999956562211 0.11749918777045329 3.6974277195371779e-08 -8.5537341693054732e-08 -5.1596372465247239e-12</pose>
+      <!-- <pose>-1.0050843463060843e-08 1.9999999956562211 0.11749918777045329 3.6974277195371779e-08 -8.5537341693054732e-08 -5.1596372465247239e-12</pose> -->
       <link name='chassis'>
         <pose>0.16 0 0 0 0 0</pose>
         <inertial>

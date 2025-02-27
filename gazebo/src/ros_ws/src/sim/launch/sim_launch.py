@@ -100,7 +100,7 @@ def generate_launch_description():
                 namespace='ros_gz_bridge',
                 executable='parameter_bridge',
                 name='gz_bridge_odom',
-                arguments=[ '/odom@nav_msgs/msg/Odometry[gz.msgs.OdometryWithCovariance']
+                arguments=[ '/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry']
             )
         ]
     )
@@ -126,7 +126,7 @@ def generate_launch_description():
                 namespace='ros_gz_bridge',
                 executable='parameter_bridge',
                 name='gz_bridge_cmd',
-                arguments=[ '/tf@tf2_msgs/msg/TFMessage]gz.msgs.Pose_V']
+                arguments=[ '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V']
             )
         ]
     )
@@ -151,6 +151,7 @@ def generate_launch_description():
         gazebo_bridge_imu,
         gazebo_bridge_odom,
         gazebo_bridge_cmd,
+        gazebo_bridge_tf
         # gazebo_bridge_joint
 
         
