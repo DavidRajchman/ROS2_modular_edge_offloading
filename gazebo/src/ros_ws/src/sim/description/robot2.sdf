@@ -565,12 +565,12 @@
           <pose>0 0 0 0 0 0</pose>
           <topic>scan</topic>
           <gz_frame_id>laser</gz_frame_id>
-          <update_rate>10</update_rate>
+          <update_rate>12</update_rate>
           <enable_metrics>false</enable_metrics>
           <lidar>
             <scan>
               <horizontal>
-                <samples>120</samples>
+                <samples>8000</samples>
                 <resolution>1</resolution>
                 <min_angle>-3.1415000000000002</min_angle>
                 <max_angle>3.1415000000000002</max_angle>
@@ -627,14 +627,14 @@
           <pose>0 0 0 0 0 0</pose>
           <topic>camera/image_raw</topic>
           <gz_frame_id>camera</gz_frame_id>
-          <update_rate>10</update_rate>
+          <update_rate>24</update_rate>
           <enable_metrics>false</enable_metrics>
           <camera>
             <pose>0 0 0 0 0 0</pose>
             <horizontal_fov>1.089</horizontal_fov>
             <image>
-              <width>10</width>
-              <height>10</height>
+              <width>720</width>
+              <height>720</height>
               <format>RGB_INT8</format>
               <anti_aliasing>4</anti_aliasing>
             </image>

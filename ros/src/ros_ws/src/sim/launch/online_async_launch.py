@@ -82,7 +82,7 @@ def generate_launch_description():
     static_laser = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0", "0", "1", "0", "0", "0", "vehicle_blue/chassis", "vehicle_blue/laser_frame/gpu_lidar"],
+        arguments=["0", "0", "1", "0", "0", "0", "base_footprint", "laser"],
         output="screen"
     )
 
@@ -100,39 +100,39 @@ def generate_launch_description():
     #     output="screen"
     # )
 
-    static_odom = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        arguments=["0", "0", "1", "0", "0", "0", "vehicle_blue/chassis", "vehicle_blue/odom"],
-        output="screen"
-    )
+    # static_odom = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     arguments=["0", "0", "1", "0", "0", "0", "base_footprint", "vehicle_blue/odom"],
+    #     output="screen"
+    # )
 
     static_imu = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0", "0", "1", "0", "0", "0", "vehicle_blue/chassis", "vehicle_blue/imu_link/imu_sensor"],
+        arguments=["0", "0", "1", "0", "0", "0", "base_footprint", "imu"],
         output="screen"
     )
 
-    odom = Node(
-            package='robot_localization',
-            executable='ekf_node',
-            name='ekf_node',
-            output='screen',
-            parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/ekf.yaml']
-        )
+    # odom = Node(
+    #         package='robot_localization',
+    #         executable='ekf_node',
+    #         name='ekf_node',
+    #         output='screen',
+    #         parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/ekf.yaml']
+    #     )
 
     ld = LaunchDescription()
 
-    # ld.add_action(declare_autostart_cmd)
-    # ld.add_action(declare_use_lifecycle_manager)
-    # ld.add_action(declare_use_sim_time_argument)
-    # ld.add_action(declare_slam_params_file_cmd)
-    # ld.add_action(start_async_slam_toolbox_node)
-    # ld.add_action(configure_event)
-    # ld.add_action(activate_event)
+    ld.add_action(declare_autostart_cmd)
+    ld.add_action(declare_use_lifecycle_manager)
+    ld.add_action(declare_use_sim_time_argument)
+    ld.add_action(declare_slam_params_file_cmd)
+    ld.add_action(start_async_slam_toolbox_node)
+    ld.add_action(configure_event)
+    ld.add_action(activate_event)
     ld.add_action(static_laser)
-    ld.add_action(static_odom)
+    # ld.add_action(static_odom)
     ld.add_action(static_imu)
     # ld.add_action(odom)
 
