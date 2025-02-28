@@ -82,7 +82,14 @@ def generate_launch_description():
     static_laser = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0", "0", "1", "0", "0", "0", "base_footprint", "laser"],
+        arguments=["0.1", "0", "0.14", "0", "0", "0", "base_footprint", "laser"],
+        output="screen"
+    )
+
+    static_camera = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0.44", "0", "0.075", "0", "0", "0", "base_footprint", "camera"],
         output="screen"
     )
 
@@ -110,7 +117,7 @@ def generate_launch_description():
     static_imu = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0", "0", "1", "0", "0", "0", "base_footprint", "imu"],
+        arguments=["-0.04", "0", "-0.02", "0", "0", "0", "base_footprint", "imu"],
         output="screen"
     )
 
@@ -134,6 +141,7 @@ def generate_launch_description():
     ld.add_action(static_laser)
     # ld.add_action(static_odom)
     ld.add_action(static_imu)
+    ld.add_action(static_camera)
     # ld.add_action(odom)
 
     return ld

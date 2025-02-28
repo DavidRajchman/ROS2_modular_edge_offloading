@@ -13,7 +13,10 @@ ros-jazzy-slam-toolbox \
 nano
 
 RUN apt install -y tmux \
-ros-jazzy-robot-localization
+ros-jazzy-robot-localization \
+ros-jazzy-navigation2 \
+ros-jazzy-nav2-bringup 
+
 
 
 # Nastavení prostředí pro ROS 2

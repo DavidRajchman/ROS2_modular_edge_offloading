@@ -3,7 +3,10 @@ services:
     build:
       context: ./gazebo/
       dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
+    # user: "${UID}:${GID}"
     environment:
+      # - UID=${UID}
+      # - GID=${GID}
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
     volumes:
@@ -20,9 +23,17 @@ services:
     build:
       context: ./ros/
       dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
+    # user: "1000:1000"  # Použití UID a GID z hostitele
     environment:
+      # - UID=${UID}
+      # - GID=${GID}
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
+    # user: "${UID}:${GID}"
+    # run this before docker compose run/up
+    # export UID=$(id -u)
+    # export GID=$(id -g)
+    # chown -R pepa:admin /home/pepa/dokumenty
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
