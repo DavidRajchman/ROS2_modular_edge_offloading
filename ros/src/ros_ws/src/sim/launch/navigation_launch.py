@@ -31,7 +31,8 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('nav2_bringup')
 
     namespace = LaunchConfiguration('namespace')
-    use_sim_time = LaunchConfiguration('use_sim_time')
+    # use_sim_time = LaunchConfiguration('use_sim_time')
+    use_sim_time = True
     autostart = LaunchConfiguration('autostart')
     params_file = LaunchConfiguration('params_file')
     use_composition = LaunchConfiguration('use_composition')
