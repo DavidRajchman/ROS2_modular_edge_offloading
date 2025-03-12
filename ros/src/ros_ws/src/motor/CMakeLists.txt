@@ -7,17 +7,28 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(services REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+find_package(OpenCV REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(my_node src/my_node.cpp)
-target_include_directories(my_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
-target_compile_features(my_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+add_executable(motor src/my_node.cpp ../../lib/topicClasses/MotorUart.cpp ../../lib/math/ROS2_math.cpp)
+ament_target_dependencies(motor rclcpp std_msgs nav_msgs services tf2_ros OpenCV)
+# ament_target_dependencies(motor rclcpp std_msgs nav_msgs visualization_msgs tf2_ros tf2_geometry_msgs services rosgraph_msgs tf2 OpenCV)
+# target_include_directories(motor PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+# target_compile_features(motor PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS my_node
+install(TARGETS motor
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

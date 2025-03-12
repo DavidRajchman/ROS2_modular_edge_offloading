@@ -37,6 +37,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
+      - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
     privileged: true
     # stdin_open: true  # Abychom udrželi interaktivní terminál
     tty: true  # Aby byl kontejner interaktivní

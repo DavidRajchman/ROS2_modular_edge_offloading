@@ -24,9 +24,6 @@ class Motor : public rclcpp::Node
   double y = 0.0;
   double yaw = 0.0;
 
-  // variables for messages
-  int seq = 0;
-  
   //corrected twist
   double linear_x = 0.0;
   double angular_z = 0.0;
@@ -37,13 +34,13 @@ class Motor : public rclcpp::Node
   const double MAX_SPEED = 1.5; // meters/second
   const double MIN_SPEED = -1.3; // meters/second
   const double WHEEL_BASE = 0.5; // distance between axles
-  const double FREQ_UPDATE = 0.02 // every 20 ms publish odom and update position
+  const double FREQ_UPDATE = 0.02; // every 20 ms publish odom and update position
 
   public:
     Motor()
-    : Node("motor"), count_(0), motor(this ->get_logger() )
+    : Node("motor"), motor(this ->get_logger() )
     {
-      publisher_ = this->create_publisher<std_msgs::msg::String>("motor/odom", 2);
+      pubOdom = this->create_publisher<nav_msgs::msg::Odometry>("motor/odom", 2);
       timer_ = this->create_wall_timer(20ms, bind(&Motor::publish_odom, this));
       subTwist = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel", 1,bind(&Motor::cmdCb, this, placeholders::_1));
 
@@ -51,7 +48,6 @@ class Motor : public rclcpp::Node
 
   private:
     MotorUart motor;
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subControl;
     void publish_odom()
     {
       //update odom pose 
@@ -59,9 +55,10 @@ class Motor : public rclcpp::Node
 
       // header
       auto message = nav_msgs::msg::Odometry();
-      message.header.seq = seq++;
-      message.header.stamp = node->get_clock()->now();
+      message.header.stamp = this->get_clock()->now();
       message.header.frame_id = "odom";
+
+      message.child_frame_id = "base_footprint";
       
       // position
       message.pose.pose.position.x = x;
@@ -69,7 +66,7 @@ class Motor : public rclcpp::Node
       message.pose.pose.position.z = 0.0;
 
       //orientation
-      tuple<double, double, double, double> rotation = yawToQuaternion(yaw)
+      tuple<double, double, double, double> rotation = yawToQuaternion(yaw);
       message.pose.pose.orientation.x = get<0>(rotation);
       message.pose.pose.orientation.y = get<1>(rotation);
       message.pose.pose.orientation.z = get<2>(rotation);
@@ -86,16 +83,16 @@ class Motor : public rclcpp::Node
       message.twist.twist.angular.z = angular_z;
 
       //publishing
-      publisher_->publish(message);
+      pubOdom->publish(message);
     }
 
 
 
     void cmdCb(const geometry_msgs::msg::Twist::SharedPtr msg) {
-      double speed = msg.linear.x;
-      double rotation = msg.angular.z;
+      double speed = msg -> linear.x;
+      double rotation = msg -> angular.z;
       
-      tie(speed, rotation) = checkCommands(double speed, double rotation)
+      tie(speed, rotation) = checkCommands(speed, rotation);
 
       linear_x = speed;
       angular_z = rotation;
@@ -138,8 +135,8 @@ class Motor : public rclcpp::Node
     
 
     rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
-    size_t count_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdom;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subTwist;
 };
 
 int main(int argc, char * argv[])
