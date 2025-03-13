@@ -13,9 +13,14 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <thread>
 #include <array>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
 
 using namespace std;
 
@@ -23,12 +28,14 @@ using namespace std;
 class MotorUart {
 public:
     MotorUart(rclcpp::Logger logger);
+    ~MotorUart();
 
-    void setSpeed(char speed);
-    char getSpeed();
 
-    void setSteer(char steer);
-    char getSteer();
+    void setSpeed(float speed);
+    float getSpeed();
+
+    void setSteer(float rotation);
+    float getSteer();
 
     void setMode(char mode);
     char getMode();
@@ -37,7 +44,7 @@ public:
     char getLidarSpeed();
 
     void publishControl();
-    void publishControl(char speed, char steer);
+    void publishControl(float speed, float steer);
 
     void publishLidarSpeed(); 
     void publishLidarSpeed(char speed);
@@ -45,17 +52,22 @@ public:
     void publishMode(); 
     void publishMode(char mode); 
 
-private:
+    
+    private:
     rclcpp::Logger logger ;
     void setConnection(string dev = "/dev/arduino");
+    void readData();
 
 
-    char speed;
-    char steer;
+    float speed;
+    float steer;
+    float rotation;
     char mode;
-    char lidarSpeed;
+    unsigned char lidarSpeed;
     int serial_port;
-
+    fstream serialPort;
+    // TODO lenghtx of AV
+    const double BASE_WHEEL = 0.5;
 };
 
 #endif

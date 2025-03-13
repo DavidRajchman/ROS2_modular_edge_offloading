@@ -5,25 +5,39 @@ MotorUart::MotorUart(rclcpp::Logger logger) : logger(logger) {
     // cout<<"hi"<<endl;
     // this -> logger = logger;
     setConnection("/dev/teensy");
+    
+
+    // thread serialReader(readData);
+    thread serialReader(bind(&MotorUart::readData, this));
+    serialReader.detach();
+}
+
+MotorUart::~MotorUart() {
+    if (serialPort.is_open()) {
+        serialPort.close();
+    }
 }
 
 
-void MotorUart::setSpeed(char speed){
-    speed = clamp99_99(speed);
+
+void MotorUart::setSpeed(float speed){
+    // speed = clamp99_99(speed);
     this -> speed = speed;
 }
 
-char MotorUart::getSpeed(){
+float MotorUart::getSpeed(){
     return speed;
 }
 
 
-void MotorUart::setSteer(char steer){
-    steer = clamp99_99(steer);
-    this -> steer = steer;
+void MotorUart::setSteer(float rotation){
+    float angle = atan((rotation * BASE_WHEEL)/ speed);
+    // steer = clamp99_99(steer);
+
+    this -> steer = angle;
 }
 
-char MotorUart::getSteer(){
+float MotorUart::getSteer(){
     return steer;
 }
 
@@ -50,24 +64,26 @@ char MotorUart::getLidarSpeed(){
 
 void MotorUart::publishControl(){
     
-    string strSpeed= to_string(getSpeed());
-    string strSteer= to_string(getSteer());
-    char command[8] ;
+    // string strSpeed= to_string(getSpeed());
+    // string strSteer= to_string(getSteer());
 
-    command[0] = 'c';
-    command[1] = speed >=0 ? '+' : '-';
-    command[2] = (speed <=-10 || speed >=10) ? strSpeed[strSpeed.size()-2] : '0';
-    command[3] = strSpeed[strSpeed.size()-1];
-    command[4] = steer >=0 ? '+' : '-';
-    command[5] = (steer <=-10 || steer >=10) ? strSteer[strSteer.size()-2] : '0';
-    command[6] = strSteer[strSteer.size()-1];
-    command[7] = '\n';
+    char speedSign = speed>0 ? '+' : '-'; 
+    char steerSign = steer>0 ? '+' : '-'; 
+    
+    serialPort << "c" 
+                << speedSign
+                << fixed << setprecision(2) << getSpeed()
+                << steerSign 
+                << fixed << setprecision(2) << getSteer();
 
-    write(serial_port, command, sizeof(command));
-
+    cout << "c" 
+                << speedSign
+                << fixed << setprecision(2) << getSpeed()
+                << steerSign 
+                << fixed << setprecision(2) << getSteer();
 }
 
-void MotorUart::publishControl(char speed, char steer){
+void MotorUart::publishControl(float speed, float steer){
     setSpeed(speed);
     setSteer(steer);
     publishControl();
@@ -84,6 +100,7 @@ void MotorUart::publishLidarSpeed(){
 
     write(serial_port, command, sizeof(command));
 }
+
 void MotorUart::publishLidarSpeed(char speed){
     setLidarSpeed(speed);
     publishLidarSpeed();
@@ -106,42 +123,26 @@ void MotorUart::publishMode(char mode){
 } 
 
 
-void MotorUart::setConnection(string dev){
-    const char* cdev = dev.c_str();
-// void MotorUart::setConnection(){
-    struct termios tty;
-    serial_port = open(cdev, O_RDWR); //TODO jetson
+void MotorUart::readData() {
+    
+    string receivedData;
 
-    if (tcgetattr(serial_port, &tty) != 0) {
-        string err = strerror(errno);
-        // status = Status::ERROR;
-        RCLCPP_ERROR(logger, "Error %i from tcgetattr: %s", errno, err.c_str());
-    } else {
-        RCLCPP_WARN(logger, "Communication with Arduino OK");
+    while (true) {
+        getline(serialPort, receivedData);  // Čtení jedné řádky
+        cout << "Přijato: " << receivedData << endl;
+        this_thread::sleep_for(chrono::milliseconds(100));
     }
+}
 
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
-    tty.c_cflag &= ~CRTSCTS;
-    tty.c_cflag |= CREAD | CLOCAL;
-    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL | ISIG);
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY | IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
-    tty.c_oflag &= ~(OPOST | ONLCR);
-    tty.c_cc[VTIME] = 10;
-    tty.c_cc[VMIN] = 0;
-    cfsetispeed(&tty, B115200);
-    cfsetospeed(&tty, B115200);
 
-    if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
-        string err = strerror(errno);
-        // status = Status::ERROR;
-        RCLCPP_ERROR(logger, "Error %i from tcsetattr: %s", errno, err.c_str());
+void MotorUart::setConnection(string dev){
+    serialPort.open(dev, ios::in | ios::out);
+    if (!serialPort.is_open()) {
+        std::cerr << "ERROR: connection not established!" << std::endl;
+        return;
     }
     sleep(2);
     RCLCPP_INFO(logger, "Connection established");
-
 }
 
 
