@@ -55,8 +55,10 @@ public:
     
     private:
     rclcpp::Logger logger ;
-    void setConnection(string dev = "/dev/arduino");
+    bool setConnection(string dev = "/dev/teensy");
     void readData();
+    void sendData(string message);
+
 
 
     float speed;
@@ -64,10 +66,12 @@ public:
     float rotation;
     char mode;
     unsigned char lidarSpeed;
-    int serial_port;
-    fstream serialPort;
     // TODO lenghtx of AV
     const double BASE_WHEEL = 0.5;
+
+    int BAUD_RATE = 115200;
+    int serialPort;
+
 };
 
 #endif

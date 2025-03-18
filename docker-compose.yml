@@ -34,6 +34,8 @@ services:
     # export UID=$(id -u)
     # export GID=$(id -g)
     # chown -R pepa:admin /home/pepa/dokumenty
+    devices:
+      - "/dev/ttyACM1:/dev/teensy"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src

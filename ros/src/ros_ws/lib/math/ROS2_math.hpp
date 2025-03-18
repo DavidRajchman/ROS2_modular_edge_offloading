@@ -31,6 +31,7 @@ tuple<int, int, int> positionToGridPosition(double x, double y, double phi, int 
 
 vector<vector<bool>> dilatation(vector<int8_t> data, int sizeX, int sizeY, int DILATATION, int obstacleLimit = 80);
 void print2DArray(vector<vector<bool>> array);
+string floatToString(float value);
 
 
 #endif

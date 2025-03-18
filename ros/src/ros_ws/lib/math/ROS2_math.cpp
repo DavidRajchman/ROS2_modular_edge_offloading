@@ -164,3 +164,10 @@ void print2DArray(vector<vector<bool>> array){
         cout<<"]\n";
     } 
 }
+
+
+string floatToString(float value) {
+    ostringstream stream;
+    stream << fixed << std::setprecision(2) << value;
+    return stream.str();
+}

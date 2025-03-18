@@ -50,6 +50,13 @@ class Motor : public rclcpp::Node
     MotorUart motor;
     void publish_odom()
     {
+
+      //for manual control
+      if (motor.getMode() == 0){
+        linear_x = motor.getSpeed();
+        angular_z = motor.getSteer(); 
+      }
+
       //update odom pose 
       update_position();
 
@@ -89,6 +96,12 @@ class Motor : public rclcpp::Node
 
 
     void cmdCb(const geometry_msgs::msg::Twist::SharedPtr msg) {
+      cout<<"cmdCb "<<endl;
+      // TODO
+      motor.publishMode(1);
+
+      if(motor.getMode() == 0) return; // in manual mode, you dont change speed and steer 
+      
       double speed = msg -> linear.x;
       double rotation = msg -> angular.z;
       
@@ -96,6 +109,8 @@ class Motor : public rclcpp::Node
 
       linear_x = speed;
       angular_z = rotation;
+      cout<<"control: "<<linear_x <<" "<<angular_z<<endl;
+      motor.publishControl(linear_x, angular_z);
     }
 
 
@@ -118,8 +133,11 @@ class Motor : public rclcpp::Node
       // correction of steering
       if (rotation > maxRotation)
         rotation = maxRotation;
+        cout << "clamp maximum steer";
       else if (rotation < minRotation)
         rotation = minRotation;
+        cout << "clamp minimum steer";
+
 
       return {speed, rotation};
     }
@@ -127,10 +145,14 @@ class Motor : public rclcpp::Node
 
 
     void update_position(){
+      // cout<< "pred" << "x: "<<x<<" y: "<<y <<" yaw: "<<yaw<<endl;
+      // cout<< "lin_x: "<<linear_x<<" ang_z: "<<angular_z <<endl;
       x = x + linear_x * cos(yaw) * FREQ_UPDATE;  
       y = y + linear_x * sin(yaw) * FREQ_UPDATE;
       yaw = yaw + angular_z * FREQ_UPDATE;
       yaw = clampPI_PI(yaw);  
+      // cout << "po "<< "x "<<x<<" y: "<<y <<" yaw: "<<yaw<<endl;
+
     }
     
 
