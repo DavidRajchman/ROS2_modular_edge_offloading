@@ -23,23 +23,18 @@ services:
     build:
       context: ./ros/
       dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
-    # user: "1000:1000"  # Použití UID a GID z hostitele
+    network_mode: "host"
     environment:
-      # - UID=${UID}
-      # - GID=${GID}
       - DISPLAY=${DISPLAY}
-      - XDG_RUNTIME_DIR=/tmp/runtime-root
-      # - DEVICE=$(readlink -f /dev/teensy)
-    # user: "${UID}:${GID}"
-    # run this before docker compose run/up
-    # export UID=$(id -u)
-    # export GID=$(id -g)
-    # chown -R pepa:admin /home/pepa/dokumenty
+      - XDG_RUNTIME_DIR=/tmp/runtime-root #ubuntu24
+      # - QT_X11_NO_MITSHM=1
     devices:
       - "/dev/teensy:/dev/Teensy"
-      # - "/dev/lidar:/dev/Lidar"
+      - "/dev/lidar:/dev/Lidar"
+      # - /dev/dri
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.X11-unix:/tmp/.X11-unix # ubuntu24
+      # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
     privileged: true
