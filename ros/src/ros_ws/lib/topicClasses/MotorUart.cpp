@@ -5,7 +5,7 @@ MotorUart::MotorUart(rclcpp::Logger logger) : logger(logger) {
     // cout<<"hi"<<endl;
     // this -> logger = logger;
     // setConnection("/dev/teensy");
-    if (!setConnection("/dev/teensy")) return;
+    if (!setConnection("/dev/Teensy")) return;
 
     
 
@@ -144,6 +144,7 @@ void MotorUart::publishMode(char mode){
 } 
 void MotorUart::sendData(string message) {
     message += "\n"; // Přidáme newline pro Teensy
+    // cout<<"posilam command: "<< message;
     write(serialPort, message.c_str(), message.size());
 }
 
@@ -156,6 +157,7 @@ void MotorUart::readData() {
         char buffer[64] = {0};
         read(serialPort, buffer, sizeof(buffer) - 1);
         receivedData = string(buffer);
+        // cout<< "teensy: "<<receivedData;
 
         if(receivedData[0] != 'v'){
             return; // it is not odom msg

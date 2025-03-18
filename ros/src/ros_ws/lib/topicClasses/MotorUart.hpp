@@ -55,7 +55,7 @@ public:
     
     private:
     rclcpp::Logger logger ;
-    bool setConnection(string dev = "/dev/teensy");
+    bool setConnection(string dev = "/dev/Teensy");
     void readData();
     void sendData(string message);
 

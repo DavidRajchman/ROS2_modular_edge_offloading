@@ -29,13 +29,15 @@ services:
       # - GID=${GID}
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
+      # - DEVICE=$(readlink -f /dev/teensy)
     # user: "${UID}:${GID}"
     # run this before docker compose run/up
     # export UID=$(id -u)
     # export GID=$(id -g)
     # chown -R pepa:admin /home/pepa/dokumenty
     devices:
-      - "/dev/ttyACM1:/dev/teensy"
+      - "/dev/teensy:/dev/Teensy"
+      # - "/dev/lidar:/dev/Lidar"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
