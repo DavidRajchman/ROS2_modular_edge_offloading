@@ -15,7 +15,8 @@ nano
 RUN apt install -y tmux \
 ros-jazzy-robot-localization \
 ros-jazzy-navigation2 \
-ros-jazzy-nav2-bringup 
+ros-jazzy-nav2-bringup \
+ros-jazzy-rmw-cyclonedds-cpp
 
 
 
