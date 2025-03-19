@@ -32,6 +32,6 @@ RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
 RUN /bin/bash -c "source /home/ubuntu/ros_ws/install/setup.bash"
 
 # Výchozí příkaz pro spuštění bash
-# CMD ["bash"]
+CMD ["bash"]
 
 

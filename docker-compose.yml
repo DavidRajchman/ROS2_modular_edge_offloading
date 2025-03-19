@@ -26,8 +26,6 @@ services:
     # user: "1000:1000"  # Použití UID a GID z hostitele
     network_mode: "host" 
     environment:
-      # - UID=${UID}
-      # - GID=${GID}
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
       # - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
@@ -43,7 +41,8 @@ services:
       # - "/dev/teensy:/dev/Teensy"
       # - "/dev/lidar:/dev/Lidar"
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.X11-unix:/tmp/.X11-unix # ubuntu24
+      # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
     privileged: true
