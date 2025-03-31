@@ -40,6 +40,10 @@ float MotorUart::getSpeed(){
 
 
 void MotorUart::setSteer(float rotation){
+    this -> steer = rotation;
+    return;
+
+    // TODO
     if (speed <0.35 && speed > -0.2){
         this -> steer = 0.0;
         return;
@@ -159,21 +163,30 @@ void MotorUart::readData() {
         receivedData = string(buffer);
         // cout<< "teensy: "<<receivedData;
 
-        if(receivedData[0] != 'v'){
-            return; // it is not odom msg
-            cout<< "first letter is not v"<< endl;
-        } 
+        // TODO
+        // if(receivedData[0] != 'v'){
+        //     cout<< "first letter is not v"<< endl;
+        //     return; // it is not odom msg
+        // } 
 
-        int index = receivedData.find('s', 0);
+        // int index = receivedData.find('s', 0);
+        // if (index == -1){
+        //     cout<< "not s in text" << endl;
+        //     return;    //it is not odom msg
+
+        // }
+
+
+        int index = receivedData.find(';', 0);
         if (index == -1){
+            cout<< "not ; in text" << endl;
             return;    //it is not odom msg
-            cout<< "not s in text" << endl;
 
         }
 
         setMode(0);
 
-        string speed = receivedData.substr(1,index-1);
+        string speed = receivedData.substr(0,index-1); //1
         setSpeed(stof(speed));
         // cout << "speed: " << speed << endl;
 
