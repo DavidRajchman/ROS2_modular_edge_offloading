@@ -46,6 +46,7 @@ services:
       # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
+      - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
     privileged: true
     # stdin_open: true  # Abychom udrželi interaktivní terminál
     tty: true  # Aby byl kontejner interaktivní
