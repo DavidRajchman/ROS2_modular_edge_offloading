@@ -2,18 +2,18 @@
 ekf_filter_node:
     ros__parameters:
 
-        use_sim_time: true
+        use_sim_time: false # TODO
 
         
 # The frequency, in Hz, at which the filter will output a position estimate. Note that the filter will not begin
 # computation until it receives at least one message from one of the inputs. It will then run continuously at the
 # frequency specified here, regardless of whether it receives more measurements. Defaults to 30 if unspecified.
-        frequency: 30.0
+        frequency: 10.0
 
 # The period, in seconds, after which we consider a sensor to have timed out. In this event, we carry out a predict
 # cycle on the EKF without correcting it. This parameter can be thought of as the minimum frequency with which the
 # filter will generate new output. Defaults to 1 / frequency if not specified.
-        sensor_timeout: 0.1
+        sensor_timeout: 0.2
 
 # ekf_localization_node and ukf_localization_node both use a 3D omnidirectional motion model. If this parameter is
 # set to true, no 3D information will be used in your state estimate. Use this if you are operating in a planar
@@ -71,16 +71,20 @@ ekf_filter_node:
 #     3b. MAKE SURE something else is generating the odom->base_link transform. Note that this can even be another state
 #         estimation node from robot_localization! However, that instance should *not* fuse the global data.
         #map_frame: map                   # Defaults to "map" if unspecified
-        odom_frame: vehicle_blue/odom                 # Defaults to "odom" if unspecified
-        base_link_frame: vehicle_blue/chassis  # Defaults to "base_link" if unspecified
-        world_frame: vehicle_blue/odom                # Defaults to the value of odom_frame if unspecified
+        odom_frame: odom                # Defaults to "odom" if unspecified
+        base_link_frame: base_footprint  # Defaults to "base_link" if unspecified
+        world_frame: odom                # Defaults to the value of odom_frame if unspecified
 
 # The filter accepts an arbitrary number of inputs from each input message type (nav_msgs/Odometry,
 # geometry_msgs/PoseWithCovarianceStamped, geometry_msgs/TwistWithCovarianceStamped,
 # sensor_msgs/Imu). To add an input, simply append the next number in the sequence to its "base" name, e.g., odom0,
 # odom1, twist0, twist1, imu0, imu1, imu2, etc. The value should be the topic name. These parameters obviously have no
 # default values, and must be specified.
-        odom0: /model/vehicle_blue/odometry
+
+
+
+
+        odom0: /odom
 
 # Each sensor reading updates some or all of the filter's state. These options give you greater control over which
 # values from each measurement are fed to the filter. For example, if you have an odometry message as input, but only
@@ -103,7 +107,7 @@ ekf_filter_node:
 
 # If you have high-frequency data or are running with a low frequency parameter value, then you may want to increase
 # the size of the subscription queue so that more measurements are fused.
-        odom0_queue_size: 2
+        odom0_queue_size: 1
 
 # [ADVANCED] Large messages in ROS can exhibit strange behavior when they arrive at a high frequency. This is a result
 # of Nagle's algorithm. This option tells the ROS subscriber to use the tcpNoDelay option, which disables Nagle's
@@ -135,7 +139,10 @@ ekf_filter_node:
         odom0_pose_rejection_threshold: 5.0
         odom0_twist_rejection_threshold: 1.0
 
-        imu0: /imu
+
+
+
+        imu0: /imu/data_raw
         imu0_config: [false, false, false,
                       true,  true,  true,
                       false, false, false,

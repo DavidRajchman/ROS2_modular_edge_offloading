@@ -9,8 +9,8 @@ def generate_launch_description():
             executable='ekf_node',
             name='ekf_filter_node',
             output='screen',
-            # parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/ekf.yaml']
-            parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/IMUlocalization.yaml'],
-            arguments=['--ros-args', '--log-level', 'DEBUG']
+            parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/ekf.yaml']
+            # parameters=[{'use_sim_time': True}, '/home/ubuntu/ros_ws/src/sim/config/IMUlocalization.yaml'],
+            # arguments=['--ros-args', '--log-level', 'DEBUG']
         ),
     ])
