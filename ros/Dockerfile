@@ -16,7 +16,10 @@ RUN apt install -y tmux \
 ros-jazzy-robot-localization \
 ros-jazzy-navigation2 \
 ros-jazzy-nav2-bringup \
-ros-jazzy-rmw-cyclonedds-cpp
+ros-jazzy-rmw-cyclonedds-cpp \
+ros-jazzy-pcl-conversions \
+ros-jazzy-pcl-msgs \
+python3-scipy
 
 
 

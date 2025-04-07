@@ -15,10 +15,10 @@ from scipy.spatial.transform import Rotation
 class MinimalSubscriber(Node):
 
     def __init__(self):
-        self.csv_filename = os.path.join(os.path.expanduser('~'), 'data.csv')
-        file = open(self.csv_filename, mode='w', newline='')
-        writer = csv.writer(file)
-        writer.writerow(['Time', 'Frame','x','y', 'yaw', 'vel_x', 'vel_y', 'vel_yaw' ])
+        self.csv_filename = os.path.join(os.path.expanduser('~'), 'data2.csv')
+        file = open('data.csv', mode='w', newline='')
+        self.writer = csv.writer(file)
+        self.writer.writerow(['Time', 'Frame','x','y', 'yaw', 'vel_x', 'vel_y', 'vel_yaw' ])
         
         super().__init__('measurement_odom')
         self.scanOdom = self.create_subscription(
@@ -30,7 +30,7 @@ class MinimalSubscriber(Node):
         self.wheelOdom = self.create_subscription(
             Odometry,
             'motor/odom',
-            self.callback,
+            self.motorCb,
             2)
 
     def callback(self, msg):
@@ -38,8 +38,13 @@ class MinimalSubscriber(Node):
 
         euler = Rotation.from_quat(quat).as_euler('xyz', degrees=True)
 
-        print(datetime.now(), msg.child_frame_id, msg.pose.pose.position.x, msg.pose.pose.position.y, euler[2], msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.angular.z)
+        print('odom',datetime.now(), msg.pose.pose.position.x, msg.pose.pose.position.y, euler[2], msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.angular.z)
+        self.writer.writerow(['odom',datetime.now(), msg.pose.pose.position.x, msg.pose.pose.position.y, euler[2]])
 
+    def motorCb(self, msg):
+        print('motor',datetime.now(),msg.twist.twist.linear.x, msg.twist.twist.angular.z )
+        self.writer.writerow(['motor',datetime.now(),msg.twist.twist.linear.x, msg.twist.twist.angular.z])
+        
 
 def main(args=None):
     rclpy.init(args=args)
