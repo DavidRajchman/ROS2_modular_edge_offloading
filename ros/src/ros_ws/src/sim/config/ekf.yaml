@@ -84,7 +84,7 @@ ekf_filter_node:
 
 
 
-        odom0: /odom
+        odom0: /scan_odom
 
 # Each sensor reading updates some or all of the filter's state. These options give you greater control over which
 # values from each measurement are fed to the filter. For example, if you have an odometry message as input, but only
