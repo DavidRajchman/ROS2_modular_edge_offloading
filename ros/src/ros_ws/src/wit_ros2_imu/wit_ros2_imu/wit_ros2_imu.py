@@ -150,7 +150,7 @@ class IMUDriverNode(Node):
         # 打开串口
 
         try:
-            wt_imu = serial.Serial(port="/dev/imu_usb", baudrate=9600, timeout=0.5)
+            wt_imu = serial.Serial(port="/dev/Imu", baudrate=9600, timeout=0.5)
             if wt_imu.isOpen():
                 self.get_logger().info("\033[32mSerial port opened successfully...\033[0m")
             else:

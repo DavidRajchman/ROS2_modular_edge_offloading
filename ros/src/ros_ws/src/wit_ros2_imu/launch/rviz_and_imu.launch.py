@@ -8,7 +8,7 @@ def generate_launch_description():
         executable='wit_ros2_imu',
         name='imu',
         remappings=[('/wit/imu', '/imu/data')],
-        parameters=[{'port': '/dev/imu_usb'},
+        parameters=[{'port': '/dev/Imu'},
                     {"baud": 9600}],
         output="screen"
 

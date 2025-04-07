@@ -19,8 +19,8 @@ ros-jazzy-nav2-bringup \
 ros-jazzy-rmw-cyclonedds-cpp \
 ros-jazzy-pcl-conversions \
 ros-jazzy-pcl-msgs \
-python3-scipy
-
+python3-scipy \
+python3-serial
 
 
 # Nastavení prostředí pro ROS 2
