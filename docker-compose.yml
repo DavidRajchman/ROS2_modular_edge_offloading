@@ -1,30 +1,10 @@
 services:
-  gz-ros2:
-    build:
-      context: ./gazebo/
-      dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
-    # user: "${UID}:${GID}"
-    environment:
-      # - UID=${UID}
-      # - GID=${GID}
-      - DISPLAY=${DISPLAY}
-      - XDG_RUNTIME_DIR=/tmp/runtime-root
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./gazebo/src:/home/ubuntu
-    privileged: true
-    # stdin_open: true  # Abychom udrželi interaktivní terminál
-    tty: true  # Aby byl kontejner interaktivní
-    # command: ros2 launch sim sim_launch.py
-    command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && ros2 launch sim sim_launch.py"
-    # command: bash
-
   ros2:
     build:
       context: ./ros/
       dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
     # user: "1000:1000"  # Použití UID a GID z hostitele
-    network_mode: "host" 
+    network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -51,5 +31,7 @@ services:
     # stdin_open: true  # Abychom udrželi interaktivní terminál
     tty: true  # Aby byl kontejner interaktivní
     # command: ros2 launch sim sim_launch.py
+    #ports:
+    # - 1883:1883
     command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
 
