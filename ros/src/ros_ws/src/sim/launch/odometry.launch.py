@@ -16,7 +16,7 @@ def generate_launch_description():
     )
 
     # IMU
-    imu_path = get_package_share_directory('wit_ros2_imu') + '/launch/rviz_and_imu.launch.py'
+    imu_path = get_package_share_directory('wit_ros2_imu') + '/rviz_and_imu.launch.py'
     imu_launch = launch.actions.IncludeLaunchDescription(
         PythonLaunchDescriptionSource(imu_path)
     )

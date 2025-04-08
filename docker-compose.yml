@@ -40,7 +40,7 @@ services:
     devices:
       - "/dev/teensy:/dev/Teensy"
       - "/dev/imu_usb:/dev/Imu"
-      # - "/dev/lidar:/dev/Lidar"
+      - "/dev/lidar:/dev/Lidar"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix # ubuntu24
       # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
