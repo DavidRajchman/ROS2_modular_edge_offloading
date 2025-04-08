@@ -20,7 +20,7 @@ public:
   : Node("ros_tcp_gateway"), socket_fd_(-1), connection_active_(false)
   {
     // Initialize parameters with defaults
-    declare_parameter("tcp_server_host", "davidpraha.buru-palermo.ts.net");
+    declare_parameter("tcp_server_host", "100.98.247.80");
     declare_parameter("tcp_server_port", 8888);
     declare_parameter("tcp_ack_timeout_ms", 2000);
     declare_parameter("tcp_max_retries", 3);

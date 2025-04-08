@@ -10,13 +10,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
-# Explicitly find Paho MQTT libraries
-find_library(PAHO_MQTT_C_LIB paho-mqtt3a)
-find_library(PAHO_MQTT_CPP_LIB paho-mqttpp3)
-
-if(NOT PAHO_MQTT_C_LIB OR NOT PAHO_MQTT_CPP_LIB)
-  message(FATAL_ERROR "Paho MQTT libraries not found. Please install libpaho-mqtt-dev and libpaho-mqttpp-dev")
-endif()
 
 add_executable(gateway_node src/gateway_node.cpp)
 target_include_directories(gateway_node PUBLIC
@@ -30,8 +23,6 @@ target_include_directories(gateway_node PUBLIC
 target_link_libraries(gateway_node
   ${rclcpp_LIBRARIES}
   ${std_msgs_LIBRARIES}
-  ${PAHO_MQTT_CPP_LIB}
-  ${PAHO_MQTT_C_LIB}
 )
 
 target_compile_features(gateway_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
