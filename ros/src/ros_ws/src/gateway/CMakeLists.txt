@@ -10,25 +10,44 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
-
-add_executable(gateway_node src/gateway_node.cpp)
-target_include_directories(gateway_node PUBLIC
+# Common include directories for all targets
+set(GATEWAY_INCLUDE_DIRS
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   ${rclcpp_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
 )
 
-# Explicitly link against both Paho MQTT C and C++ libraries
-target_link_libraries(gateway_node
+# Common libraries for all targets
+set(GATEWAY_LIBRARIES
   ${rclcpp_LIBRARIES}
   ${std_msgs_LIBRARIES}
 )
 
-target_compile_features(gateway_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS gateway_node
-  DESTINATION lib/${PROJECT_NAME})
+# New gateway sender node
+add_executable(gateway_sender_node src/gateway_sender_node.cpp)
+target_include_directories(gateway_sender_node PUBLIC ${GATEWAY_INCLUDE_DIRS})
+target_link_libraries(gateway_sender_node ${GATEWAY_LIBRARIES})
+target_compile_features(gateway_sender_node PUBLIC c_std_99 cxx_std_17)
+
+# New gateway receiver node
+add_executable(gateway_receiver_node src/gateway_receiver_node.cpp)
+target_include_directories(gateway_receiver_node PUBLIC ${GATEWAY_INCLUDE_DIRS})
+target_link_libraries(gateway_receiver_node ${GATEWAY_LIBRARIES})
+target_compile_features(gateway_receiver_node PUBLIC c_std_99 cxx_std_17)
+
+# Install all targets
+install(TARGETS
+  gateway_sender_node
+  gateway_receiver_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install headers if you create them
+install(DIRECTORY include/
+  DESTINATION include/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
