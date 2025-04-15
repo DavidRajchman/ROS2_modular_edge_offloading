@@ -7,7 +7,7 @@ RosGateway::RosGateway(const std::string& node_name)
 {
   // Initialize parameters with defaults
   declare_parameter("transport_type", "tcp");
-  declare_parameter("server_host", "127.0.0.1");
+  declare_parameter("server_host", "100.98.247.80");
   declare_parameter("server_port", 8888);
   declare_parameter("max_retries", 3);
   

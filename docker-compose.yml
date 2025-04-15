@@ -17,10 +17,10 @@ services:
     # export UID=$(id -u)
     # export GID=$(id -g)
     # chown -R pepa:admin /home/pepa/dokumenty
-    devices:
-      - "/dev/teensy:/dev/Teensy"
-      - "/dev/imu_usb:/dev/Imu"
-      - "/dev/lidar:/dev/Lidar"
+    #devices:
+    #  - "/dev/teensy:/dev/Teensy"
+    #  - "/dev/imu_usb:/dev/Imu"
+    #  - "/dev/lidar:/dev/Lidar"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix # ubuntu24
       # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
