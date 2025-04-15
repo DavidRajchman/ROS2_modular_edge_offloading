@@ -12,7 +12,7 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=3)
+add_definitions(-DVERSION_MINOR=4)
 add_definitions(-DVERSION_PATCH=0)
 
 # find dependencies
