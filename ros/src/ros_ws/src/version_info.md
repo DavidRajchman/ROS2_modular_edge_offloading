@@ -1,6 +1,9 @@
+# 0.5.0 MODULAR GW
+- rewrite of modular gateway structure - only a single node that is running. Node registers topic specific handlers, that are using handler base class. TCP structure is unchanged from v0.4.0
+- confirmed working for string handler topic  "topic" (using helloword node)
 # 0.4.0 MODULAR GW
-    - extended ros_gateway to allow for setting all header parameters by topic modules
-    - 
+ - extended ros_gateway to allow for setting all header parameters by topic modules
+  
 # 0.3.0 MODULAR GW
  - split gateway into sender and reciever packages NOTE: Reciever not implemented in this version
  - created a modular structure |topic_parser - gateway - sending protocol_handler|

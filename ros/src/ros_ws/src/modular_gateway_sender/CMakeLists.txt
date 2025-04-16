@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(modular_gateway_sender)
 
-# Default to C++14
+# Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -12,7 +12,7 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=4)
+add_definitions(-DVERSION_MINOR=5)
 add_definitions(-DVERSION_PATCH=0)
 
 # find dependencies
@@ -23,33 +23,81 @@ find_package(std_msgs REQUIRED)
 # Include directories
 include_directories(include)
 
-# Create library with common code
+# Transport library
 add_library(gateway_transport_lib
   src/tcp_transport.cpp
+)
+
+ament_target_dependencies(gateway_transport_lib
+  rclcpp
+)
+
+# ROS Gateway library (depends on transport)
+add_library(ros_gateway_lib
   src/ros_gateway.cpp
 )
-ament_target_dependencies(gateway_transport_lib
+
+target_link_libraries(ros_gateway_lib
+  gateway_transport_lib
+)
+
+ament_target_dependencies(ros_gateway_lib
+  rclcpp
+)
+
+# Message handler base
+add_library(message_handler_base
+  src/message_handler_base.cpp
+)
+
+target_link_libraries(message_handler_base
+  ros_gateway_lib
+)
+
+ament_target_dependencies(message_handler_base
+  rclcpp
+)
+
+# String handler implementation
+add_library(string_handler
+  src/string_handler.cpp
+)
+
+target_link_libraries(string_handler
+  message_handler_base
+)
+
+ament_target_dependencies(string_handler
   rclcpp
   std_msgs
 )
 
-# String gateway executable
-add_executable(string_gateway src/string_gateway.cpp)
-target_link_libraries(string_gateway gateway_transport_lib)
-ament_target_dependencies(string_gateway
+# Main gateway executable
+add_executable(modular_gateway src/gateway_main.cpp)
+
+target_link_libraries(modular_gateway
+  ros_gateway_lib
+  message_handler_base
+  string_handler
+)
+
+ament_target_dependencies(modular_gateway
   rclcpp
   std_msgs
 )
 
 # Install executables
 install(TARGETS
-  string_gateway
+  modular_gateway
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install library
+# Install libraries
 install(TARGETS
   gateway_transport_lib
+  ros_gateway_lib
+  message_handler_base
+  string_handler
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

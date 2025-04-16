@@ -1,3 +1,4 @@
+#include "modular_gateway_sender/logging_utils.hpp"
 #include "modular_gateway_sender/ros_gateway.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>

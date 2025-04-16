@@ -1,0 +1,39 @@
+// message_handler_base.hpp
+#ifndef MESSAGE_HANDLER_BASE_HPP
+#define MESSAGE_HANDLER_BASE_HPP
+
+#include <string>
+#include "rclcpp/rclcpp.hpp"
+#include "modular_gateway_sender/message_header.hpp"
+
+namespace gateway {
+
+class RosGateway; // Forward declaration
+
+class MessageHandlerBase {
+public:
+  MessageHandlerBase(RosGateway* gateway, const std::string& handler_name);
+  virtual ~MessageHandlerBase() = default;
+  
+  virtual void initialize() = 0;
+  virtual void shutdown() = 0;
+  
+  const std::string& get_name() const { return handler_name_; }
+  bool is_enabled() const { return enabled_; }
+  void enable() { enabled_ = true; }
+  void disable() { enabled_ = false; }
+  
+protected:
+  RosGateway* gateway_; // Non-owning pointer to parent gateway
+  std::string handler_name_;
+  bool enabled_ = false;
+  
+  // Helper methods for handlers to send messages through the gateway
+  bool send_message(const std::string& topic, MessageType type,
+                    const void* data, size_t size,
+                    const MessageOptions& options);
+};
+
+} // namespace gateway
+
+#endif // MESSAGE_HANDLER_BASE_HPP
