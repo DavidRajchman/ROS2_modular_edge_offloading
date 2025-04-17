@@ -57,36 +57,36 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
   const void* data, size_t size,
   const MessageOptions& options)
 {
-if (!transport_) {
-LOG_ERROR(get_logger(), "No transport initialized");
-return false;
-}
+  if (!transport_) {
+    LOG_ERROR(get_logger(), "No transport initialized");
+    return false;
+  }
 
-if (!transport_->is_connected()) {
-LOG_WARN(get_logger(), "Transport not connected, trying to connect...");
-if (!transport_->connect()) {
-LOG_ERROR(get_logger(), "Failed to connect transport");
-return false;
-}
-}
+  if (!transport_->is_connected()) {
+    LOG_WARN(get_logger(), "Transport not connected, trying to connect...");
+    if (!transport_->connect()) {
+      LOG_ERROR(get_logger(), "Failed to connect transport");
+      return false;
+    }
+  }
 
-// Create header using the options
-std::vector<uint8_t> header = create_header(topic, type, size, options);
+  // Create header using the options
+  std::vector<uint8_t> header = create_header(topic, type, size, options);
 
-// Send header
-if (!transport_->send_data(header.data(), header.size())) {
-LOG_ERROR(get_logger(), "Failed to send header");
-return false;
-}
+  // Send header
+  if (!transport_->send_data(header.data(), header.size())) {
+    LOG_ERROR(get_logger(), "Failed to send header");
+    return false;
+  }
 
-// Send data
-if (!transport_->send_data(data, size)) {
-LOG_ERROR(get_logger(), "Failed to send data");
-return false;
-}
+  // Send data
+  if (!transport_->send_data(data, size)) {
+    LOG_ERROR(get_logger(), "Failed to send data");
+    return false;
+  }
 
-LOG_INFO(get_logger(), "Sent %zu bytes to topic %s", size, topic.c_str());
-return true;
+  LOG_INFO(get_logger(), "Sent %zu bytes to topic %s", size, topic.c_str());
+  return true;
 }
 
 bool RosGateway::register_handler(std::shared_ptr<MessageHandlerBase> handler)

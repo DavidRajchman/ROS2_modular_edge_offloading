@@ -12,13 +12,14 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=5)
+add_definitions(-DVERSION_MINOR=6)
 add_definitions(-DVERSION_PATCH=0)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -72,6 +73,20 @@ ament_target_dependencies(string_handler
   std_msgs
 )
 
+# LaserScan handler implementation
+add_library(laserscan_handler
+  src/laserscan_handler.cpp
+)
+
+target_link_libraries(laserscan_handler
+  message_handler_base
+)
+
+ament_target_dependencies(laserscan_handler
+  rclcpp
+  sensor_msgs
+)
+
 # Main gateway executable
 add_executable(modular_gateway src/gateway_main.cpp)
 
@@ -79,6 +94,7 @@ target_link_libraries(modular_gateway
   ros_gateway_lib
   message_handler_base
   string_handler
+  laserscan_handler
 )
 
 ament_target_dependencies(modular_gateway

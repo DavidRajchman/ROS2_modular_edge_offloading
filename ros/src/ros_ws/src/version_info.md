@@ -1,3 +1,5 @@
+# 0.6.0 MODULAR GW
+- added laser scan handler with message serialization and possibility to empty intensities array
 # 0.5.0 MODULAR GW
 - rewrite of modular gateway structure - only a single node that is running. Node registers topic specific handlers, that are using handler base class. TCP structure is unchanged from v0.4.0
 - confirmed working for string handler topic  "topic" (using helloword node)

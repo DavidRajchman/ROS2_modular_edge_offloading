@@ -23,12 +23,15 @@ namespace gateway {
  * transmitted through the gateway. New types can be added as needed.
  */
 enum class MessageType : uint8_t {
-  STRING = 1,   ///< Text/string data
-  INT32 = 2,    ///< 32-bit signed integer
-  FLOAT32 = 3,  ///< 32-bit floating point number
-  BOOL = 4,     ///< Boolean value
-  IMAGE = 5,    ///< Image data (format depends on implementation)
-  // Add more as needed
+  //basic messages - range [1-10]
+  STRING = 1,       ///< Text/string data
+  INT32 = 2,        ///< 32-bit signed integer
+  FLOAT32 = 3,      ///< 32-bit floating point number
+  BOOL = 4,         ///< Boolean value
+
+  //sensor_msgs - range [11 - 100]
+  smLASERSCAN = 11,  ///< sensor_msgs/LaserScan Message
+  
 };
 
 /// Magic number used to identify the start of a valid message header
