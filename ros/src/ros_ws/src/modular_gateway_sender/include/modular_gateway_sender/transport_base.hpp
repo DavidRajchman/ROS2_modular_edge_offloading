@@ -24,6 +24,21 @@ public:
   
   // Check if connected
   virtual bool is_connected() const = 0;
+
+  //----receive methods---- 
+
+  // Check if data is available to read with optional timeout (in milliseconds)
+  // Returns true if data is available, false otherwise
+  virtual bool data_available(int timeout_ms = 0) = 0;
+  
+  // Receive data into provided buffer
+  // Returns number of bytes received, 0 on connection closed, or -1 on error
+  virtual int receive_data(void* buffer, size_t max_size) = 0;
+  
+  // Receive exactly the specified number of bytes (blocks until complete)
+  // Returns true if successful, false on error or connection closed
+  virtual bool receive_exact(void* buffer, size_t size) = 0;
+
 };
 
 // TCP transport implementation
@@ -32,10 +47,18 @@ public:
   TcpTransport(const std::string& host, int port, int max_retries = 3);
   virtual ~TcpTransport();
   
+  // Connection management
   bool connect() override;
   void disconnect() override;
-  bool send_data(const void* data, size_t size) override;
   bool is_connected() const override;
+  
+  // Data transmission
+  bool send_data(const void* data, size_t size) override;
+  
+  // Data reception
+  bool data_available(int timeout_ms = 0) override;
+  int receive_data(void* buffer, size_t max_size) override;
+  bool receive_exact(void* buffer, size_t size) override;
   
 private:
   std::string server_host_;
@@ -43,8 +66,8 @@ private:
   int max_retries_;
   int socket_fd_;
   bool connected_;
+  rclcpp::Logger logger_{rclcpp::get_logger("tcp_transport")};
 };
 
 } // namespace gateway
-
 #endif // TRANSPORT_BASE_HPP

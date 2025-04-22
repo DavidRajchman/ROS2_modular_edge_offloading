@@ -1,3 +1,12 @@
+# 0.7.0 MODULAR GW
+ - reciever implementation
+ - added transport_access_mutex to prevent recieve-send collisions implemented mutex protection in send_data function
+
+ - **TODO** - add a parameter to change the wait time before reciever polling (current 1ms) 
+## 0.7.1
+ - fix, added waiting for transport connect before receiver start 
+
+
 # 0.6.0 MODULAR GW
 - added laser scan handler with message serialization and possibility to empty intensities array
 # 0.5.0 MODULAR GW

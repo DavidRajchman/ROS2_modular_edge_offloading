@@ -1,4 +1,5 @@
 #include "modular_gateway_sender/logging_utils.hpp"
+
 #include "modular_gateway_sender/ros_gateway.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -130,6 +131,78 @@ bool TcpTransport::send_data(const void* data, size_t size)
 bool TcpTransport::is_connected() const
 {
   return connected_ && socket_fd_ >= 0;
+}
+
+bool TcpTransport::data_available(int timeout_ms) {
+    if (!is_connected()) return false;
+    
+    fd_set readfds;
+    struct timeval tv;
+    
+    FD_ZERO(&readfds);
+    FD_SET(socket_fd_, &readfds);
+    
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+    
+    int result = select(socket_fd_ + 1, &readfds, NULL, NULL, 
+                       timeout_ms > 0 ? &tv : NULL);
+    
+    if (result < 0) {
+        LOG_ERROR(logger_, "Select error: %s", strerror(errno));
+        return false;
+    }
+    
+    return result > 0;
+}
+
+int TcpTransport::receive_data(void* buffer, size_t size) {
+    if (!is_connected()) return -1;
+    
+    ssize_t bytes_received = recv(socket_fd_, buffer, size, 0);
+    
+    if (bytes_received < 0) {
+        LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+        return -1;
+    }
+    
+    // Connection closed by peer
+    if (bytes_received == 0) {
+        LOG_WARN(logger_, "Connection closed by peer");
+        disconnect();
+        return -1;
+    }
+    
+    return bytes_received;
+}
+
+bool TcpTransport::receive_exact(void* buffer, size_t size) {
+    if (!is_connected()) return false;
+    
+    size_t total_received = 0;
+    char* buf_ptr = static_cast<char*>(buffer);
+    
+    while (total_received < size) {
+        ssize_t bytes_received = recv(socket_fd_, 
+                                     buf_ptr + total_received, 
+                                     size - total_received, 0);
+        
+        if (bytes_received < 0) {
+            LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+            return false;
+        }
+        
+        // Connection closed by peer
+        if (bytes_received == 0) {
+            LOG_WARN(logger_, "Connection closed by peer during receive");
+            disconnect();
+            return false;
+        }
+        
+        total_received += bytes_received;
+    }
+    
+    return true;
 }
 
 } // namespace gateway
