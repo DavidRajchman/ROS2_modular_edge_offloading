@@ -232,12 +232,28 @@ bool RosGateway::receive_and_process_message() {
     
     LOG_INFO(get_logger(), "Successfully received %u bytes of message data", data_size);
     
-    // Step 6: Forward the message to appropriate handlers
-    // This would publish to ROS topics, call handler methods, etc.
-    // For now, this is just a placeholder as you'll need to implement
-    // the specific message handling logic
+    // Step 6: Try to find a handler that can process this message type
+    bool processed = false;
     
-    LOG_INFO(get_logger(), "Message processed successfully");
+    for (const auto& handler_pair : handlers_) {
+        auto& handler = handler_pair.second;
+        
+        if (handler->is_enabled() && handler->can_process_message_type(type)) {
+            if (handler->process_and_publish_received_msg(
+                    topic, type, data_buffer.data(), data_buffer.size(), options)) {
+                LOG_INFO(get_logger(), "Message processed by handler: %s", 
+                         handler->get_name().c_str());
+                processed = true;
+                // No break - allow multiple handlers to process same message if needed
+            }
+        }
+    }
+    
+    if (!processed) {
+        LOG_WARN(get_logger(), "No handler processed message type %d for topic %s", 
+                 static_cast<int>(type), topic.c_str());
+    }
+    
     return true;
 }
 

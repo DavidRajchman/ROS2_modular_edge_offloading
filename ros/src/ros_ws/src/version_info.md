@@ -1,8 +1,20 @@
+ # **TODO** 
+ - (0.7.1) add a parameter to change the wait time before reciever polling (current 1ms)
+ - (0.8.0) implement a way where topic handler can only be used as a subcriber or a publisher to add the ability to utilise the same handler for server and reciever gw
+
+
+# 0.8.0
+ - reciever publishing to ros2 topics functionality added
+ - simple aproach - just add the can_procces_message_type to hpp of handler and implement the process_and_publish_receveid_msg() method
+ - no need to modify the main file to implement the message recieving
+ - tested on string handler (working), but loopback test will result in an infinite loop (expected behaviour) - need to implement server to fix this
+ - need to implement only subscriber and only publisher version
+
 # 0.7.0 MODULAR GW
- - reciever implementation
+ - reciever implementation (without publishing to ros2, only transport gateway - gateway)
  - added transport_access_mutex to prevent recieve-send collisions implemented mutex protection in send_data function
 
- - **TODO** - add a parameter to change the wait time before reciever polling (current 1ms) 
+  
 ## 0.7.1
  - fix, added waiting for transport connect before receiver start 
 

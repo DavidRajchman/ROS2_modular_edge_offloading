@@ -28,6 +28,12 @@ void StringHandler::initialize()
 void StringHandler::shutdown()
 {
   subscription_.reset();
+  
+  // Clean up the publishers
+  publishers_.clear();
+  
+  // Disable the handler
+  enabled_ = false;
 }
 
 void StringHandler::handle_message(const std::string& topic, 
@@ -42,6 +48,43 @@ void StringHandler::handle_message(const std::string& topic,
   
   // Send message with default options (no flags)
   send_message(topic, MessageType::STRING, msg->data.c_str(), msg->data.size(),options);
+}
+
+bool StringHandler::process_and_publish_received_msg(
+  const std::string& topic,
+  MessageType type,
+  const void* data,
+  size_t size,
+  const MessageOptions& options)
+{
+if (!is_enabled() || !can_process_message_type(type)) {
+  return false;
+}
+
+// Find or create publisher for this topic
+auto it = publishers_.find(topic);
+if (it == publishers_.end()) {
+  auto publisher = gateway_->create_publisher<std_msgs::msg::String>(topic, 10);
+  it = publishers_.emplace(topic, publisher).first;
+  RCLCPP_INFO(gateway_->get_logger(), "Created string publisher for topic: %s", topic.c_str());
+}
+
+// Process based on serialization flag
+if (options.serialized) {
+  //serialization not implemented for string messages
+  LOG_ERROR(gateway_->get_logger(), "Serialized string messages are not supported for processing");
+}
+else {
+  // Handle raw string data
+  std_msgs::msg::String msg;
+  msg.data = std::string(static_cast<const char*>(data), size);
+  it->second->publish(msg);
+  
+  RCLCPP_INFO(gateway_->get_logger(), "Published string to topic %s: %s", 
+             topic.c_str(), msg.data.c_str());
+}
+
+return true;
 }
 
 } // namespace gateway

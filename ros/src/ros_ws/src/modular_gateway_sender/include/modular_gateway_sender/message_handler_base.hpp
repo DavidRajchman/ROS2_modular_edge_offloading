@@ -1,4 +1,3 @@
-// message_handler_base.hpp
 #ifndef MESSAGE_HANDLER_BASE_HPP
 #define MESSAGE_HANDLER_BASE_HPP
 
@@ -22,6 +21,21 @@ public:
   bool is_enabled() const { return enabled_; }
   void enable() { enabled_ = true; }
   void disable() { enabled_ = false; }
+  
+  // New method to check if handler can process a message type
+  virtual bool can_process_message_type(MessageType /* type */) const {
+    return false; // Default implementation processes no message types
+  }
+  
+  // New method to process and publish received messages
+  virtual bool process_and_publish_received_msg(
+      const std::string& /* topic */,
+      MessageType /* type */,
+      const void* /* data */,
+      size_t /* size */,
+      const MessageOptions& /* options */) {
+    return false; // Default implementation does no processing
+  }
   
 protected:
   RosGateway* gateway_; // Non-owning pointer to parent gateway
