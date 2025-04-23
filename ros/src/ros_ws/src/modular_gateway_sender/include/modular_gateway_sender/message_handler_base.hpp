@@ -22,12 +22,21 @@ public:
   void enable() { enabled_ = true; }
   void disable() { enabled_ = false; }
   
+  // ROS Publisher/Subscriber mode control
+  void enable_ros_publisher_mode() { ros_publisher_enabled_ = true; }
+  void disable_ros_publisher_mode() { ros_publisher_enabled_ = false; }
+  void enable_ros_subscriber_mode() { ros_subscriber_enabled_ = true; }
+  void disable_ros_subscriber_mode() { ros_subscriber_enabled_ = false; }
+  
+  bool is_ros_publisher_enabled() const { return enabled_ && ros_publisher_enabled_; }
+  bool is_ros_subscriber_enabled() const { return enabled_ && ros_subscriber_enabled_; }
+  
   // New method to check if handler can process a message type
   virtual bool can_process_message_type(MessageType /* type */) const {
     return false; // Default implementation processes no message types
   }
   
-  // New method to process and publish received messages
+  // New method to process and publish received messages to ROS
   virtual bool process_and_publish_received_msg(
       const std::string& /* topic */,
       MessageType /* type */,
@@ -41,6 +50,8 @@ protected:
   RosGateway* gateway_; // Non-owning pointer to parent gateway
   std::string handler_name_;
   bool enabled_ = false;
+  bool ros_publisher_enabled_ = true;  // Default: can publish to ROS topics (receive from network)
+  bool ros_subscriber_enabled_ = true; // Default: can subscribe to ROS topics (send to network)
   
   // Helper methods for handlers to send messages through the gateway
   bool send_message(const std::string& topic, MessageType type,

@@ -12,8 +12,8 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=7)
-add_definitions(-DVERSION_PATCH=1)
+add_definitions(-DVERSION_MINOR=10)
+add_definitions(-DVERSION_PATCH=3)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -26,7 +26,8 @@ include_directories(include)
 
 # Transport library
 add_library(gateway_transport_lib
-  src/tcp_transport.cpp
+  src/tcp_client_transport.cpp
+  src/tcp_server_transport.cpp
 )
 
 ament_target_dependencies(gateway_transport_lib
@@ -87,24 +88,36 @@ ament_target_dependencies(laserscan_handler
   sensor_msgs
 )
 
-# Main gateway executable
-add_executable(modular_gateway src/gateway_main.cpp)
-
-target_link_libraries(modular_gateway
+# Client executable
+add_executable(gateway_client src/gateway_client_main.cpp)
+target_link_libraries(gateway_client
   ros_gateway_lib
-  message_handler_base
   string_handler
   laserscan_handler
 )
-
-ament_target_dependencies(modular_gateway
+ament_target_dependencies(gateway_client
   rclcpp
   std_msgs
+  sensor_msgs
+)
+
+# Server executable
+add_executable(gateway_server src/gateway_server_main.cpp)
+target_link_libraries(gateway_server
+  ros_gateway_lib
+  string_handler
+  laserscan_handler
+)
+ament_target_dependencies(gateway_server
+  rclcpp
+  std_msgs
+  sensor_msgs
 )
 
 # Install executables
 install(TARGETS
-  modular_gateway
+  gateway_client
+  gateway_server
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -114,6 +127,7 @@ install(TARGETS
   ros_gateway_lib
   message_handler_base
   string_handler
+  laserscan_handler
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

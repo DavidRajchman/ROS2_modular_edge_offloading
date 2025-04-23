@@ -42,10 +42,10 @@ public:
 };
 
 // TCP transport implementation
-class TcpTransport : public TransportBase {
+class TcpClientTransport : public TransportBase {
 public:
-  TcpTransport(const std::string& host, int port, int max_retries = 3);
-  virtual ~TcpTransport();
+  TcpClientTransport(const std::string& host, int port, int max_retries = 3);
+  virtual ~TcpClientTransport();
   
   // Connection management
   bool connect() override;
@@ -67,6 +67,38 @@ private:
   int socket_fd_;
   bool connected_;
   rclcpp::Logger logger_{rclcpp::get_logger("tcp_transport")};
+};
+
+// TCP Server transport implementation
+class TcpServerTransport : public TransportBase {
+public:
+  TcpServerTransport(int port, int max_connections = 1);
+  virtual ~TcpServerTransport();
+  
+  // Connection management (for server this means start/stop listening)
+  bool connect() override;  // For server: start listening
+  void disconnect() override;  // For server: stop listening and close connections
+  bool is_connected() const override;  // True if client is connected
+  
+  // Data transmission to connected client
+  bool send_data(const void* data, size_t size) override;
+  
+  // Data reception from connected client
+  bool data_available(int timeout_ms = 0) override;
+  int receive_data(void* buffer, size_t max_size) override;
+  bool receive_exact(void* buffer, size_t size) override;
+  
+private:
+  int port_;               // Server listening port
+  int max_connections_;    // Maximum allowed connections (typically 1)
+  int server_socket_fd_;   // Socket for listening
+  int client_socket_fd_;   // Socket for accepted client
+  bool listening_;         // Server is currently listening
+  bool client_connected_;  // Client is currently connected
+  rclcpp::Logger logger_{rclcpp::get_logger("tcp_server_transport")};
+  
+  // Accept a new client connection (called internally)
+  bool accept_connection();
 };
 
 } // namespace gateway

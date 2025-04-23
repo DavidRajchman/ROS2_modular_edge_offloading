@@ -39,7 +39,7 @@ void StringHandler::shutdown()
 void StringHandler::handle_message(const std::string& topic, 
                                   const std_msgs::msg::String::SharedPtr msg)
 {
-  if (!is_enabled()) return;
+  if (!is_enabled() || !is_ros_subscriber_enabled()) return;
   
   LOG_INFO(gateway_->get_logger(), "StringHandler received: %s", msg->data.c_str());
 

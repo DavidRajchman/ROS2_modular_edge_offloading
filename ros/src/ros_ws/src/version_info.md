@@ -1,7 +1,17 @@
- # **TODO** 
+ # **TODO fixes and modifications** 
  - (0.7.1) add a parameter to change the wait time before reciever polling (current 1ms)
- - (0.8.0) implement a way where topic handler can only be used as a subcriber or a publisher to add the ability to utilise the same handler for server and reciever gw
+ - (0.8.0) TESTING NEEDED [IMPLEMENTED] implement a way where topic handler can only be used as a subcriber or a publisher to add the ability to utilise the same handler for server and reciever gw
+ - (0.10.0) Rework file structure and cmakelist to make the project cleaner and adding new handlers as simple as possible (make all handlers a single cmakelist library)
 
+# 0.10.0
+ - added tcp server transport layer
+ - aded a server node and renamed the client node
+ - currently not working over localhost port 8888, needs further investigation
+ - server gives error transport not connected imidiately after calling connection succesfull
+
+# 0.9.0
+ - Implemented separate togle for ros publisher and subscriber mode for topic handlers. Meaning the topic handlers are now able to function universaly.
+ - After the adtition of tcp_server transport layer, modular gateway will be able to comunicate both ways
 
 # 0.8.0
  - reciever publishing to ros2 topics functionality added
@@ -10,13 +20,14 @@
  - tested on string handler (working), but loopback test will result in an infinite loop (expected behaviour) - need to implement server to fix this
  - need to implement only subscriber and only publisher version
 
+## 0.7.1
+ - fix, added waiting for transport connect before receiver start 
+
 # 0.7.0 MODULAR GW
  - reciever implementation (without publishing to ros2, only transport gateway - gateway)
  - added transport_access_mutex to prevent recieve-send collisions implemented mutex protection in send_data function
 
   
-## 0.7.1
- - fix, added waiting for transport connect before receiver start 
 
 
 # 0.6.0 MODULAR GW

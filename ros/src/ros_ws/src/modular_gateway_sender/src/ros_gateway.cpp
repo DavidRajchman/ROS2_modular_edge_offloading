@@ -3,13 +3,13 @@
 
 namespace gateway {
 
-RosGateway::RosGateway(const std::string& node_name)
-  : Node(node_name)
+RosGateway::RosGateway(const std::string& node_name, TransportMode transport_mode)
+: Node(node_name), transport_mode_(transport_mode)
 {
-  // Initialize parameters with defaults
+  // Initialize parameters with defaults for client mode
   declare_parameter("transport_type", "tcp");
-  declare_parameter("server_host", "100.98.247.80");
-  declare_parameter("server_port", 8888);
+  declare_parameter("server_host", "127.0.0.1");
+  declare_parameter("server_port", 12888);
   declare_parameter("max_retries", 3);
   declare_parameter("auto_start_receiver", true);
   declare_parameter("wait_for_connection", true);
@@ -45,17 +45,28 @@ RosGateway::~RosGateway()
   }
 }
 
+// Update init_transport to use transport_mode_
 void RosGateway::init_transport()
 {
   std::string transport_type = get_parameter("transport_type").as_string();
-  std::string server_host = get_parameter("server_host").as_string();
-  int server_port = get_parameter("server_port").as_int();
-  int max_retries = get_parameter("max_retries").as_int();
   
   if (transport_type == "tcp") {
-    transport_ = std::make_unique<TcpTransport>(server_host, server_port, max_retries);
-    LOG_INFO(get_logger(), "Initializing TCP transport to %s:%d", 
-             server_host.c_str(), server_port);
+    if (transport_mode_ == TransportMode::CLIENT) {
+      std::string server_host = get_parameter("server_host").as_string();
+      int server_port = get_parameter("server_port").as_int();
+      int max_retries = get_parameter("max_retries").as_int();
+      
+      transport_ = std::make_unique<TcpClientTransport>(server_host, server_port, max_retries);
+      LOG_INFO(get_logger(), "Initializing TCP client transport to %s:%d", 
+               server_host.c_str(), server_port);
+    }
+    else { // SERVER mode
+      int server_port = get_parameter("server_port").as_int();
+      int max_connections = 1; // Default to 1 connection
+      
+      transport_ = std::make_unique<TcpServerTransport>(server_port, max_connections);
+      LOG_INFO(get_logger(), "Initializing TCP server transport on port %d", server_port);
+    }
   } 
   else if (transport_type == "udp") {
     // Future: create UDP transport
@@ -238,10 +249,12 @@ bool RosGateway::receive_and_process_message() {
     for (const auto& handler_pair : handlers_) {
         auto& handler = handler_pair.second;
         
-        if (handler->is_enabled() && handler->can_process_message_type(type)) {
+        // Check both overall enabled state and ROS publisher mode
+        // (publisher mode = receiving from network and publishing to ROS)
+        if (handler->is_ros_publisher_enabled() && handler->can_process_message_type(type)) {
             if (handler->process_and_publish_received_msg(
                     topic, type, data_buffer.data(), data_buffer.size(), options)) {
-                LOG_INFO(get_logger(), "Message processed by handler: %s", 
+                LOG_INFO(get_logger(), "Message published to ROS by handler: %s", 
                          handler->get_name().c_str());
                 processed = true;
                 // No break - allow multiple handlers to process same message if needed

@@ -14,7 +14,7 @@
 
 namespace gateway {
 
-TcpTransport::TcpTransport(const std::string& host, int port, int max_retries)
+TcpClientTransport::TcpClientTransport(const std::string& host, int port, int max_retries)
   : server_host_(host), 
     server_port_(port), 
     max_retries_(max_retries), 
@@ -23,12 +23,12 @@ TcpTransport::TcpTransport(const std::string& host, int port, int max_retries)
 {
 }
 
-TcpTransport::~TcpTransport()
+TcpClientTransport::~TcpClientTransport()
 {
   disconnect();
 }
 
-bool TcpTransport::connect()
+bool TcpClientTransport::connect()
 {
   // Close existing connection if any
   if (socket_fd_ >= 0) {
@@ -72,7 +72,7 @@ bool TcpTransport::connect()
   }
 }
 
-void TcpTransport::disconnect()
+void TcpClientTransport::disconnect()
 {
   if (socket_fd_ >= 0) {
     close(socket_fd_);
@@ -81,7 +81,7 @@ void TcpTransport::disconnect()
   }
 }
 
-bool TcpTransport::send_data(const void* data, size_t size)
+bool TcpClientTransport::send_data(const void* data, size_t size)
 {
   if (!connected_ || socket_fd_ < 0) {
     return false;
@@ -128,12 +128,12 @@ bool TcpTransport::send_data(const void* data, size_t size)
   return false;
 }
 
-bool TcpTransport::is_connected() const
+bool TcpClientTransport::is_connected() const
 {
   return connected_ && socket_fd_ >= 0;
 }
 
-bool TcpTransport::data_available(int timeout_ms) {
+bool TcpClientTransport::data_available(int timeout_ms) {
     if (!is_connected()) return false;
     
     fd_set readfds;
@@ -156,7 +156,7 @@ bool TcpTransport::data_available(int timeout_ms) {
     return result > 0;
 }
 
-int TcpTransport::receive_data(void* buffer, size_t size) {
+int TcpClientTransport::receive_data(void* buffer, size_t size) {
     if (!is_connected()) return -1;
     
     ssize_t bytes_received = recv(socket_fd_, buffer, size, 0);
@@ -176,7 +176,7 @@ int TcpTransport::receive_data(void* buffer, size_t size) {
     return bytes_received;
 }
 
-bool TcpTransport::receive_exact(void* buffer, size_t size) {
+bool TcpClientTransport::receive_exact(void* buffer, size_t size) {
     if (!is_connected()) return false;
     
     size_t total_received = 0;

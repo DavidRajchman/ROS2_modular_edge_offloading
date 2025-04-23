@@ -39,7 +39,7 @@ void LaserScanHandler::shutdown()
 void LaserScanHandler::handle_message(const std::string& topic, 
                                      const sensor_msgs::msg::LaserScan::SharedPtr msg)
 {
-  if (!is_enabled()) return;
+  if (!is_enabled() || !is_ros_subscriber_enabled()) return;
   
   // Create a copy of the message to modify if needed
   sensor_msgs::msg::LaserScan scan_msg = *msg;
