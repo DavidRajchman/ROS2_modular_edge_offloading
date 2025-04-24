@@ -148,7 +148,6 @@ bool RosGateway::start_receiver(bool wait_for_connection, int timeout_ms) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_ms));
                 time_waited += retry_interval_ms;
             }
-            
             if (!transport_->is_connected()) {
                 LOG_ERROR(get_logger(), "Failed to connect transport after %d ms", time_waited);
                 return false;
