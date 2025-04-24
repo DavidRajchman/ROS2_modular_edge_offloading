@@ -128,33 +128,45 @@ bool RosGateway::start_receiver(bool wait_for_connection, int timeout_ms) {
         return false;
     }
 
-    // Check if we need to wait for a connection
-    if (wait_for_connection && !transport_->is_connected()) {
-        LOG_INFO(get_logger(), "Transport not connected, waiting for connection...");
-        
-        const int retry_interval_ms = 100; // Check every 100ms
-        int time_waited = 0;
-        
-        while (!transport_->is_connected() && (timeout_ms <= 0 || time_waited < timeout_ms)) {
-            if (!transport_->connect()) {
-                LOG_DEBUG(get_logger(), "Connection attempt failed, retrying...");
-            } else {
-                LOG_INFO(get_logger(), "Transport connected after waiting %d ms", time_waited);
-                break;
+    // Special handling based on transport mode
+    if (transport_mode_ == TransportMode::CLIENT) {
+        // For client mode: we need an active connection to a server
+        if (wait_for_connection && !transport_->is_connected()) {
+            LOG_INFO(get_logger(), "Transport not connected, waiting for connection...");
+            
+            const int retry_interval_ms = 100; // Check every 100ms
+            int time_waited = 0;
+            
+            while (!transport_->is_connected() && (timeout_ms <= 0 || time_waited < timeout_ms)) {
+                if (!transport_->connect()) {
+                    LOG_DEBUG(get_logger(), "Connection attempt failed, retrying...");
+                } else {
+                    LOG_INFO(get_logger(), "Transport connected after waiting %d ms", time_waited);
+                    break;
+                }
+                
+                std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_ms));
+                time_waited += retry_interval_ms;
             }
             
-            std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_ms));
-            time_waited += retry_interval_ms;
+            if (!transport_->is_connected()) {
+                LOG_ERROR(get_logger(), "Failed to connect transport after %d ms", time_waited);
+                return false;
+            }
         }
-        
-        if (!transport_->is_connected()) {
-            LOG_ERROR(get_logger(), "Failed to connect transport after %d ms", time_waited);
+        else if (!transport_->is_connected()) {
+            LOG_ERROR(get_logger(), "Cannot start receiver - transport not connected");
             return false;
         }
-    }
-    else if (!transport_->is_connected()) {
-        LOG_ERROR(get_logger(), "Cannot start receiver - transport not connected");
-        return false;
+    } 
+    else {
+        // For server mode: we just need to start listening
+        // The server doesn't need an active client connection to start the receiver
+        if (!transport_->connect()) {
+            LOG_ERROR(get_logger(), "Failed to start server transport");
+            return false;
+        }
+        LOG_INFO(get_logger(), "Server transport listening (receiver will accept connections)");
     }
     
     receiver_running_ = true;
