@@ -52,12 +52,12 @@ int main(int argc, char * argv[])
   
   // Configure string handler as ROS subscriber only (subscribe to ROS, send to network)
   auto string_handler = std::make_shared<gateway::StringHandler>(gateway.get());
-  gateway::configure_handler_mode(string_handler, gateway::HandlerMode::PUBLISHER_ONLY);
+  gateway::configure_handler_mode(string_handler, gateway::HandlerMode::SUBSCRIBER_ONLY);
   gateway->register_handler(string_handler);
 
   // Configure laser scan handler as ROS subscriber only (corrected from the original)
   auto laser_handler = std::make_shared<gateway::LaserScanHandler>(gateway.get());
-  gateway::configure_handler_mode(laser_handler, gateway::HandlerMode::PUBLISHER_ONLY);
+  gateway::configure_handler_mode(laser_handler, gateway::HandlerMode::SUBSCRIBER_ONLY);
   gateway->register_handler(laser_handler);
   
   rclcpp::spin(gateway);

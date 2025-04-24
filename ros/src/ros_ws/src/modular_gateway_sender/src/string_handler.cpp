@@ -57,32 +57,32 @@ bool StringHandler::process_and_publish_received_msg(
   size_t size,
   const MessageOptions& options)
 {
-if (!is_enabled() || !can_process_message_type(type)) {
-  return false;
-}
+  if (!is_enabled() || !can_process_message_type(type)) {
+    return false;
+  }
 
-// Find or create publisher for this topic
-auto it = publishers_.find(topic);
-if (it == publishers_.end()) {
-  auto publisher = gateway_->create_publisher<std_msgs::msg::String>(topic, 10);
-  it = publishers_.emplace(topic, publisher).first;
-  RCLCPP_INFO(gateway_->get_logger(), "Created string publisher for topic: %s", topic.c_str());
-}
+  // Find or create publisher for this topic
+  auto it = publishers_.find(topic);
+  if (it == publishers_.end()) {
+    auto publisher = gateway_->create_publisher<std_msgs::msg::String>(topic, 10);
+    it = publishers_.emplace(topic, publisher).first;
+    RCLCPP_INFO(gateway_->get_logger(), "Created string publisher for topic: %s", topic.c_str());
+  }
 
-// Process based on serialization flag
-if (options.serialized) {
-  //serialization not implemented for string messages
-  LOG_ERROR(gateway_->get_logger(), "Serialized string messages are not supported for processing");
-}
-else {
-  // Handle raw string data
-  std_msgs::msg::String msg;
-  msg.data = std::string(static_cast<const char*>(data), size);
-  it->second->publish(msg);
-  
-  RCLCPP_INFO(gateway_->get_logger(), "Published string to topic %s: %s", 
-             topic.c_str(), msg.data.c_str());
-}
+  // Process based on serialization flag
+  if (options.serialized) {
+    //serialization not implemented for string messages
+    LOG_ERROR(gateway_->get_logger(), "Serialized string messages are not supported for processing");
+  }
+  else {
+    // Handle raw string data
+    std_msgs::msg::String msg;
+    msg.data = std::string(static_cast<const char*>(data), size);
+    it->second->publish(msg);
+    
+    RCLCPP_INFO(gateway_->get_logger(), "Published string to topic %s: %s", 
+              topic.c_str(), msg.data.c_str());
+  }
 
 return true;
 }

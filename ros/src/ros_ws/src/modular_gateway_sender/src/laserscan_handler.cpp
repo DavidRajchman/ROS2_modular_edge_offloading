@@ -33,6 +33,10 @@ void LaserScanHandler::initialize()
 void LaserScanHandler::shutdown()
 {
   subscription_.reset();
+  
+  // Clean up publishers
+  publishers_.clear();
+  
   LOG_INFO(gateway_->get_logger(), "LaserScanHandler shut down");
 }
 
@@ -70,6 +74,56 @@ void LaserScanHandler::handle_message(const std::string& topic,
   
   LOG_INFO(gateway_->get_logger(), "Sent LaserScan message, ranges: %zu, intensities: %zu", 
            scan_msg.ranges.size(), scan_msg.intensities.size());
+}
+
+bool LaserScanHandler::process_and_publish_received_msg(
+    const std::string& topic,
+    MessageType type,
+    const void* data,
+    size_t size,
+    const MessageOptions& options)
+{
+  if (!is_enabled() || !is_ros_publisher_enabled() || !can_process_message_type(type)) {
+    return false;
+  }
+
+  try {
+    // Find or create publisher for this topic
+    auto it = publishers_.find(topic);
+    if (it == publishers_.end()) {
+      auto publisher = gateway_->create_publisher<sensor_msgs::msg::LaserScan>(topic, 10);
+      it = publishers_.emplace(topic, publisher).first;
+      LOG_INFO(gateway_->get_logger(), "Created LaserScan publisher for topic: %s", topic.c_str());
+    }
+
+    if (options.serialized == false) {
+      LOG_ERROR(gateway_->get_logger(), "Received LaserScan message without serialization flag");
+      return false;
+    }
+    
+    // Create a properly sized serialized message and copy the data
+    rclcpp::SerializedMessage serialized_msg(size);
+    
+    // Copy the data instead of sharing the pointer
+    memcpy(serialized_msg.get_rcl_serialized_message().buffer, data, size);
+    serialized_msg.get_rcl_serialized_message().buffer_length = size;
+    
+    sensor_msgs::msg::LaserScan laser_msg;
+    rclcpp::Serialization<sensor_msgs::msg::LaserScan> serialization;
+    serialization.deserialize_message(&serialized_msg, &laser_msg);
+
+    // Publish the message
+    it->second->publish(laser_msg);
+    
+    LOG_INFO(gateway_->get_logger(), "Published LaserScan to topic %s: ranges: %zu, intensities: %zu", 
+              topic.c_str(), laser_msg.ranges.size(), laser_msg.intensities.size());
+
+    return true;
+  }
+  catch (const std::exception& e) {
+    LOG_ERROR(gateway_->get_logger(), "Error processing LaserScan message: %s", e.what());
+    return false;
+  }
 }
 
 } // namespace gateway

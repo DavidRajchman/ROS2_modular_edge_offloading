@@ -3,6 +3,11 @@
  - (0.8.0) TESTING NEEDED [IMPLEMENTED] implement a way where topic handler can only be used as a subcriber or a publisher to add the ability to utilise the same handler for server and reciever gw
  - (0.10.0) Rework file structure and cmakelist to make the project cleaner and adding new handlers as simple as possible (make all handlers a single cmakelist library)
 
+# 0.11.1
+ - server transpot tcp is working for message receiving also
+ - added msg deserialization to laserscan handler - confirmed working
+ - confirmed working, NO KNOWN issues except todo list additions
+
 ## 0.10.7
  - server transport tcp is working for message sending (server in subscriber mode)
 
