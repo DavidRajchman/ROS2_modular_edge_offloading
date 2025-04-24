@@ -14,6 +14,7 @@ RosGateway::RosGateway(const std::string& node_name, TransportMode transport_mod
   declare_parameter("auto_start_receiver", true);
   declare_parameter("wait_for_connection", true);
   declare_parameter("connection_timeout_ms", 5000);  // 5 seconds default timeout
+  declare_parameter("receiver_sleep_time_us", 1000); // 1000 microseconds default sleep time
   
   // Set up shutdown handler
   rclcpp::on_shutdown([this]() { 
@@ -187,6 +188,9 @@ void RosGateway::stop_receiver() {
 }
 
 void RosGateway::receiver_thread_func() {
+  // Get the sleep time parameter (in microseconds)
+  int sleep_time_us = get_parameter("receiver_sleep_time_us").as_int();
+
   while (receiver_running_) {
       bool data_ready = false;
       
@@ -203,7 +207,7 @@ void RosGateway::receiver_thread_func() {
           std::lock_guard<std::mutex> lock(transport_access_mutex_);
           receive_and_process_message();  // Process with its own lock
       } else {
-          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::microseconds(sleep_time_us));
       }
   }
 }
