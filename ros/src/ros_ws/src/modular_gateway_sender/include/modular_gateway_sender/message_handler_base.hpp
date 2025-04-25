@@ -7,6 +7,14 @@
 
 namespace gateway {
 
+// Add this enum definition
+enum class HandlerMode {
+  SUBSCRIBER_ONLY,  // Subscribe to ROS topics, send to network
+  PUBLISHER_ONLY,   // Receive from network, publish to ROS topics
+  BOTH              // Both modes enabled
+};
+
+
 class RosGateway; // Forward declaration
 
 class MessageHandlerBase {
@@ -31,6 +39,9 @@ public:
   bool is_ros_publisher_enabled() const { return enabled_ && ros_publisher_enabled_; }
   bool is_ros_subscriber_enabled() const { return enabled_ && ros_subscriber_enabled_; }
   
+  static void configure_handler_mode(std::shared_ptr<MessageHandlerBase> handler, HandlerMode mode);
+
+
   // New method to check if handler can process a message type
   virtual bool can_process_message_type(MessageType /* type */) const {
     return false; // Default implementation processes no message types

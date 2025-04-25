@@ -12,8 +12,8 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=11)
-add_definitions(-DVERSION_PATCH=2)
+add_definitions(-DVERSION_MINOR=12)
+add_definitions(-DVERSION_PATCH=1)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -24,10 +24,27 @@ find_package(sensor_msgs REQUIRED)
 # Include directories
 include_directories(include)
 
+# Add handlers here
+add_library(handlers
+  src/handlers/string_handler.cpp
+  src/handlers/laserscan_handler.cpp
+)
+
+target_link_libraries(handlers
+  message_handler_base
+)
+
+# Libraries needed for all handlers
+ament_target_dependencies(handlers
+  rclcpp
+  std_msgs
+  sensor_msgs
+)
+
 # Transport library
 add_library(gateway_transport_lib
-  src/tcp_client_transport.cpp
-  src/tcp_server_transport.cpp
+  src/transport/tcp_client_transport.cpp
+  src/transport/tcp_server_transport.cpp
 )
 
 ament_target_dependencies(gateway_transport_lib
@@ -60,40 +77,15 @@ ament_target_dependencies(message_handler_base
   rclcpp
 )
 
-# String handler implementation
-add_library(string_handler
-  src/string_handler.cpp
-)
 
-target_link_libraries(string_handler
-  message_handler_base
-)
 
-ament_target_dependencies(string_handler
-  rclcpp
-  std_msgs
-)
 
-# LaserScan handler implementation
-add_library(laserscan_handler
-  src/laserscan_handler.cpp
-)
-
-target_link_libraries(laserscan_handler
-  message_handler_base
-)
-
-ament_target_dependencies(laserscan_handler
-  rclcpp
-  sensor_msgs
-)
 
 # Client executable
 add_executable(gateway_client src/gateway_client_main.cpp)
 target_link_libraries(gateway_client
   ros_gateway_lib
-  string_handler
-  laserscan_handler
+  handlers
 )
 ament_target_dependencies(gateway_client
   rclcpp
@@ -105,8 +97,7 @@ ament_target_dependencies(gateway_client
 add_executable(gateway_server src/gateway_server_main.cpp)
 target_link_libraries(gateway_server
   ros_gateway_lib
-  string_handler
-  laserscan_handler
+  handlers
 )
 ament_target_dependencies(gateway_server
   rclcpp
@@ -126,8 +117,7 @@ install(TARGETS
   gateway_transport_lib
   ros_gateway_lib
   message_handler_base
-  string_handler
-  laserscan_handler
+  handlers
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

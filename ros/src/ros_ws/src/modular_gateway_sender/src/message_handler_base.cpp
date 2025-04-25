@@ -20,4 +20,32 @@ bool MessageHandlerBase::send_message(const std::string& topic, MessageType type
   return gateway_->send_message(topic, type, data, size, options);
 }
 
+void MessageHandlerBase::configure_handler_mode(std::shared_ptr<MessageHandlerBase> handler, HandlerMode mode)
+{
+  if (!handler) return;
+  
+  handler->enable(); // Always enable the handler
+  
+  switch (mode) {
+    case HandlerMode::SUBSCRIBER_ONLY:
+      LOG_INFO(rclcpp::get_logger("gateway"), "Configuring handler '%s' as subscriber-only", 
+               handler->get_name().c_str());
+      handler->enable_ros_subscriber_mode();
+      handler->disable_ros_publisher_mode();
+      break;
+    case HandlerMode::PUBLISHER_ONLY:
+      LOG_INFO(rclcpp::get_logger("gateway"), "Configuring handler '%s' as publisher-only", 
+               handler->get_name().c_str());
+      handler->disable_ros_subscriber_mode();
+      handler->enable_ros_publisher_mode();
+      break;
+    case HandlerMode::BOTH:
+      LOG_INFO(rclcpp::get_logger("gateway"), "Configuring handler '%s' with both modes", 
+               handler->get_name().c_str());
+      handler->enable_ros_subscriber_mode();
+      handler->enable_ros_publisher_mode();
+      break;
+  }
+}
+
 } // namespace gateway

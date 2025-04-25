@@ -1,6 +1,6 @@
 // string_handler.cpp
 #include "modular_gateway_sender/logging_utils.hpp"
-#include "modular_gateway_sender/string_handler.hpp"
+#include "modular_gateway_sender/handlers/string_handler.hpp"
 #include "modular_gateway_sender/ros_gateway.hpp"
 
 namespace gateway {

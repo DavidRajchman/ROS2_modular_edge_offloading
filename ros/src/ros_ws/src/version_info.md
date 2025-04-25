@@ -1,6 +1,13 @@
  # **TODO fixes and modifications** 
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
- - (0.10.0) Rework file structure and cmakelist to make the project cleaner and adding new handlers as simple as possible (make all handlers a single cmakelist library)
+ - 
+
+# 0.12.1
+ - moved topic handler mode swtiching helper to the topic handler base class from server/client main.cpp files
+
+# 0.12.0
+ - (0.10.0) FIXED/ADDED  Rework file structure and cmakelist to make the project cleaner and adding new handlers as simple as possible (make all handlers a single cmakelist library)
+ - changed cmakelist to make it easier to add new handlers
 
 # 0.11.2
  - FIXED/ADDED - (0.7.1) add a parameter to change the wait time before reciever polling (current 1ms)
