@@ -25,23 +25,6 @@ find_package(gateway_transport_common REQUIRED) # Find the new transport library
 # Include directories
 include_directories(include)
 
-<<<<<<< HEAD
-# Add handlers here
-add_library(handlers
-  src/handlers/string_handler.cpp
-  src/handlers/laserscan_handler.cpp
-)
-
-target_link_libraries(handlers
-  message_handler_base
-)
-
-# Libraries needed for all handlers
-ament_target_dependencies(handlers
-  rclcpp
-  std_msgs
-  sensor_msgs
-=======
 # Transport library
 add_library(gateway_transport_lib
   src/tcp_client_transport.cpp
@@ -50,7 +33,6 @@ add_library(gateway_transport_lib
 
 ament_target_dependencies(gateway_transport_lib
   rclcpp
->>>>>>> parent of d37d9fb (# 0.12.1 reworked file structure for better readeablity, reorganized cmakelist for easier handler adding.)
 )
 
 # ROS Gateway library (depends on transport)
@@ -80,8 +62,6 @@ ament_target_dependencies(message_handler_base
   rclcpp
 )
 
-<<<<<<< HEAD
-=======
 # String handler implementation
 add_library(string_handler
   src/string_handler.cpp
@@ -110,7 +90,6 @@ ament_target_dependencies(laserscan_handler
   sensor_msgs
 )
 
->>>>>>> parent of d37d9fb (# 0.12.1 reworked file structure for better readeablity, reorganized cmakelist for easier handler adding.)
 # Client executable
 add_executable(gateway_client src/gateway_client_main.cpp)
 target_link_libraries(gateway_client
