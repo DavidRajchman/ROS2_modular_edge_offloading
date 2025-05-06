@@ -1,0 +1,36 @@
+Here is the action button configruation for the vscode extension "VsCode Action Buttons" by Seun LanLege
+
+{
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "actionButtons": {
+        
+        
+        "commands": [
+            {
+                "name": "$(rocket) Source ROS2",
+                "color": "white",
+                "command": "source install/setup.bash",
+                "singleInstance": false,
+                "focus": true
+            },
+            {
+                "name": "$(gear) M.GW Build & Source",
+                "color": "white",
+                "command": "colcon build --packages-select modular_gateway_sender && source install/setup.bash",
+                "cwd": "/home/ubuntu/ros_ws",
+                "singleInstance": false,
+                "focus": true
+            }
+        ],
+        "defaultColor": "white",
+        "reloadButton": "↻",
+        "loadNpmCommands": false
+    },
+    "github.copilot.chat.agent.thinkingTool": true,
+    "github.copilot.chat.editor.temporalContext.enabled": true,
+    "github.copilot.chat.edits.temporalContext.enabled": true,
+    "github.copilot.chat.codesearch.enabled": true,
+    "git.ignoreRebaseWarning": true,
+    "explorer.confirmDelete": false
+}

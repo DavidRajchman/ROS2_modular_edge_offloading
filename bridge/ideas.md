@@ -20,6 +20,8 @@ time to complete
 
 
 popis funkcionality:
+VHC = vehicle
+OM = offloading manager
 
 VHC pošle request pro offloading, pro určitý typ výpočtu. OM zjistí zda má dostatečnou serverovou kapacitu, pokud ano tak spustí nový kontejner na MEC a pošle info do Bridge aby sestavil trasu. Bridge sestaví cestu a pošle info do VHC který zapne handlery. 
 
@@ -27,4 +29,4 @@ Pro určité stupně QoS bude designovaný jeden topic signalizující start vý
 
 requesty pro offloading se neposílají s každým výpočtem ale periodicky (např 10s). První request vyžaduje nějaký čas na spuštění nového kontejneru a přiřazení cesty bridgem, následující requesty přijdu dříve než deadline uplyne a tím pádem již sestavená offloading trasa bude ponechána. Pokud nový request nepřijde než uplyne deadline, bude trasa zničena a kontejner vypnut. Trasu je také možné zničit na žádost VHC (např konec jízdy)
 
-Navíc, v Bridge bude FIFO fronta která bude cashovat veškeré zprávy topiců potřebných pro výpočet. Tato fronta se bude vyprazdňovat pokaždé když dojde k dokončení předchozího výpočtu. V případě že by něco selhalo, může být tato fronta použita k znovuspuštění výpočtu v jiném kontejneru
+Navíc (Bonus), v Bridge bude FIFO fronta která bude cashovat veškeré zprávy topiců potřebných pro výpočet. Tato fronta se bude vyprazdňovat pokaždé když dojde k dokončení předchozího výpočtu. V případě že by něco selhalo, může být tato fronta použita k znovuspuštění výpočtu v jiném kontejneru

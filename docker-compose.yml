@@ -34,4 +34,18 @@ services:
     #ports:
     # - 1883:1883
     command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
-
+  bridge:
+    build:
+      context: .  # Changed from ./bridge/ - Sets context to project root
+      dockerfile: ./bridge/Dockerfile # Path to Dockerfile relative to new context
+    network_mode: "host"
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./bridge:/home/ubuntu/bridge  # Mounts the bridge app's source
+      - ./cpplib:/home/ubuntu/cpplib_src # Changed from ../cpplib - Mounts cpplib from project root
+    working_dir: /home/ubuntu/bridge
+    privileged: true
+    command: /bin/bash
