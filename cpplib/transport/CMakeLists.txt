@@ -1,3 +1,4 @@
+set(CMAKE_VERBOSE_MAKEFILE ON) 
 cmake_minimum_required(VERSION 3.10)
 project(TransportLib VERSION 1.0.0 LANGUAGES CXX)
 
@@ -19,9 +20,10 @@ target_include_directories(transport
 # Pass version definitions to the compiler for logging_utils.hpp
 target_compile_definitions(transport
     PRIVATE
-        VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-        VERSION_MINOR=${PROJECT_VERSION_MINOR}
-        VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    APP_NAME="TransportLIB"   # Define APP_NAME as the string TransportLIB
+    VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 # Link against pthreads for std::thread

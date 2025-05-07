@@ -14,21 +14,8 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libboost-all-dev \
     sudo \
-    # Network debugging tools
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    netcat \
-    tcpdump \
-    nmap \
-    curl \
-    wget \
-    iptables \
-    dnsutils \
-    traceroute \
-    # Additional useful tools
-    htop \
-    tree \
+    # sudo is already installed on ubuntu:22.04 base, but explicitly listing if needed by other tools
+    # For the ubuntu user created below, sudo privileges are granted via /etc/sudoers.d/
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -39,21 +26,21 @@ RUN mkdir -p /etc/sudoers.d && \
     chmod 0440 /etc/sudoers.d/ubuntu
 
 # --- Build and Install TransportLib ---
-# The build context for this Dockerfile is ./bridge, so ../cpplib is correct
-# This COPY command places the TransportLib source into the image for the initial build.
-# If you mount ../cpplib as a volume in docker-compose, that mount will overlay this path at runtime.
-COPY ../cpplib /home/ubuntu/cpplib_src_build_time 
+# Assuming the build context in docker-compose.yml is '.', so ./cpplib is correct.
+COPY ./cpplib /home/ubuntu/cpplib_src_build_time 
 
 # Set working directory for building TransportLib
 WORKDIR /home/ubuntu/cpplib_src_build_time/transport
 
 # Build and install TransportLib
 # This build uses the source code copied into the image at build time.
-RUN mkdir build && \
+# This RUN command executes as root, so sudo is not needed for make install.
+# Ensure the build directory is clean before starting.
+RUN rm -rf build && \
+    mkdir build && \
     cd build && \
     cmake .. && \
     make -j$(nproc) && \
-    # Use sudo because the ubuntu user is installing to system locations like /usr/local/
     make install 
 
 # Optional: Clean up the build-time source directory to save image space.
@@ -62,7 +49,7 @@ RUN mkdir build && \
 # However, if the volume mount is not present, the library would still be installed,
 # but its source (from build time) would be gone.
 # For maximum flexibility with volume mounts, it's often fine to leave it.
-# RUN sudo rm -rf /home/ubuntu/cpplib_src_build_time
+# RUN rm -rf /home/ubuntu/cpplib_src_build_time
 # --- End TransportLib Installation ---
 
 # Switch to ubuntu user for subsequent commands and default runtime user

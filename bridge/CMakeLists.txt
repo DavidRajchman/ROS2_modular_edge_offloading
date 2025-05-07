@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(bridge VERSION 0.1.0)
+project(bridge VERSION 0.1.2)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -19,6 +19,14 @@ find_package(TransportLib REQUIRED)
 # Add the executable for your bridge application
 add_executable(bridge
     src/main.cpp
+)
+
+target_compile_definitions(bridge
+    PRIVATE
+    APP_NAME="Bridge"  # Define the application name for bridge logs
+    VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 # Link libraries

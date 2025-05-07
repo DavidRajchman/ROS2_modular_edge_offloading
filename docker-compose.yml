@@ -48,4 +48,6 @@ services:
       - ./cpplib:/home/ubuntu/cpplib_src # Changed from ../cpplib - Mounts cpplib from project root
     working_dir: /home/ubuntu/bridge
     privileged: true
+    stdin_open: true  # Add this line
+    tty: true         # Add this line
     command: /bin/bash
