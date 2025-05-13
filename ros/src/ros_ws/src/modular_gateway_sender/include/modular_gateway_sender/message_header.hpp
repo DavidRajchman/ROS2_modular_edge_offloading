@@ -126,13 +126,15 @@ struct MessageOptions {
 inline std::vector<uint8_t> create_header(
   const std::string& topic,
   MessageType type,
+  uint8_t id_group,             // New parameter
+  uint8_t identifier_in_group,  // New parameter
   uint32_t data_size,
   uint8_t flags = 0)
 {
   std::vector<uint8_t> header;
   
-  // Reserve space for efficiency
-  header.reserve(9 + topic.size());
+  // Reserve space for efficiency (9 original + 2 for ID + topic size)
+  header.reserve(11 + topic.size());
   
   // Magic bytes
   header.push_back(HEADER_MAGIC >> 8);    // High byte
@@ -143,12 +145,17 @@ inline std::vector<uint8_t> create_header(
   
   // Message type
   header.push_back(static_cast<uint8_t>(type));
+
+  // Unique ID
+  header.push_back(id_group);
+  header.push_back(identifier_in_group);
   
   // Payload size (4 bytes, big endian)
   header.push_back((data_size >> 24) & 0xFF);  // Most significant byte
   header.push_back((data_size >> 16) & 0xFF);  
   header.push_back((data_size >> 8) & 0xFF);   
   header.push_back(data_size & 0xFF);          // Least significant byte
+  
   
   // Topic length (1 byte)
   uint8_t topic_len = std::min(topic.size(), static_cast<size_t>(255));
@@ -175,11 +182,13 @@ inline std::vector<uint8_t> create_header(
 inline std::vector<uint8_t> create_header(
   const std::string& topic,
   MessageType type,
+  uint8_t id_group,             // New parameter
+  uint8_t identifier_in_group,  // New parameter
   uint32_t data_size,
   const MessageOptions& options)
 {
   // Convert the options to a flags byte and use the raw flags version
-  return create_header(topic, type, data_size, options.to_flags());
+  return create_header(topic, type, id_group, identifier_in_group, data_size, options.to_flags());
 }
 
 } // namespace gateway

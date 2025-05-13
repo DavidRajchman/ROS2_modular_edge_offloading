@@ -98,7 +98,8 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
   }
 
   // Create header using the options
-  std::vector<uint8_t> header = create_header(topic, type, size, options);
+  std::vector<uint8_t> header = create_header(topic, type, id_group_, identifier_in_group_, size, options);
+
 {
   std::lock_guard<std::mutex> lock(transport_access_mutex_); // Add mutex protection
 
@@ -213,8 +214,8 @@ void RosGateway::receiver_thread_func() {
 }
 
 bool RosGateway::receive_and_process_message() {
-    // Step 1: Read the first 9 bytes (magic, flags, type, size, topic_len)
-    constexpr size_t HEADER_MIN_SIZE = 9;
+    // Step 1: Read the first 11 bytes (magic, flags, type, id_group, id_in_group, size, topic_len)
+    constexpr size_t HEADER_MIN_SIZE = 11; // Increased by 2 for the ID
     uint8_t header_start[HEADER_MIN_SIZE];
     
     if (!transport_->receive_exact(header_start, HEADER_MIN_SIZE)) {
@@ -232,9 +233,13 @@ bool RosGateway::receive_and_process_message() {
     // Step 3: Extract basic header information
     uint8_t flags = header_start[2];
     MessageType type = static_cast<MessageType>(header_start[3]);
-    uint32_t data_size = (header_start[4] << 24) | (header_start[5] << 16) | 
-                         (header_start[6] << 8) | header_start[7];
-    uint8_t topic_len = header_start[8];
+    uint8_t received_id_group = header_start[4];          // New
+    uint8_t received_identifier_in_group = header_start[5]; // New
+    uint32_t data_size = (static_cast<uint32_t>(header_start[6]) << 24) | 
+                         (static_cast<uint32_t>(header_start[7]) << 16) | 
+                         (static_cast<uint32_t>(header_start[8]) << 8)  | 
+                         static_cast<uint32_t>(header_start[9]);
+    uint8_t topic_len = header_start[10];
     
     // Step 4: Read the topic name
     std::vector<char> topic_buf(topic_len + 1, '\0');  // +1 for null terminator
@@ -246,8 +251,7 @@ bool RosGateway::receive_and_process_message() {
     std::string topic(topic_buf.data(), topic_len);
     MessageOptions options(flags);
     
-    LOG_INFO(get_logger(), "Received message header for topic '%s', type %d, size %u bytes",
-             topic.c_str(), static_cast<int>(type), data_size);
+    LOG_INFO(get_logger(), "Received message header for topic '%s', type %d, from ID %u:%u, size %u bytes",topic.c_str(), static_cast<int>(type), received_id_group, received_identifier_in_group, data_size);
     
     // Step 5: Read the message payload
     std::vector<uint8_t> data_buffer(data_size);
@@ -342,6 +346,14 @@ void RosGateway::disable_handler(const std::string& handler_name)
   it->second->disable();
   LOG_INFO(get_logger(), "Disabled handler: %s", handler_name.c_str());
 }
+
+void RosGateway::set_gateway_id(uint8_t id_group, uint8_t identifier_in_group) {
+  id_group_ = id_group;
+  identifier_in_group_ = identifier_in_group;
+  LOG_INFO(get_logger(), "Gateway ID explicitly set to ID Group: %u, Identifier in Group: %u",
+           id_group_, identifier_in_group_);
+}
+
 
 } // namespace gateway
 

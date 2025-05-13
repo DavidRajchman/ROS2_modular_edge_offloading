@@ -9,7 +9,7 @@
     *   [ ] 1.3. Bridge Control Plane - Data Plane Internal Interface (Interaction mechanism for handler/map management).
 *   **[ ] 2. Routing Map - Access and Structure:**
     *   [ ] 2.1. Queue Identification (How `Source_Identifier` in map value maps to handler's MPSC queue).
-    *   [ ] 2.2. Update Strategy (Preferred high-level strategy for CP updates to map, e.g., atomic pointer swaps).
+    *   [X] 2.2. Update Strategy (Preferred high-level strategy for CP updates to map, e.g., atomic pointer swaps).
 *   **[ ] 3. VHC-Bridge Data Stream Reconnection Strategy:**
     *   [ ] 3.1. Finalize strategy (e.g., confirm: re-establish transport, notify CP, CP informs OM of disruption, OM decides on task restart/termination).
 *   **[ ] 4. Control Plane State Management:**
@@ -66,13 +66,19 @@ The Bridge is designed with a dual-plane architecture to separate control logic 
     *   Handlers communicate directly with each other by placing messages onto target handlers' input queues, forming a "mesh-like" flow rather than passing through a central routing task.
     *   Each handler has its own input queue, which is MPSC (Multi-Producer, Single-Consumer): multiple handlers can produce messages for the queue, but only the owning handler consumes from it.
     *   Intention is to use high-performance, preferably lock-free, MPSC queue implementations.
+
 *   **Shared Routing Map:**
     *   A concurrently accessible data structure (e.g., `std::unordered_map`) storing routing rules.
     *   **Key:** `(Source_Identifier_from_Header, Topic_from_Header)`
         *   `Source_Identifier_from_Header`: ID of the entity that sent the message directly to the Bridge (e.g., VHC_ID or MEC_ID).
         *   `Topic_from_Header`: ROS2 topic name from the message header.
     *   **Value:** A list of identifiers for the destination handler queues.
-    *   Populated/updated by the Control Plane. Data Plane access must be thread-safe and highly efficient (e.g., reader-writer locks or atomic pointer swaps for map updates).
+    *   Populated/updated by the Control Plane. Data Plane access must be thread-safe.
+        *   **Concurrency Strategy:** The map will be protected by a `std::shared_mutex` (read-write lock).
+            *   Data Plane threads will acquire a shared lock for read access.
+            *   The Control Plane thread will acquire an exclusive lock for write access (updates).
+        *   **Rehash Prevention:** To ensure stable Control Plane load during updates and prevent long pauses in the Data Plane due to rehashes under exclusive lock, the `std::unordered_map` instance will be pre-sized at initialization (e.g., using `map.reserve(MAX_EXPECTED_ROUTES)` where `MAX_EXPECTED_ROUTES` is a configurable upper bound like 10,000 plus a margin). This prevents automatic runtime rehashes.
+        *   **Performance Implication:** This approach prioritizes stable Control Plane load during updates over achieving the absolute minimum Data Plane read latency or non-blocking reads. Data Plane reads will have a small, consistent overhead from lock acquisition. During Control Plane updates (when the exclusive lock is held), Data Plane routing lookups will be briefly paused.
 *   **Message Processing Flow (Data Plane Handler):**
     1.  Receives a raw message over its TCP connection.
     2.  Parses the header to extract `Source_Identifier` and `Topic`.

@@ -19,7 +19,6 @@ enum class TransportMode {
 
 class RosGateway : public rclcpp::Node {
 public:
-  // Add transport_mode parameter to constructor
   RosGateway(const std::string& node_name, TransportMode transport_mode = TransportMode::CLIENT);
   ~RosGateway();
   
@@ -35,10 +34,14 @@ public:
   
   bool start_receiver(bool wait_for_connection = true, int timeout_ms = 5000);
   void stop_receiver();
+
+  void set_gateway_id(uint8_t id_group, uint8_t identifier_in_group);
   
 private:
-  // Add transport mode member
   TransportMode transport_mode_;
+
+  uint8_t id_group_;
+  uint8_t identifier_in_group_;
   
   // Existing members
   std::unique_ptr<TransportBase> transport_;

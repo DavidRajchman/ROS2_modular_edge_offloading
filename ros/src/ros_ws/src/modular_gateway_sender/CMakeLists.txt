@@ -12,8 +12,8 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=12)
-add_definitions(-DVERSION_PATCH=1)
+add_definitions(-DVERSION_MINOR=13)
+add_definitions(-DVERSION_PATCH=0)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
