@@ -1,84 +1,123 @@
 #ifndef COMMON_TYPES_HPP
 #define COMMON_TYPES_HPP
 
+#include <transport/logging_utils.hpp> // For logging
+
+
 #include <string>
 #include <vector>
-#include <memory> // For std::shared_ptr
+#include <memory>     // For std::shared_ptr
 #include <functional> // For std::hash
+#include <cstdint>    // For uint8_t, uint16_t
+#include <optional>   // For std::optional
+#include <cstring>    // For memcpy
+#include <arpa/inet.h> // For ntohs, ntohl
 
-// Assuming moodycamel's MPSC queue.
-// You'll need to ensure this header is available in your include paths.
-// If you don't have it yet, you can temporarily use a placeholder,
-// but for actual MPSC functionality, a proper queue is needed.
 #include "concurrentqueue.h"
 
-// A simple placeholder for a message
-struct Message {
-    // For now, let's assume the message data itself is a byte vector.
-    // The actual structure of ROS2 messages might be more complex and handled
-    // by ROS2 libraries, but for the Bridge's internal forwarding,
-    // it might treat the payload as opaque bytes after parsing the header.
-    std::vector<char> data;
+// --- Modular GW Header Constants ---
+namespace ModGW {
+namespace Header {
+    constexpr size_t MAGIC_NUMBER_OFFSET = 0;
+    constexpr size_t FLAGS_OFFSET = 2;
+    constexpr size_t MESSAGE_TYPE_OFFSET = 3;
+    constexpr size_t ID_GROUP_OFFSET = 4;
+    constexpr size_t IDENTIFIER_IN_GROUP_OFFSET = 5;
+    constexpr size_t PAYLOAD_SIZE_FIELD_OFFSET = 6;
+    constexpr size_t TOPIC_LENGTH_FIELD_OFFSET = 10;
+    constexpr size_t TOPIC_NAME_START_OFFSET = 11;
 
-    // You might add other fields if the Bridge needs to inspect/modify them,
-    // but for simple forwarding, the payload might be opaque.
+    constexpr size_t MAGIC_NUMBER_LEN = 2;
+    constexpr size_t PAYLOAD_SIZE_FIELD_LEN = 4;
+    constexpr size_t TOPIC_LENGTH_FIELD_LEN = 1;
+
+    constexpr size_t MIN_HEADER_LEN_BEFORE_TOPIC_NAME = TOPIC_NAME_START_OFFSET;
+
+    constexpr uint16_t EXPECTED_MAGIC_NUMBER = 0xA5C3;
+} // namespace Header
+} // namespace ModGW
+
+inline uint16_t read_uint16_big_endian(const unsigned char* buffer) {
+    uint16_t value;
+    std::memcpy(&value, buffer, sizeof(uint16_t));
+    return ntohs(value);
+}
+
+inline uint32_t read_uint32_big_endian(const unsigned char* buffer) {
+    uint32_t value;
+    std::memcpy(&value, buffer, sizeof(uint32_t));
+    return ntohl(value);
+}
+
+struct Message {
+    std::vector<unsigned char> data;
 };
 
-// Define the MPSC Queue type we'll be using
-// This queue will hold shared_ptr to Message objects.
 using MPSCQueueType = moodycamel::ConcurrentQueue<std::shared_ptr<Message>>;
 
-// Define the Routing Key
 struct RoutingKey {
-    std::string source_id; // e.g., VHC_ID or MEC_ID
-    std::string topic;     // e.g., ROS2 topic name
+    uint16_t source_id;
+    uint8_t message_type;
 
-    // Equality operator for std::unordered_map
     bool operator==(const RoutingKey& other) const {
-        return source_id == other.source_id && topic == other.topic;
+        return source_id == other.source_id && message_type == other.message_type;
     }
 };
 
-// Hash function for RoutingKey for std::unordered_map
-// This needs to be in the std namespace or provided as a custom hasher to std::unordered_map
+inline RoutingKey construct_routing_key(uint8_t id_group, uint8_t id_in_group, uint8_t msg_type) {
+    uint16_t combined_source_id = (static_cast<uint16_t>(id_group) << 8) | static_cast<uint16_t>(id_in_group);
+    return {combined_source_id, msg_type};
+}
+
 namespace std {
     template <>
     struct hash<RoutingKey> {
         std::size_t operator()(const RoutingKey& k) const {
-            // A simple hash combination.
-            // You might want a more robust hash function for production.
-            std::size_t h1 = std::hash<std::string>()(k.source_id);
-            std::size_t h2 = std::hash<std::string>()(k.topic);
-            return h1 ^ (h2 << 1); // Combine hashes
+            std::size_t h1 = std::hash<uint16_t>()(k.source_id);
+            std::size_t h2 = std::hash<uint8_t>()(k.message_type);
+            return h1 ^ (h2 << 1);
         }
     };
-} // namespace std
+}
 
-// Placeholder function to parse message header and extract RoutingKey
-// This function will be implemented properly once the header format is defined.
-// It takes the raw message data (or a part of it representing the header).
-inline RoutingKey parse_message_header(const Message& received_message) {
-    // TODO: Implement actual header parsing logic here once header format is defined.
-    // The header is expected to be a byte array at the start of received_message.data.
-    // This function will need to:
-    // 1. Access the beginning of received_message.data.
-    // 2. Deserialize the Source_Identifier and Topic from these bytes according to the defined format.
-    // 3. Handle potential errors (e.g., insufficient data for header, malformed header).
+struct ParsedHeaderInfo {
+    RoutingKey routing_key;
+    size_t total_message_length;
+    size_t payload_offset;
+    size_t payload_size;
+};
 
-    // For now, returning a dummy/placeholder key based on simple checks for varied testing.
-    // This is NOT how actual header parsing would work.
-    if (received_message.data.empty()) {
-        return {"UNKNOWN_SOURCE_H", "UNKNOWN_TOPIC_H"}; // "H" for Header-parsed
-    }
-    
-    // Example: very simple placeholder logic based on message content
-    if (received_message.data.size() > 4 && received_message.data[0] == 'V' && received_message.data[1] == '1') {
-        return {"VHC1_FROM_HEADER", "GPS_FROM_HEADER"};
-    } else if (received_message.data.size() > 4 && received_message.data[0] == 'M' && received_message.data[1] == '1') {
-        return {"MEC1_FROM_HEADER", "RESULT_FROM_HEADER"};
+inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char* buffer, size_t buffer_size) {
+    if (buffer_size < ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME) {
+        LOG_ERROR("parse_message_header: Insufficient data for header parsing.");
+        return std::nullopt;
     }
 
-    return {"DEFAULT_SOURCE_H", "DEFAULT_TOPIC_H"};
+    uint16_t magic_number = read_uint16_big_endian(buffer + ModGW::Header::MAGIC_NUMBER_OFFSET);
+    if (magic_number != ModGW::Header::EXPECTED_MAGIC_NUMBER) {
+        LOG_ERROR("parse_message_header: Invalid magic number.");
+        return std::nullopt;
+    }
+
+    uint8_t msg_type = buffer[ModGW::Header::MESSAGE_TYPE_OFFSET];
+    uint8_t id_group = buffer[ModGW::Header::ID_GROUP_OFFSET];
+    uint8_t id_in_group = buffer[ModGW::Header::IDENTIFIER_IN_GROUP_OFFSET];
+    RoutingKey key = construct_routing_key(id_group, id_in_group, msg_type);
+
+    uint8_t topic_length = buffer[ModGW::Header::TOPIC_LENGTH_FIELD_OFFSET];
+    uint32_t payload_size = read_uint32_big_endian(buffer + ModGW::Header::PAYLOAD_SIZE_FIELD_OFFSET);
+
+    size_t total_header_length = ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME + topic_length;
+    size_t total_message_length = total_header_length + payload_size;
+
+    return ParsedHeaderInfo{key, total_message_length, total_header_length, payload_size};
+}
+
+inline std::optional<ParsedHeaderInfo> parse_message_header(const std::vector<unsigned char>& data_buffer) {
+    if (data_buffer.empty()) {
+        return std::nullopt;
+    }
+    return parse_message_header(data_buffer.data(), data_buffer.size());
 }
 
 #endif // COMMON_TYPES_HPP

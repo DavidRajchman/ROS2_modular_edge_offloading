@@ -40,6 +40,8 @@ The header is a minimum of 11 bytes, plus the length of the topic name. All mult
 | 11             | `Topic Length` | Topic Name            | The ROS 2 topic name associated with the message, UTF-8 encoded.                                           |
 | 11 + `Topic Length` | `Payload Size` | Payload             | The actual message data. Its interpretation depends on the `Message Type`.                                 |
 
+**Note for Routing Intermediaries (e.g., a Bridge):** While the `Topic Name` is essential for the end-point Modular GWs to interact with their respective ROS 2 environments, an intermediary system designed for high-speed routing might primarily use a combination of `ID Group`, `Identifier in Group` (as a composite source ID), and the `Message Type` byte as its primary key for routing decisions. This assumes a system-level convention or external configuration (e.g., from an Orchestrator) that maps these key components to specific data flows, especially when a unique `(Source ID, Message Type)` pair consistently corresponds to a single logical data stream (e.g., a specific ROS 2 topic) for routing purposes. The full `Topic Name` would still need to be parsed by such an intermediary to correctly determine the total message length and forward the message intact.
+
 ##### 3.1.1. Flags Byte
 
 The Flags byte is an 8-bit field where each bit (or group of bits) has a specific meaning:

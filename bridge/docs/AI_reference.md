@@ -29,9 +29,11 @@ The primary goal is to create a "Bridge" application that acts as an intelligent
 *   **Vehicle (VHC):** A mobile entity (e.g., a car) running a ROS2 environment. It generates data on various ROS2 topics (e.g., MAP, SPEED, GPS, PICTURES) and can request to offload computations.
 *   **MEC Server & Docker Instances:** A Mobile Edge Computing server, also running a ROS2 environment, typically within Docker containers. It performs computations on data received from VHCs. Each MEC Docker instance is dedicated to processing tasks for exactly one VHC.
 *   **Offloading Manager (OM):** An external system responsible for high-level decision-making. It decides if and where offloading should occur, manages MEC resources (e.g., instructing the MEC Control Plane to spawn Docker containers), and instructs the Bridge on how to route data.
-*   **Bridge:** The application being designed. It sits between VHCs and MECs, routing messages according to OM's directives. It comprises a Control Plane and a Data Plane.
+* **Bridge:** The application being designed. It sits between VHCs and MECs, routing messages according to OM's directives. It comprises:
+  - **Control Plane:** Acts as a TCP server, managing control communication with VHCs and the OM.
+  - **Data Plane:** Acts as a TCP client, establishing connections to gateways (VHCs and MECs) for message routing.
 *   **MEC Control Plane:** An entity (presumably part of the MEC infrastructure or managed by OM) that can spawn/destroy Docker containers on MEC servers based on OM directives.
-*   **Task Database:** An external, static database that maps a "task ID" (used in control communications) to the specific input ROS2 topics required for that task and the output ROS2 topic(s) that will carry the results. This database does not change during runtime.
+*   **Task Database:** An external, static database that maps a "task ID" (used in control communications) to the specific input ROS2 topics required for that task, **their expected `Message Type` byte (as per the Modular GW protocol)**, and the output ROS2 topic(s) (and **their `Message Type` bytes**) that will carry the results. This database does not change during runtime and is crucial for the Control Plane to translate OM directives into routing rules for the Data Plane.
 
 ### 1.3. High-Level Communication Paths
 *   **VHC <-> Bridge Control Plane <-> OM:** For control messages (e.g., offloading requests, keep-alives, OM directives). VHC-OM communication is always relayed via the Bridge Control Plane.
@@ -58,10 +60,9 @@ The Bridge is designed with a dual-plane architecture to separate control logic 
     *   Forwards VHC messages to one or more designated MEC Docker instances based on the Routing Map. Supports "fan-out" (max ~5 copies, using `std::shared_ptr` to avoid data duplication).
     *   Receives computed results from MEC Docker instances and routes them back to the correct VHC.
     *   **Low Latency:** A paramount design driver for all data plane operations.
-*   **Universal Transport Handlers:**
-    *   The core processing units are instances of a single, generic "universal transport handler" class/template.
-    *   One handler instance is dedicated to managing each active TCP data connection (to a VHC or a MEC Docker).
-    *   This approach promotes code reusability and consistency.
+* **Universal Transport Handlers:**
+  - Each handler acts as a TCP client, establishing a connection to a specific gateway (VHC or MEC) based on instructions from the Control Plane.
+  - During connection setup, the handler performs a handshake with the gateway to ensure compatibility and readiness.
 *   **Mesh-like Communication & MPSC Queues:**
     *   Handlers communicate directly with each other by placing messages onto target handlers' input queues, forming a "mesh-like" flow rather than passing through a central routing task.
     *   Each handler has its own input queue, which is MPSC (Multi-Producer, Single-Consumer): multiple handlers can produce messages for the queue, but only the owning handler consumes from it.
@@ -69,10 +70,10 @@ The Bridge is designed with a dual-plane architecture to separate control logic 
 
 *   **Shared Routing Map:**
     *   A concurrently accessible data structure (e.g., `std::unordered_map`) storing routing rules.
-    *   **Key:** `(Source_Identifier_from_Header, Topic_from_Header)`
-        *   `Source_Identifier_from_Header`: ID of the entity that sent the message directly to the Bridge (e.g., VHC_ID or MEC_ID).
-        *   `Topic_from_Header`: ROS2 topic name from the message header.
-    *   **Value:** A list of identifiers for the destination handler queues.
+    *   **Key:** `(Source_Identifier_from_Header, MessageType_from_Header)`
+    *   `Source_Identifier_from_Header`: A unique identifier derived from the `ID Group` and `Identifier in Group` fields of the Modular GW message header (e.g., a combined `uint16_t` or a canonical string representation). This identifies the specific Modular GW instance that sent the message to the Bridge.
+    *   `MessageType_from_Header`: The `uint8_t Message Type` field from the Modular GW message header. This, in conjunction with the `Source_Identifier_from_Header` and a system-level 1-to-1 mapping convention (Source_ID + MessageType -> unique ROS Topic), allows the Bridge to identify the specific data stream.
+*   **Value:** A list of identifiers for the destination handler queues.
     *   Populated/updated by the Control Plane. Data Plane access must be thread-safe.
         *   **Concurrency Strategy:** The map will be protected by a `std::shared_mutex` (read-write lock).
             *   Data Plane threads will acquire a shared lock for read access.
@@ -80,10 +81,15 @@ The Bridge is designed with a dual-plane architecture to separate control logic 
         *   **Rehash Prevention:** To ensure stable Control Plane load during updates and prevent long pauses in the Data Plane due to rehashes under exclusive lock, the `std::unordered_map` instance will be pre-sized at initialization (e.g., using `map.reserve(MAX_EXPECTED_ROUTES)` where `MAX_EXPECTED_ROUTES` is a configurable upper bound like 10,000 plus a margin). This prevents automatic runtime rehashes.
         *   **Performance Implication:** This approach prioritizes stable Control Plane load during updates over achieving the absolute minimum Data Plane read latency or non-blocking reads. Data Plane reads will have a small, consistent overhead from lock acquisition. During Control Plane updates (when the exclusive lock is held), Data Plane routing lookups will be briefly paused.
 *   **Message Processing Flow (Data Plane Handler):**
-    1.  Receives a raw message over its TCP connection.
-    2.  Parses the header to extract `Source_Identifier` and `Topic`.
-    3.  Performs a lookup in the shared Routing Map.
-    4.  For each destination queue identified, enqueues a `std::shared_ptr<Message>`.
+    1.  Receives a raw message (or part of it) over its TCP connection.
+    2.  Parses the Modular GW header to:
+        a.  Verify the Magic Number.
+        b.  Extract `ID Group` and `Identifier in Group` to form the `Source_Identifier`.
+        c.  Extract the `Message Type`.
+        d.  Determine the total message length (by parsing `Topic Length` and `Payload Size`) to ensure the full message (original header + payload) is read.
+    3.  Constructs the `RoutingKey` using the extracted `Source_Identifier` and `Message Type`.
+    4.  Performs a lookup in the shared `RoutingTable` using this `RoutingKey`.
+    5.  For each destination queue identified, enqueues a `std::shared_ptr<Message>` containing the *complete, original Modular GW message* (header and payload).
 *   **Symmetrical Routing Logic Execution:**
     *   The Data Plane handler's code for lookup and enqueuing is identical for messages from VHCs or MECs. The intelligence to differentiate flows is encoded in the Routing Map's contents by the OM via the Control Plane.
 
@@ -97,8 +103,10 @@ This outlines the sequence of events for establishing, maintaining, and tearing 
     *   OM informs Bridge CP of approval (including MEC details).
     *   OM directs MEC CP to spawn the task-specific Docker.
 *   **Step 4: Bridge CP Prepares Data Path:**
-    *   Creates/configures a transport handler for the new MEC Docker.
-    *   Updates Routing Map for VHC -> MEC (input topics from Task Database) and MEC -> VHC (result topics from Task Database).
+    *   Creates/configures a transport handler for the new MEC Docker if one doesn't exist for this MEC.
+    *   Updates `RoutingTable`:
+        *   For VHC -> MEC: For each input ROS topic specified by the OM (via Task ID), the CP uses the Task Database to find the corresponding `Message Type`. It then adds/updates routes using `(VHC_Source_Identifier, MessageType)` as the key, pointing to the MEC handler's queue.
+        *   For MEC -> VHC: Similarly, for each result ROS topic, the CP uses the Task Database to find its `Message Type`. It then adds/updates routes using `(MEC_Source_Identifier, MessageType)` as the key, pointing to the VHC handler's queue.
 *   **Step 5: Bridge CP Instructs VHC:** Sends control message to VHC to start sending specified topics and prepare for result topics.
 *   **Step 6: Stable Data Flow:** VHC sends data, MEC Docker connects. Data flows: VHC -> Bridge DP -> MEC Docker, and MEC Docker -> Bridge DP -> VHC.
 *   **Step 7: VHC Keep-Alive & OM Timeout:** VHC sends periodic keep-alives to OM (via Bridge CP). If OM doesn't receive one in time, it initiates teardown.
@@ -149,6 +157,7 @@ This outlines the sequence of events for establishing, maintaining, and tearing 
 *   The Bridge Control Plane reports significant failures (e.g., inability to set up a route, loss of communication with OM or VHC, critical errors from Data Plane) to the OM (if possible) and/or logs them extensively for manual intervention.
 
 ## 5. Key Design Principles and Assumptions Summary
+* **Separate TCP Roles:** The Control Plane acts as a TCP server for managing control communication, while the Data Plane acts as a TCP client for establishing connections to gateways.
 *   **Low Latency (Data Plane):** A primary driver for data forwarding architecture.
 *   **Identical Transport Layer:** VHCs and MECs utilize the same `TransportLib` and ROS2 environment.
 *   **Standardized Message Headers:** Messages contain `Source_Identifier` and `Topic` for routing.
@@ -160,3 +169,4 @@ This outlines the sequence of events for establishing, maintaining, and tearing 
 *   **Separate Control/Data Planes:** For clarity, independent resource management (mostly), and differing reliability requirements. Communication between planes (e.g., CP updating routing map used by DP) must be efficient and safe.
 
 This revised document aims to provide a comprehensive understanding of the Bridge system, its dynamic operation, and its approach to handling failures within the specified lab environment constraints.
+
