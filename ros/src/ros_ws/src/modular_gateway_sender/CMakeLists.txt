@@ -12,7 +12,7 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=13)
+add_definitions(-DVERSION_MINOR=14)
 add_definitions(-DVERSION_PATCH=0)
 
 # find dependencies
@@ -28,6 +28,9 @@ include_directories(include)
 add_library(handlers
   src/handlers/string_handler.cpp
   src/handlers/laserscan_handler.cpp
+  src/handlers/string_test_input_handler.cpp  
+  src/handlers/string_test_result_handler.cpp
+
 )
 
 target_link_libraries(handlers

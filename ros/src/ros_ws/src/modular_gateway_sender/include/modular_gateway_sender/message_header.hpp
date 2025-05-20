@@ -31,6 +31,10 @@ enum class MessageType : uint8_t {
 
   //sensor_msgs - range [11 - 100]
   smLASERSCAN = 11,  ///< sensor_msgs/LaserScan Message
+
+  //Testing messages - range [201-255]
+  STRING_TEST_INPUT = 201, ///< Test input string message
+  STRING_TEST_RESULT = 202, ///< Test result string message
   
 };
 

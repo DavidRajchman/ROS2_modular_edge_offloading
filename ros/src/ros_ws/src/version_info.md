@@ -1,6 +1,12 @@
  # **TODO fixes and modifications** 
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
- - 
+
+# 0.14.0
+ - added new testing handlers for testing bridge.
+ - python procccesing test script should be added to simulate MEC functions (TODO)
+
+# 0.13.0
+ - added MGW ID to the message header 
 
 # 0.12.1
  - moved topic handler mode swtiching helper to the topic handler base class from server/client main.cpp files
