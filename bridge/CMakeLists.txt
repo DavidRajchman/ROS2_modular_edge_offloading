@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(bridge VERSION 0.1.2)
+project(bridge VERSION 0.2.0)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -37,6 +37,7 @@ find_package(TransportLib REQUIRED)
 add_executable(bridge
     src/main.cpp
     src/RoutingTable.cpp
+    src/TransportHandler.cpp
 )
 
 # Explicitly add the include directory for concurrentqueue

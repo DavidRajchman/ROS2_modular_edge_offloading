@@ -123,6 +123,8 @@ struct MessageOptions {
  * 
  * @param topic The topic name for the message
  * @param type The message type from MessageType enum
+ * @param id_group Unique ID for the group
+ * @param identifier_in_group Unique ID for the identifier in the group
  * @param data_size Size of the message payload in bytes
  * @param flags Raw flags byte (default: 0)
  * @return std::vector<uint8_t> Binary header as a byte vector

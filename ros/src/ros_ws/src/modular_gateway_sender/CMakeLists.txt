@@ -13,7 +13,7 @@ endif()
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
 add_definitions(-DVERSION_MINOR=14)
-add_definitions(-DVERSION_PATCH=0)
+add_definitions(-DVERSION_PATCH=1)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -108,10 +108,36 @@ ament_target_dependencies(gateway_server
   sensor_msgs
 )
 
+# VHC executable
+add_executable(gateway_VHC src/gateway_VHC_main.cpp)
+target_link_libraries(gateway_VHC
+  ros_gateway_lib
+  handlers
+)
+ament_target_dependencies(gateway_VHC
+  rclcpp
+  std_msgs
+  sensor_msgs
+)
+
+# MEC executable
+add_executable(gateway_MEC src/gateway_MEC_main.cpp)
+target_link_libraries(gateway_MEC
+  ros_gateway_lib
+  handlers
+)
+ament_target_dependencies(gateway_MEC
+  rclcpp
+  std_msgs
+  sensor_msgs
+)
+
 # Install executables
 install(TARGETS
   gateway_client
   gateway_server
+  gateway_VHC
+  gateway_MEC
   DESTINATION lib/${PROJECT_NAME}
 )
 

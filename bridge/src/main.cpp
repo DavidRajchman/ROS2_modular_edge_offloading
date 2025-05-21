@@ -30,13 +30,14 @@ void print_message_info(const std::string& queue_name, const std::shared_ptr<Mes
 
     // Attempt to parse the header for more details
     // Ensure your parse_modular_gw_header can handle raw byte vector
-    std::optional<ParsedHeaderInfo> header_info = parse_modular_gw_header(msg->data.data(), msg->data.size());
+    std::optional<ParsedHeaderInfo> header_info = parse_message_header(msg->data.data(), msg->data.size());
     if (header_info) {
-        LOG_INFO("  Parsed Header: SourceID_str: '%s', MsgType_str: '%s', Topic: '%s', PayloadSize: %u",
-                 header_info->routing_key.source_id_str.c_str(),
-                 header_info->routing_key.message_type_str.c_str(),
-                 header_info->topic_name_str.c_str(),
-                 header_info->payload_size);
+        LOG_INFO("  Parsed Header: SourceID: %u, MsgType: %u, PayloadOffset: %zu, PayloadSize: %u, TotalMsgLen: %zu",
+            header_info->routing_key.source_id,
+            header_info->routing_key.message_type,
+            header_info->payload_offset,
+            header_info->payload_size,
+            header_info->total_message_length);
     } else {
         LOG_WARN("  Could not parse ModGW header from received message in %s.", queue_name.c_str());
     }
@@ -57,12 +58,12 @@ int main(int argc, char* argv[]) {
     // --- VHC Modular GW Configuration ---
     const std::string VHC_GW_INSTANCE_ID_STR = "VHC1_TEST"; // Used for TH logging and potentially as part of routing key if MGW uses it
     const std::string VHC_MGW_IP = "127.0.0.1";         // IP of your VHC MGW
-    const int VHC_MGW_PORT = 5001;                      // Port your VHC MGW listens on
+    const int VHC_MGW_PORT = 15001;                      // Port your VHC MGW listens on
 
     // --- MEC Modular GW Configuration ---
     const std::string MEC_GW_INSTANCE_ID_STR = "MEC1_TEST"; // Used for TH logging
     const std::string MEC_MGW_IP = "127.0.0.1";         // IP of your MEC MGW
-    const int MEC_MGW_PORT = 6001;                      // Port your MEC MGW listens on
+    const int MEC_MGW_PORT = 16001;                      // Port your MEC MGW listens on
 
     // --- Routing Key Definitions (CRITICAL: These must match what your MGWs send) ---
     // These are the string identifiers that `parse_modular_gw_header` will produce
@@ -70,18 +71,18 @@ int main(int argc, char* argv[]) {
     // You need to know how your MGWs are configured to populate the header fields
     // that map to these strings.
 
-    // Example: VHC MGW (identified as "VHC_GW_SENDER_ID" in its messages) sends two types of test topics
-    const std::string VHC_SENDER_ID_STR = "VHC_GW_SENDER_ID"; // This string must match what parse_modular_gw_header extracts as source_id_str from VHC's messages
-    const std::string VHC_MSG_TYPE_A_STR = "VHC_DATA_STREAM_A"; // e.g., GPS data
-    const std::string VHC_MSG_TYPE_B_STR = "VHC_DATA_STREAM_B"; // e.g., Camera metadata
+   // For VHC originated messages:
+   const uint8_t VHC_ID_GROUP = 2; // VHC ID group - 2 is manualy assigned VHC group ID
+   const uint8_t VHC_ID_IN_GROUP_1 = 1; // Example VHC instance 1
+   const uint8_t MSG_STRING_INPUT = 201;
 
-    // Example: MEC MGW (identified as "MEC_GW_SENDER_ID") sends one type of test topic
-    const std::string MEC_SENDER_ID_STR = "MEC_GW_SENDER_ID"; // This string must match what parse_modular_gw_header extracts as source_id_str from MEC's messages
-    const std::string MEC_MSG_TYPE_X_STR = "MEC_RESULT_STREAM_X"; // e.g., Processed results
 
-    RoutingKey key_vhc_sends_A = {VHC_SENDER_ID_STR, VHC_MSG_TYPE_A_STR};
-    RoutingKey key_vhc_sends_B = {VHC_SENDER_ID_STR, VHC_MSG_TYPE_B_STR};
-    RoutingKey key_mec_sends_X = {MEC_SENDER_ID_STR, MEC_MSG_TYPE_X_STR};
+   // For MEC originated messages:
+   const uint8_t MEC_ID_GROUP = 12; // MEC ID group - 12 is manually assigned MEC group ID
+   const uint8_t MEC_ID_IN_GROUP_1 = 1; // Example MEC instance 1
+   const uint8_t MSG_STRING_RESULT = 202;
+
+
 
     // 4. Create Core Components
     LOG_INFO("Initializing Routing Table...");
@@ -101,25 +102,32 @@ int main(int argc, char* argv[]) {
     // Scenario 1: VHC sends Topic A, forward it to MEC MGW
     // This means messages from VHC_SENDER_ID_STR with type VHC_MSG_TYPE_A_STR
     // should go into the input queue of the MEC Transport Handler.
-    routing_table->add_route(key_vhc_sends_A, mec_th_input_queue);
-    LOG_INFO("Route ADDED: (%s, %s) -> MEC_TH_InputQueue (for forwarding to MEC MGW)", VHC_SENDER_ID_STR.c_str(), VHC_MSG_TYPE_A_STR.c_str());
-
-    // Scenario 2: VHC sends Topic B, let the test harness observe it
-    routing_table->add_route(key_vhc_sends_B, main_observes_vhc_topic_B_q);
-    LOG_INFO("Route ADDED: (%s, %s) -> Main_Observe_VHC_Queue", VHC_SENDER_ID_STR.c_str(), VHC_MSG_TYPE_B_STR.c_str());
-
-    // Scenario 3: MEC sends Topic X, forward it to VHC MGW (or let test harness observe)
-    // Option A: Forward to VHC MGW
-    routing_table->add_route(key_mec_sends_X, vhc_th_input_queue);
-    LOG_INFO("Route ADDED: (%s, %s) -> VHC_TH_InputQueue (for forwarding to VHC MGW)", MEC_SENDER_ID_STR.c_str(), MEC_MSG_TYPE_X_STR.c_str());
-    // Option B: Let test harness observe (uncomment if preferred, and comment out Option A)
-    // routing_table->add_route(key_mec_sends_X, main_observes_mec_topic_X_q);
-    // LOG_INFO("Route ADDED: (%s, %s) -> Main_Observe_MEC_Queue", MEC_SENDER_ID_STR.c_str(), MEC_MSG_TYPE_X_STR.c_str());
-
+    
+    //create routing key for VHC using construct routing key function
+    //VHC ROUTES
+    routing_table->add_route(
+        construct_routing_key(VHC_ID_GROUP, VHC_ID_IN_GROUP_1, MSG_STRING_INPUT), // MSG_STRING_INPUT should be a uint8_t msg type
+        mec_th_input_queue
+    );
+    routing_table->add_route( //debug route
+        construct_routing_key(VHC_ID_GROUP, VHC_ID_IN_GROUP_1, MSG_STRING_INPUT), // MSG_STRING_INPUT should be a uint8_t msg type
+        main_observes_vhc_topic_B_q
+    );
+    //MEC ROUTES
+    routing_table->add_route(
+        construct_routing_key(MEC_ID_GROUP, MEC_ID_IN_GROUP_1, MSG_STRING_RESULT), // MSG_STRING_INPUT should be a uint8_t msg type
+        vhc_th_input_queue
+    );
+    routing_table->add_route( //debug route
+        construct_routing_key(MEC_ID_GROUP, MEC_ID_IN_GROUP_1, MSG_STRING_RESULT), // MSG_STRING_INPUT should be a uint8_t msg type
+        main_observes_mec_topic_X_q
+    );
+    
 
     // 6. Create and Start Transport Handlers
     LOG_INFO("Creating and starting Transport Handlers...");
     std::weak_ptr<ITransportHandlerObserver> null_observer; // No CP, so no observer
+
 
     auto vhc_handler = std::make_shared<TransportHandler>(
         VHC_GW_INSTANCE_ID_STR, VHC_MGW_IP, VHC_MGW_PORT,

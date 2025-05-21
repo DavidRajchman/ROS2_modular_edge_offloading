@@ -3,19 +3,32 @@
 
 namespace gateway {
 
-RosGateway::RosGateway(const std::string& node_name, TransportMode transport_mode)
-: Node(node_name), transport_mode_(transport_mode)
-{
-  // Initialize parameters with defaults for client mode
-  declare_parameter("transport_type", "tcp");
-  declare_parameter("server_host", "127.0.0.1");
-  declare_parameter("server_port", 12888);
-  declare_parameter("max_retries", 3);
-  declare_parameter("auto_start_receiver", true);
-  declare_parameter("wait_for_connection", true);
-  declare_parameter("connection_timeout_ms", 5000);  // 5 seconds default timeout
-  declare_parameter("receiver_sleep_time_us", 1000); // 1000 microseconds default sleep time
+  RosGateway::RosGateway(
+    const std::string& node_name,
+    TransportMode transport_mode,
+    const rclcpp::NodeOptions& options) // Add NodeOptions parameter
+  : Node(node_name, options), // Pass options to the base Node constructor
+    transport_mode_(transport_mode)
+  {
+    // Initialize parameters with defaults for client mode
+    // If parameters are overridden in 'options', those values will be used.
+    // Otherwise, the defaults specified here will be used.
+    this->declare_parameter("transport_type", "tcp");
+    this->declare_parameter("server_host", "127.0.0.1");
+    this->declare_parameter("server_port", 12888);
+    this->declare_parameter("max_retries", 3);
+    this->declare_parameter("auto_start_receiver", true);
+    this->declare_parameter("wait_for_connection", true);
+    this->declare_parameter("connection_timeout_ms", 5000);
+    this->declare_parameter("receiver_sleep_time_us", 1000);
+    this->declare_parameter("id_group", 0);
+    this->declare_parameter("identifier_in_group", 0);
   
+    id_group_ = static_cast<uint8_t>(this->get_parameter("id_group").as_int());
+    identifier_in_group_ = static_cast<uint8_t>(this->get_parameter("identifier_in_group").as_int());
+  
+    LOG_INFO(this->get_logger(), "Gateway configured with ID Group: %u, Identifier in Group: %u",id_group_, identifier_in_group_);
+
   // Set up shutdown handler
   rclcpp::on_shutdown([this]() { 
     stop_receiver();

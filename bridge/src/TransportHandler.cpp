@@ -1,6 +1,5 @@
 #include "TransportHandler.hpp"
 #include "common_types.hpp" // For parse_modular_gw_header, Message, etc.
-#include <transport/transport_base.hpp> // For receive_exact, etc. if needed directly, though mostly via tcp_client_
 #include <chrono> // For std::chrono::milliseconds
 #include <vector> // For std::vector used in receive buffer operations
 
@@ -255,7 +254,7 @@ void TransportHandler::handle_incoming_data() {
                 break; 
             }
 
-            std::optional<ParsedHeaderInfo> header_info = parse_modular_gw_header(receive_buffer_.data(), receive_buffer_watermark_);
+            std::optional<ParsedHeaderInfo> header_info = parse_message_header(receive_buffer_.data(), receive_buffer_watermark_);
             
             if (!header_info) {
                 // This case should ideally be caught by the MIN_HEADER_LEN_BEFORE_TOPIC_NAME check above

@@ -4,7 +4,7 @@
 #include "common_types.hpp"       // For Message, RoutingKey, MPSCQueueType, ParsedHeaderInfo, parse_modular_gw_header
 #include "RoutingTable.hpp"       // For RoutingTable
 #include "ITransportHandlerObserver.hpp" // For the observer interface (even if not fully used yet)
-#include <transport/tcp_client_transport.hpp> // From your transportlib
+#include <transport/transport_base.hpp> // From your transportlib
 #include <transport/logging_utils.hpp>    // For LOG_INFO, LOG_ERROR etc.
 
 #include <string>

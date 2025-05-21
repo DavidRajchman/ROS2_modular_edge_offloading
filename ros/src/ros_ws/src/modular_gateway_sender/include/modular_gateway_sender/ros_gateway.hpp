@@ -19,7 +19,11 @@ enum class TransportMode {
 
 class RosGateway : public rclcpp::Node {
 public:
-  RosGateway(const std::string& node_name, TransportMode transport_mode = TransportMode::CLIENT);
+  RosGateway(
+    const std::string& node_name, 
+    TransportMode transport_mode = TransportMode::CLIENT, 
+    const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
+  );
   ~RosGateway();
   
   // Existing methods

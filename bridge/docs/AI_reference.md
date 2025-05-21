@@ -160,6 +160,7 @@ This outlines the sequence of events for establishing, maintaining, and tearing 
 * **Separate TCP Roles:** The Control Plane acts as a TCP server for managing control communication, while the Data Plane acts as a TCP client for establishing connections to gateways.
 *   **Low Latency (Data Plane):** A primary driver for data forwarding architecture.
 *   **Identical Transport Layer:** VHCs and MECs utilize the same `TransportLib` and ROS2 environment.
+    *   *Note on `TransportLib` Header Usage:* Core transport classes provided by `TransportLib` (e.g., `gateway::TcpClientTransport`, `gateway::TcpServerTransport`) are declared within the main public header file, `transport/transport_base.hpp`. Implementations consuming `TransportLib` should include `<transport/transport_base.hpp>` to access these class definitions, rather than assuming separate header files for each individual transport class unless `TransportLib`'s specific documentation indicates otherwise.
 *   **Standardized Message Headers:** Messages contain `Source_Identifier` and `Topic` for routing.
 *   **Atomicity of Routing Map Updates:** Control Plane updates to the shared Routing Map must be safe for concurrent Data Plane reads.
 *   **Task ID as Central Key:** Used in control communications to identify offloading instances and their associated topics via the external Task Database.
