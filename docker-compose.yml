@@ -1,9 +1,9 @@
 services:
-  ros2_VHC: # First instance of ros2
+  ros2_vhc: # First instance of ros2
     build:
       context: ./ros/
       dockerfile: Dockerfile
-    container_name: ros2_VHC # Custom name
+    container_name: ros2_vhc # Custom name
     network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
@@ -19,11 +19,11 @@ services:
     tty: true
     command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
 
-  ros2_MEC: # Second instance of ros2
+  ros2_mec: # Second instance of ros2
     build:
       context: ./ros/
       dockerfile: Dockerfile
-    container_name: ros2_MEC # Custom name
+    container_name: ros2_mec # Custom name
     network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY} 
