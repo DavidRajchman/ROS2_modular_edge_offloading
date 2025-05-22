@@ -75,5 +75,5 @@ networks:
         ipam:
             config:
                 - subnet: 192.168.65.0/24
-        driver_opts:
-            com.docker.network.bridge.name: "offloading-test-net"
+#        driver_opts:
+#            com.docker.network.bridge.name: "offloading-test-net"
