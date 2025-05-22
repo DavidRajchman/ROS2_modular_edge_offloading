@@ -24,7 +24,10 @@ target_compile_definitions(transport
     VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     VERSION_MINOR=${PROJECT_VERSION_MINOR}
     VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    ACTIVE_LOG_LEVEL=LOG_LEVEL_WARN
 )
+
+
 
 # Link against pthreads for std::thread
 find_package(Threads REQUIRED)
