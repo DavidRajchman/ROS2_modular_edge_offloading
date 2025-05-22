@@ -4,7 +4,7 @@ services:
       context: ./ros/
       dockerfile: Dockerfile
     container_name: ros2_vhc # Custom name
-    #network_mode: "host"
+    network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -18,17 +18,13 @@ services:
     privileged: true
     tty: true
     command: /bin/bash 
-    networks:
-      public_net:
-          ipv4_address: 192.168.65.101
-
 
   ros2_mec: # Second instance of ros2
     build:
       context: ./ros/
       dockerfile: Dockerfile
     container_name: ros2_mec # Custom name
-    #network_mode: "host"
+    network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY} 
       - XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -42,16 +38,13 @@ services:
     privileged: true
     tty: true
     command: /bin/bash # Example: different command, or another rviz2 if display handles it
-    networks:
-      public_net:
-          ipv4_address: 192.168.65.102
 
   bridge:
     build:
       context: .
       dockerfile: ./bridge/Dockerfile
     container_name: my_bridge_instance # Custom name
-    #network_mode: "host"
+    network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -64,16 +57,3 @@ services:
     stdin_open: true
     tty: true
     command: /bin/bash
-    networks:
-      public_net:
-          ipv4_address: 192.168.65.10
-
-networks:
-    public_net:
-        driver: bridge
-        name: offloading-test-net
-        ipam:
-            config:
-                - subnet: 192.168.65.0/24
-        driver_opts:
-            com.docker.network.bridge.name: "offloading-test-net"
