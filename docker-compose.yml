@@ -1,53 +1,59 @@
 services:
-  ros2:
+  ros2_VHC: # First instance of ros2
     build:
       context: ./ros/
-      dockerfile: Dockerfile  # nebo použijte vlastní Dockerfile, pokud chcete specifikovat vlastní image
-    # user: "1000:1000"  # Použití UID a GID z hostitele
+      dockerfile: Dockerfile
+    container_name: ros2_VHC # Custom name
     network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      # - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=12
-      # - DEVICE=$(readlink -f /dev/teensy)
-    # user: "${UID}:${GID}"
-    # run this before docker compose run/up
-    # export UID=$(id -u)
-    # export GID=$(id -g)
-    # chown -R pepa:admin /home/pepa/dokumenty
-    #devices:
-    #  - "/dev/teensy:/dev/Teensy"
-    #  - "/dev/imu_usb:/dev/Imu"
-    #  - "/dev/lidar:/dev/Lidar"
+      - ROS_DOMAIN_ID=12 # Or a unique ID if needed
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix # ubuntu24
-      # - /tmp/.X11-unix:/tmp/.X11-unix:rw # ubuntu22
+      - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
     privileged: true
-    # stdin_open: true  # Abychom udrželi interaktivní terminál
-    tty: true  # Aby byl kontejner interaktivní
-    # command: ros2 launch sim sim_launch.py
-    #ports:
-    # - 1883:1883
+    tty: true
     command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
+
+  ros2_MEC: # Second instance of ros2
+    build:
+      context: ./ros/
+      dockerfile: Dockerfile
+    container_name: ros2_MEC # Custom name
+    network_mode: "host"
+    environment:
+      - DISPLAY=${DISPLAY} 
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=13 # Example: different domain ID
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src # Shares sources, or use different paths if needed
+      - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
+      - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
+    privileged: true
+    tty: true
+    command: /bin/bash # Example: different command, or another rviz2 if display handles it
+
   bridge:
     build:
-      context: .  # Changed from ./bridge/ - Sets context to project root
-      dockerfile: ./bridge/Dockerfile # Path to Dockerfile relative to new context
+      context: .
+      dockerfile: ./bridge/Dockerfile
+    container_name: my_bridge_instance # Custom name
     network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./bridge:/home/ubuntu/bridge  # Mounts the bridge app's source
-      - ./cpplib:/home/ubuntu/cpplib_src # Changed from ../cpplib - Mounts cpplib from project root
+      - ./bridge:/home/ubuntu/bridge
+      - ./cpplib:/home/ubuntu/cpplib_src
     working_dir: /home/ubuntu/bridge
     privileged: true
-    stdin_open: true  # Add this line
-    tty: true         # Add this line
+    stdin_open: true
+    tty: true
     command: /bin/bash
