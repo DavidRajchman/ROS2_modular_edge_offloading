@@ -141,7 +141,7 @@ void TransportHandler::run_internal() {
             // The TcpClientTransport::data_available() can be used with a timeout.
             // A small timeout allows the loop to remain responsive to shutdown_requested_
             // and to check the outgoing queue.
-            if (tcp_client_ && tcp_client_->data_available(10)) { // Check for data with 10ms timeout
+            if (tcp_client_ && tcp_client_->data_available(1)) { // Check for data with 10ms timeout
                 handle_incoming_data();
             } else if (tcp_client_ && !tcp_client_->is_connected()){
                 LOG_WARN("TransportHandler [%s]: TCP client reported disconnected during data_available check.", gateway_id_.c_str());
