@@ -17,7 +17,7 @@ services:
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
     privileged: true
     tty: true
-    command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash && rviz2"
+    command: /bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/ubuntu/ros_ws/install/setup.bash"
 
   ros2_mec: # Second instance of ros2
     build:
