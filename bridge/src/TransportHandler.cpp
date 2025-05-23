@@ -18,7 +18,8 @@ TransportHandler::TransportHandler(
     std::weak_ptr<ITransportHandlerObserver> observer,
     int connect_max_retries,
     int connect_retry_delay_ms,
-    size_t receive_buffer_size
+    size_t receive_buffer_size,
+    int minimum_sleep_time_us 
 ) : gateway_id_(std::move(gateway_id)),
     target_ip_(std::move(target_ip)),
     target_port_(target_port),
@@ -30,7 +31,8 @@ TransportHandler::TransportHandler(
     connected_status_(false),
     connect_max_retries_(connect_max_retries),
     connect_retry_delay_ms_(connect_retry_delay_ms),
-    MAX_RECEIVE_BUFFER_SIZE(receive_buffer_size) // Initialize const member
+    MAX_RECEIVE_BUFFER_SIZE(receive_buffer_size), // Initialize const member
+    minimum_sleep_time_us_(minimum_sleep_time_us)
 {
     if (!input_queue_) {
         throw std::invalid_argument("TransportHandler: Input queue cannot be null.");
@@ -117,6 +119,7 @@ bool TransportHandler::is_connected() const {
 void TransportHandler::run_internal() {
     LOG_INFO("TransportHandler [%s]: Thread %p started execution.", gateway_id_.c_str(), std::this_thread::get_id());
     receive_buffer_watermark_ = 0; // Reset watermark
+    bool work_done_this_iteration = false;
 
     while (!shutdown_requested_.load()) {
         if (!connected_status_.load()) {
@@ -137,12 +140,14 @@ void TransportHandler::run_internal() {
 
         // If connected, proceed to handle I/O
         if (connected_status_.load() && !shutdown_requested_.load()) {
+            work_done_this_iteration = false;
             // Check for incoming data from the socket
             // The TcpClientTransport::data_available() can be used with a timeout.
             // A small timeout allows the loop to remain responsive to shutdown_requested_
             // and to check the outgoing queue.
-            if (tcp_client_ && tcp_client_->data_available(1)) { // Check for data with 10ms timeout
+            if (tcp_client_ && tcp_client_->data_available(0)) { // Check for data without a timeout
                 handle_incoming_data();
+                work_done_this_iteration = true; 
             } else if (tcp_client_ && !tcp_client_->is_connected()){
                 LOG_WARN("TransportHandler [%s]: TCP client reported disconnected during data_available check.", gateway_id_.c_str());
                 connected_status_.store(false);
@@ -151,19 +156,16 @@ void TransportHandler::run_internal() {
                 continue; // Re-enter connection loop
             }
 
-            // Check for outgoing messages from the input queue
-            handle_outgoing_messages();
+            // Check for outgoing messages from the input queue if work done, then log it
+            work_done_this_iteration = work_done_this_iteration || handle_outgoing_messages();
+            
+            //if no work done, then sleep for certain amount of time in us
+            if (!work_done_this_iteration){
+                std::this_thread::sleep_for(std::chrono::microseconds(minimum_sleep_time_us_));
+            }
+
         }
         
-        // Small sleep to prevent busy-looping if no I/O is happening,
-        // especially if data_available has a zero timeout or if the outgoing queue is often empty.
-        // This can be adjusted or made more sophisticated with condition variables if
-        // input_queue_ had a blocking dequeue with timeout.
-        if (!shutdown_requested_.load() && connected_status_.load()) {
-             // Only sleep if connected and not handling immediate data, to be responsive.
-             // If data_available had a non-zero timeout, this sleep might be less critical.
-            // std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Very short sleep
-        }
     }
 
     // Shutdown sequence
@@ -324,16 +326,17 @@ void TransportHandler::handle_incoming_data() {
     }
 }
 
-void TransportHandler::handle_outgoing_messages() {
+bool TransportHandler::handle_outgoing_messages() {
     if (!tcp_client_ || !tcp_client_->is_connected()) {
         // Don't attempt to send if not connected
-        return;
+        return false;
     }
-
+    bool work_has_been_done = false;
     std::shared_ptr<Message> msg_to_send;
     // Try to dequeue without blocking indefinitely.
     // moodycamel::ConcurrentQueue's try_dequeue is non-blocking.
     if (input_queue_->try_dequeue(msg_to_send)) {
+        work_has_been_done = true;
         if (msg_to_send && !msg_to_send->data.empty()) {
             LOG_DEBUG("TransportHandler [%s]: Dequeued message of size %zu to send.", gateway_id_.c_str(), msg_to_send->data.size());
             if (!tcp_client_->send_data(msg_to_send->data.data(), msg_to_send->data.size())) {
@@ -349,7 +352,9 @@ void TransportHandler::handle_outgoing_messages() {
             LOG_WARN("TransportHandler [%s]: Dequeued null or empty message from input queue.", gateway_id_.c_str());
         }
     }
+
     // If try_dequeue fails, it means queue is empty, so just return and try later.
+    return work_has_been_done;
 }
 
 

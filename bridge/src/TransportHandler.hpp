@@ -12,6 +12,7 @@
 #include <thread>   // For std::thread
 #include <atomic>   // For std::atomic_bool
 #include <vector>   // For std::vector<unsigned char> buffer
+#include <chrono>
 
 // Forward declaration if ITransportHandlerObserver is complex or to reduce include dependencies in some cases,
 // but since we need its type for weak_ptr, including the header is fine.
@@ -29,7 +30,8 @@ public:
         // Configuration parameters
         int connect_max_retries = 5,
         int connect_retry_delay_ms = 1000,
-        size_t receive_buffer_size = 8192 // 8KB default buffer for incoming data
+        size_t receive_buffer_size = 8192, // 8KB default buffer for incoming data
+        int minimum_sleep_time_us = 200 //time the running loop will sleep for in us if no messages are received or sent
     );
 
     ~TransportHandler();
@@ -56,7 +58,7 @@ private:
 
     // Message handling logic
     void handle_incoming_data(); // Reads from socket, parses, routes
-    void handle_outgoing_messages(); // Reads from input_queue_, sends to socket
+    bool handle_outgoing_messages(); // Reads from input_queue_, sends to socket
 
     // Helper to safely notify observer (will be used more when observer logic is added)
     void notify_observer_connected();
@@ -87,6 +89,7 @@ private:
     int connect_max_retries_;
     int connect_retry_delay_ms_;
     const size_t MAX_RECEIVE_BUFFER_SIZE; // Max size for receive_buffer_
+    const int minimum_sleep_time_us_;
 
     // Constants for handshake (example, to be defined)
     static constexpr char HANDSHAKE_MSG_BRIDGE_HELLO[] = "BRIDGE_HELLO_V1";

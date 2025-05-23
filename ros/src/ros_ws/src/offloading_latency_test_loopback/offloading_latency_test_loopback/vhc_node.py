@@ -8,7 +8,7 @@ class VHCNode(Node):
         super().__init__('vhc_node')
         self.declare_parameter('publish_topic', 'test_input_topic')
         self.declare_parameter('subscribe_topic', 'test_result_topic')
-        self.declare_parameter('publish_interval_sec', 1.0)
+        self.declare_parameter('publish_interval_sec', 10.0)
         self.declare_parameter('message_counter_max', 9999) # Max value for the counter part
 
         self.publish_topic_name = self.get_parameter('publish_topic').get_parameter_value().string_value

@@ -57,13 +57,13 @@ int main(int argc, char* argv[]) {
     // 3. Configuration
     // --- VHC Modular GW Configuration ---
     const std::string VHC_GW_INSTANCE_ID_STR = "VHC1_TEST"; // Used for TH logging and potentially as part of routing key if MGW uses it
-    const std::string VHC_MGW_IP = "127.0.0.1";         // IP of your VHC MGW
+    const std::string VHC_MGW_IP = "192.168.65.101";         // IP of your VHC MGW
     const int VHC_MGW_PORT = 15001;                      // Port your VHC MGW listens on
 
     // --- MEC Modular GW Configuration ---
     const std::string MEC_GW_INSTANCE_ID_STR = "MEC1_TEST"; // Used for TH logging
-    const std::string MEC_MGW_IP = "127.0.0.1";         // IP of your MEC MGW
-    const int MEC_MGW_PORT = 16001;                      // Port your MEC MGW listens on
+    const std::string MEC_MGW_IP = "192.168.65.102";         // IP of your MEC MGW
+    const int MEC_MGW_PORT = 16001;                         // Port your MEC MGW listens on
 
     // --- Routing Key Definitions (CRITICAL: These must match what your MGWs send) ---
     // These are the string identifiers that `parse_modular_gw_header` will produce

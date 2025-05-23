@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(bridge VERSION 0.2.0)
+project(bridge VERSION 0.3.0)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
