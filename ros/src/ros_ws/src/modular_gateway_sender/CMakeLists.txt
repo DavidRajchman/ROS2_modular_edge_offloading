@@ -12,8 +12,19 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=14)
-add_definitions(-DVERSION_PATCH=1)
+add_definitions(-DVERSION_MINOR=15)
+add_definitions(-DVERSION_PATCH=0)
+
+# --- Compile-Time Log Level Control ---
+# Set the desired log level here using its numeric value.
+# Your logging_utils.hpp defines these levels:
+#   4 = DEBUG (all custom logs enabled)
+#   3 = INFO
+#   2 = WARN
+#   1 = ERROR
+#   0 = NONE (all custom logs disabled)
+# Change the '4' in the line below to the desired numeric log level.
+set(PROJECT_ACTIVE_LOG_LEVEL 2) # Default to DEBUG.
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
