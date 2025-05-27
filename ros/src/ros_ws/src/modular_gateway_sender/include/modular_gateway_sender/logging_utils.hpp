@@ -53,7 +53,7 @@
   * target_compile_definitions(my_target PRIVATE ACTIVE_LOG_LEVEL=LOG_LEVEL_INFO)
   */
  #ifndef ACTIVE_LOG_LEVEL
- #define ACTIVE_LOG_LEVEL LOG_LEVEL_DEBUG // Default: all logs enabled
+ #define ACTIVE_LOG_LEVEL LOG_LEVEL_WARN // Default: all logs enabled
  #endif
  
  /**
