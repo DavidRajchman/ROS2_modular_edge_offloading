@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libboost-all-dev \
     sudo \
+    iputils-ping \
+    iproute2 \
+
     # sudo is already installed on ubuntu:22.04 base, but explicitly listing if needed by other tools
     # For the ubuntu user created below, sudo privileges are granted via /etc/sudoers.d/
     && apt-get clean \

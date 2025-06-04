@@ -12,22 +12,28 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Include FetchContent module
 include(FetchContent)
 
-# Declare the dependency on moodycamel::ConcurrentQueue
-FetchContent_Declare(
-    moodycamel_concurrent_queue
-    GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
-    GIT_TAG v1.0.4 # Using a specific stable tag is recommended
-)
+# Online moodycamel download version
 
-# Make the content available (downloads if not already present and adds to build)
-FetchContent_MakeAvailable(moodycamel_concurrent_queue)
+## Declare the dependency on moodycamel::ConcurrentQueue
+#FetchContent_Declare(
+#    moodycamel_concurrent_queue
+#    GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+#    GIT_TAG v1.0.4 # Using a specific stable tag is recommended
+#)
+#
+## Make the content available (downloads if not already present and adds to build)
+#FetchContent_MakeAvailable(moodycamel_concurrent_queue)
+#
+## Get the source directory of the fetched content
+#FetchContent_GetProperties(moodycamel_concurrent_queue)
+## The source directory will be in moodycamel_concurrent_queue_SOURCE_DIR (variable name is <lcName>_SOURCE_DIR)
+#if(NOT moodycamel_concurrent_queue_POPULATED) # Check if it was populated (downloaded/found)
+#    message(FATAL_ERROR "FetchContent_MakeAvailable failed to populate moodycamel_concurrent_queue")
+#endif()
 
-# Get the source directory of the fetched content
-FetchContent_GetProperties(moodycamel_concurrent_queue)
-# The source directory will be in moodycamel_concurrent_queue_SOURCE_DIR (variable name is <lcName>_SOURCE_DIR)
-if(NOT moodycamel_concurrent_queue_POPULATED) # Check if it was populated (downloaded/found)
-    message(FATAL_ERROR "FetchContent_MakeAvailable failed to populate moodycamel_concurrent_queue")
-endif()
+#ofline moodycamel
+set(moodycamel_concurrent_queue_SOURCE_DIR /home/ubuntu/external_libs/moodycamel_concurrent_queue) # Path inside the container
+
 
 # Find required packages
 find_package(Threads REQUIRED)

@@ -1,6 +1,19 @@
 # Použijte ROS 2 Jazzy jako základní image
 FROM ros:jazzy
 
+RUN rm /etc/apt/sources.list.d/ros2-latest.list \
+  && rm /usr/share/keyrings/ros2-latest-archive-keyring.gpg
+
+RUN apt-get update \
+  && apt-get install -y ca-certificates curl
+
+RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') ;\
+    curl -L -s -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo $VERSION_CODENAME)_all.deb" \
+    && apt-get update \
+    && apt-get install /tmp/ros2-apt-source.deb \
+    && rm -f /tmp/ros2-apt-source.deb
+
+
 # Nastavte pracovní adresář
 COPY ./src /home/ubuntu/
 
@@ -10,7 +23,10 @@ ros-jazzy-demo-nodes-cpp \
 ros-jazzy-rviz2 \
 ros-jazzy-teleop-twist-keyboard \
 ros-jazzy-slam-toolbox \
-nano
+nano \ 
+iputils-ping \
+iproute2 
+
 
 RUN apt install -y tmux \
 ros-jazzy-robot-localization \
@@ -33,9 +49,11 @@ RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 WORKDIR /home/ubuntu/ros_ws
 RUN rm -rf build/ install/ log/
 RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash"
-RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build"
-RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
-RUN /bin/bash -c "source /home/ubuntu/ros_ws/install/setup.bash"
+
+##building all packages
+#RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build"
+#RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
+#RUN /bin/bash -c "source /home/ubuntu/ros_ws/install/setup.bash"
 
 #Instalace paho.mqtt.cpp
 #RUN cd /home/ubuntu/
