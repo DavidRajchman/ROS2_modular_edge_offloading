@@ -1,27 +1,28 @@
-#include "transport/logging_utils.hpp" // Changed from modular_gateway_sender/
-#include "transport/transport_base.hpp" // Changed from modular_gateway_sender/
+#include "transport/transport_base.hpp"
+#include "transport/logging_utils.hpp"
 
 #include <sys/socket.h>
-#include <unistd.h> // For close
-#include <fcntl.h>  // For fcntl
 #include <netinet/in.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
-#include <stdexcept>
-#include <cstring>  // For strerror, memset
-#include <cerrno>   // For errno
-#include <thread>   // For std::this_thread::sleep_for
-#include <chrono>   // For std::chrono::milliseconds
+#include <string.h>
+#include <errno.h>
+#include <sys/select.h>
+#include <unordered_map>
+#include <algorithm>
 
 namespace gateway {
 
-TcpServerTransport::TcpServerTransport(int port, int max_connections)
-  : port_(port), 
-    max_connections_(max_connections), 
-    server_socket_fd_(-1), 
-    client_socket_fd_(-1),
-    listening_(false),
-    client_connected_(false)
-    // logger_ is implicitly used by old macros, not needed for new ones
+// Add this using declaration to fix the ClientId scope issue
+using ClientId = TransportBase::ClientId;
+
+TcpServerTransport::TcpServerTransport(int port, bool multi_client_mode, int max_clients)
+  : port_(port),
+    multi_client_mode_(multi_client_mode),
+    max_clients_(max_clients),
+    server_socket_fd_(-1),
+    running_(false)
 {
 }
 
@@ -32,67 +33,73 @@ TcpServerTransport::~TcpServerTransport()
 
 bool TcpServerTransport::connect()
 {
-  // This method starts the server listening for connections
-  
-  // Close existing sockets if any
-  disconnect();
+  // Close existing socket if already running
+  if (running_) {
+    disconnect();
+  }
   
   try {
-    // Create the server socket
+    // Create server socket
     server_socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket_fd_ < 0) {
-      throw std::runtime_error(std::string("Failed to create socket: ") + strerror(errno));
+      LOG_ERROR("Failed to create socket: %s", strerror(errno));
+      return false;
     }
     
-    // Set socket options to allow address reuse
+    // Allow immediate address reuse
     int opt = 1;
     if (setsockopt(server_socket_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-      throw std::runtime_error(std::string("Failed to set socket options: ") + strerror(errno));
+      LOG_ERROR("Failed to set socket options: %s", strerror(errno));
+      close(server_socket_fd_);
+      server_socket_fd_ = -1;
+      return false;
     }
     
-    // Enable TCP keepalive to detect disconnected clients
-    if (setsockopt(server_socket_fd_, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt)) < 0) {
-      LOG_WARN("Failed to set keepalive: %s", strerror(errno));
-      // Not critical, can continue
-    }
-    
-    // Bind to port
+    // Bind socket to port
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all available interfaces
+    server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port_);
     
     if (bind(server_socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-      throw std::runtime_error(std::string("Bind failed: ") + strerror(errno));
+      LOG_ERROR("Failed to bind socket: %s", strerror(errno));
+      close(server_socket_fd_);
+      server_socket_fd_ = -1;
+      return false;
     }
     
-    // Listen for connections
-    if (listen(server_socket_fd_, max_connections_) < 0) {
-      throw std::runtime_error(std::string("Listen failed: ") + strerror(errno));
-    }
-    
-    // Make the server socket non-blocking for accept()
+    // Set socket to non-blocking mode
     int flags = fcntl(server_socket_fd_, F_GETFL, 0);
-    if (flags == -1) {
-      throw std::runtime_error(std::string("Failed to get socket flags: ") + strerror(errno));
-    }
-    if (fcntl(server_socket_fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
-      throw std::runtime_error(std::string("Failed to set socket non-blocking: ") + strerror(errno));
+    if (flags < 0 || fcntl(server_socket_fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
+      LOG_ERROR("Failed to set socket non-blocking: %s", strerror(errno));
+      close(server_socket_fd_);
+      server_socket_fd_ = -1;
+      return false;
     }
     
-    listening_ = true;
+    // Start listening for connections
+    if (listen(server_socket_fd_, multi_client_mode_ ? (max_clients_ ? max_clients_ : SOMAXCONN) : 1) < 0) {
+      LOG_ERROR("Failed to listen on socket: %s", strerror(errno));
+      close(server_socket_fd_);
+      server_socket_fd_ = -1;
+      return false;
+    }
     
-    // Print the actual socket we're bound to
+    running_ = true;
+    
+    // Log running information
     struct sockaddr_in actual_addr;
     socklen_t addr_len = sizeof(actual_addr);
     if (getsockname(server_socket_fd_, (struct sockaddr*)&actual_addr, &addr_len) == 0) {
       char host[INET_ADDRSTRLEN];
       inet_ntop(AF_INET, &actual_addr.sin_addr, host, INET_ADDRSTRLEN);
-      LOG_INFO("TCP server listening on %s:%d", 
-               host, ntohs(actual_addr.sin_port));
+      LOG_INFO("TCP server listening on %s:%d in %s mode", 
+               host, ntohs(actual_addr.sin_port), 
+               multi_client_mode_ ? "multi-client" : "single-client");
     } else {
-      LOG_INFO("TCP server listening on port %d", port_);
+      LOG_INFO("TCP server listening on port %d in %s mode", 
+               port_, multi_client_mode_ ? "multi-client" : "single-client");
     }
     
     return true;
@@ -102,8 +109,7 @@ bool TcpServerTransport::connect()
       close(server_socket_fd_);
       server_socket_fd_ = -1;
     }
-    listening_ = false;
-    client_connected_ = false;
+    running_ = false;
     LOG_ERROR("Failed to start server: %s", ex.what());
     return false;
   }
@@ -111,362 +117,461 @@ bool TcpServerTransport::connect()
 
 void TcpServerTransport::disconnect()
 {
-  // Close client socket if connected
-  if (client_socket_fd_ >= 0) {
-    close(client_socket_fd_);
-    client_socket_fd_ = -1;
-    client_connected_ = false;
-    LOG_INFO("Client connection closed");
+  // Close all client connections
+  for (const auto& client_pair : clients_) {
+    if (disconnect_callback_) {
+      disconnect_callback_(client_pair.first);
+    }
+    close(client_pair.second.socket_fd);
   }
+  clients_.clear();
   
-  // Close server socket if listening
+  // Close server socket
   if (server_socket_fd_ >= 0) {
     close(server_socket_fd_);
     server_socket_fd_ = -1;
-    listening_ = false;
-    LOG_INFO("Server stopped listening");
   }
+  
+  running_ = false;
 }
 
 bool TcpServerTransport::is_connected() const
 {
-  // For server transport, consider connected if either:
-  // 1. We have an active client connection
-  // 2. We're listening for connections (but no client yet)
-  return client_connected_ || listening_;
+  // In single client mode, we are "connected" if there is one client
+  if (!multi_client_mode_) {
+    return !clients_.empty();
+  }
+  
+  // In multi-client mode, we are "connected" if the server is running
+  return running_;
 }
 
-bool TcpServerTransport::accept_connection()
+bool TcpServerTransport::process_events(int timeout_ms)
 {
-  if (!listening_ || server_socket_fd_ < 0) {
+  if (!running_ || server_socket_fd_ < 0) {
     return false;
   }
   
-  // If already connected to a client, check if the connection is still alive
-  if (client_connected_ && client_socket_fd_ >= 0) {
-    // Simple connection check - send 0 bytes
-    if (send(client_socket_fd_, nullptr, 0, MSG_NOSIGNAL) < 0) {
-      if (errno == EPIPE || errno == ECONNRESET) {
-        LOG_WARN("Client disconnected: %s", strerror(errno));
-        close(client_socket_fd_);
-        client_socket_fd_ = -1;
-        client_connected_ = false;
-      }
-    } else {
-      // Connection still good
+  fd_set read_fds;
+  FD_ZERO(&read_fds);
+  FD_SET(server_socket_fd_, &read_fds);
+  
+  int max_fd = server_socket_fd_;
+  
+  // Add client sockets
+  for (const auto& client : clients_) {
+    FD_SET(client.second.socket_fd, &read_fds);
+    max_fd = std::max(max_fd, client.second.socket_fd);
+  }
+  
+  struct timeval tv;
+  tv.tv_sec = timeout_ms / 1000;
+  tv.tv_usec = (timeout_ms % 1000) * 1000;
+  
+  int activity = select(max_fd + 1, &read_fds, NULL, NULL, timeout_ms >= 0 ? &tv : NULL);
+  
+  if (activity < 0) {
+    if (errno == EINTR) {
+      // Interrupted by signal, just continue
       return true;
+    }
+    LOG_ERROR("select() error: %s", strerror(errno));
+    return false;
+  }
+  
+  if (activity == 0) {
+    // Timeout, no activity
+    return true;
+  }
+  
+  // Check for new connections
+  if (FD_ISSET(server_socket_fd_, &read_fds)) {
+    accept_new_connections();
+  }
+  
+  // Check client sockets - copy keys to avoid invalidation during iteration
+  std::vector<ClientId> client_ids;
+  for (const auto& client : clients_) {
+    client_ids.push_back(client.first);
+  }
+  
+  for (auto client_id : client_ids) {
+    // Client may have been removed during a previous iteration
+    auto it = clients_.find(client_id);
+    if (it == clients_.end()) {
+      continue;
+    }
+    
+    if (FD_ISSET(it->second.socket_fd, &read_fds)) {
+      // Data available or connection closed
+      handle_client_data(client_id);
     }
   }
   
-  // Try to accept a connection
+  return true;
+}
+
+bool TcpServerTransport::accept_new_connections()
+{
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
   
-  int new_socket = accept(server_socket_fd_, (struct sockaddr*)&client_addr, &client_len);
-  if (new_socket < 0) {
-    // Non-blocking accept, so EAGAIN/EWOULDBLOCK means no connection pending
+  int client_fd = accept(server_socket_fd_, (struct sockaddr*)&client_addr, &client_len);
+  
+  if (client_fd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return false; // No client waiting, not an error
+      // No pending connections
+      return true;
     }
-    LOG_ERROR("Accept failed: %s", strerror(errno));
+    LOG_ERROR("accept() error: %s", strerror(errno));
     return false;
   }
   
-  // We have a new client
-  client_socket_fd_ = new_socket;
-  client_connected_ = true;
-  
-  // Enable TCP keepalive for the client socket too
-  int opt = 1;
-  if (setsockopt(client_socket_fd_, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt)) < 0) {
-    LOG_WARN("Failed to set client keepalive: %s", strerror(errno));
-    // Not critical, can continue
+  // Set client socket to non-blocking mode
+  int flags = fcntl(client_fd, F_GETFL, 0);
+  if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    LOG_ERROR("Failed to set client socket non-blocking: %s", strerror(errno));
+    close(client_fd);
+    return false;
   }
   
-  // Make the client socket non-blocking for better performance
-  int flags = fcntl(client_socket_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(client_socket_fd_, F_SETFL, flags | O_NONBLOCK);
+  // In single-client mode, disconnect any existing client first
+  if (!multi_client_mode_ && !clients_.empty()) {
+    LOG_INFO("New client connecting in single-client mode, disconnecting existing client");
+    
+    // Disconnect all existing clients (should just be one)
+    for (const auto& client_pair : clients_) {
+      if (disconnect_callback_) {
+        disconnect_callback_(client_pair.first);
+      }
+      close(client_pair.second.socket_fd);
+    }
+    clients_.clear();
   }
   
-  // Get the client's IP address as string
-  char client_ip[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
-  LOG_INFO("Client connected from %s:%d", client_ip, ntohs(client_addr.sin_port));
+  // Enforce max clients limit in multi-client mode
+  if (multi_client_mode_ && max_clients_ > 0 && clients_.size() >= static_cast<size_t>(max_clients_)) {
+    LOG_WARN("Max clients limit (%d) reached, rejecting new connection", max_clients_);
+    close(client_fd);
+    return false;
+  }
+  
+  // Create client info
+  ClientInfo client_info;
+  client_info.socket_fd = client_fd;
+  client_info.ip_address = inet_ntoa(client_addr.sin_addr);
+  client_info.port = ntohs(client_addr.sin_port);
+  
+  // In single-client mode, always use ClientId 0
+  // In multi-client mode, use the socket fd as the client ID
+  ClientId client_id = multi_client_mode_ ? client_fd : DEFAULT_CLIENT;
+  
+  // Store client info
+  clients_[client_id] = std::move(client_info);
+  
+  LOG_INFO("New client connected from %s:%d, assigned ID %d", 
+           clients_[client_id].ip_address.c_str(), 
+           clients_[client_id].port, 
+           client_id);
+  
+  // Notify of new connection
+  if (connect_callback_) {
+    connect_callback_(client_id, clients_[client_id].ip_address, clients_[client_id].port);
+  }
   
   return true;
+}
+
+void TcpServerTransport::handle_client_data(ClientId client_id)
+{
+  auto it = clients_.find(client_id);
+  if (it == clients_.end()) {
+    return; // Client not found
+  }
+  
+  // Check if the client has data or has disconnected
+  char buffer[1];
+  ssize_t bytes_read = recv(it->second.socket_fd, buffer, sizeof(buffer), MSG_PEEK);
+  
+  if (bytes_read <= 0) {
+    if (bytes_read == 0 || errno != EAGAIN) {
+      // Client disconnected or error
+      LOG_INFO("Client %d disconnected", client_id);
+      if (disconnect_callback_) {
+        disconnect_callback_(client_id);
+      }
+      close(it->second.socket_fd);
+      clients_.erase(it);
+    }
+    return;
+  }
+  
+  // Notify that data is available
+  if (data_callback_) {
+    data_callback_(client_id);
+  }
 }
 
 bool TcpServerTransport::send_data(const void* data, size_t size)
 {
-  // Try to accept connection multiple times before giving up
-  const int max_accept_attempts = 5;
-  for (int attempt = 0; attempt < max_accept_attempts; attempt++) {
-    // Try to accept any pending connections
-    accept_connection();
-    
-    // If we have a client, proceed with sending
-    if (client_connected_ && client_socket_fd_ >= 0) {
-      break;
-    }
-    
-    // No client yet, wait a bit before trying again
-    if (attempt < max_accept_attempts - 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      LOG_DEBUG("No client connected, waiting before retry %d/%d", 
-               attempt + 1, max_accept_attempts);
-    }
-  }
-  
-  // If still no client after attempts, fail
-  if (!client_connected_ || client_socket_fd_ < 0) {
-    LOG_WARN("No client connected, cannot send data");
+  // In single-client mode, this sends to DEFAULT_CLIENT
+  // In multi-client mode, it sends to the first client (if any)
+  if (clients_.empty()) {
+    LOG_ERROR("Cannot send data: no clients connected");
     return false;
   }
   
-  // Send logic with timeout
-  const uint8_t* buffer = static_cast<const uint8_t*>(data);
-  size_t remaining = size;
-  size_t offset = 0;
-  
-  // Use a timeout to avoid hanging indefinitely
-  const int max_send_attempts = 50; // ~500ms max wait
-  int send_attempts = 0;
-  
-  while (remaining > 0 && send_attempts < max_send_attempts) {
-    ssize_t bytes_sent = ::send(client_socket_fd_, buffer + offset, remaining, MSG_NOSIGNAL);
-    
-    if (bytes_sent < 0) {
-      if (errno == EWOULDBLOCK || errno == EAGAIN) {
-        // Socket buffer is full, wait a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        send_attempts++;
-        continue;
-      } else if (errno == EPIPE || errno == ECONNRESET) {
-        // Client disconnected
-        LOG_WARN("Client disconnected during send: %s", strerror(errno));
-        close(client_socket_fd_);
-        client_socket_fd_ = -1;
-        client_connected_ = false;
-        return false;
-      } else {
-        // Other error
-        LOG_ERROR("Send failed: %s", strerror(errno));
-        close(client_socket_fd_);
-        client_socket_fd_ = -1;
-        client_connected_ = false;
-        return false;
-      }
-    } else if (bytes_sent == 0) {
-      // This shouldn't normally happen with non-blocking sockets
-      LOG_WARN("Send returned 0 bytes, possible client disconnect");
-      send_attempts++;
-      continue;
-    }
-    
-    // Successful send, update counters
-    offset += bytes_sent;
-    remaining -= bytes_sent;
-    send_attempts = 0; // Reset attempts counter on progress
+  ClientId target_client;
+  if (!multi_client_mode_) {
+    // In single-client mode, use DEFAULT_CLIENT
+    target_client = DEFAULT_CLIENT;
+  } else {
+    // In multi-client mode, use the first client
+    target_client = clients_.begin()->first;
   }
   
-  // Check if we timed out
-  if (remaining > 0) {
-    LOG_ERROR("Send timed out, %zu bytes remaining", remaining);
+  return send_to(target_client, data, size);
+}
+
+int TcpServerTransport::receive_data(void* buffer, size_t max_size)
+{
+  // Similar logic to send_data
+  if (clients_.empty()) {
+    return -1;
+  }
+  
+  ClientId source_client;
+  if (!multi_client_mode_) {
+    // In single-client mode, use DEFAULT_CLIENT
+    source_client = DEFAULT_CLIENT;
+  } else {
+    // In multi-client mode, use the first client
+    source_client = clients_.begin()->first;
+  }
+  
+  return receive_from(source_client, buffer, max_size);
+}
+
+bool TcpServerTransport::data_available(int timeout_ms)
+{
+  // Similar logic to send_data and receive_data
+  if (clients_.empty()) {
     return false;
+  }
+  
+  ClientId check_client;
+  if (!multi_client_mode_) {
+    // In single-client mode, use DEFAULT_CLIENT
+    check_client = DEFAULT_CLIENT;
+  } else {
+    // In multi-client mode, use the first client
+    check_client = clients_.begin()->first;
+  }
+  
+  return data_available_from(check_client, timeout_ms);
+}
+
+bool TcpServerTransport::receive_exact(void* buffer, size_t size)
+{
+  if (size == 0) {
+    return true;
+  }
+  
+  uint8_t* buf = static_cast<uint8_t*>(buffer);
+  size_t received = 0;
+  
+  while (received < size) {
+    int bytes = receive_data(buf + received, size - received);
+    if (bytes <= 0) {
+      return false;
+    }
+    received += bytes;
   }
   
   return true;
 }
 
-bool TcpServerTransport::data_available(int timeout_ms)
+bool TcpServerTransport::send_to(ClientId client_id, const void* data, size_t size)
 {
-  // Try to accept a new connection first
-  accept_connection();
-  
-  if (!client_connected_ || client_socket_fd_ < 0) {
-    // When no client is connected, don't block in select for too long
-    // to give accept_connection() more frequent chances to run
-    if (timeout_ms > 100) timeout_ms = 100;
-    
-    // No client, check for connections after a short delay
-    std::this_thread::sleep_for(std::chrono::milliseconds(timeout_ms));
+  auto it = clients_.find(client_id);
+  if (it == clients_.end()) {
+    LOG_ERROR("Cannot send to client %d: not connected", client_id);
     return false;
   }
   
-  fd_set readfds;
+  const uint8_t* buf = static_cast<const uint8_t*>(data);
+  size_t total_sent = 0;
+  
+  while (total_sent < size) {
+    ssize_t sent = send(it->second.socket_fd, buf + total_sent, size - total_sent, 0);
+    
+    if (sent <= 0) {
+      if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // Would block, try again later
+        fd_set write_fds;
+        FD_ZERO(&write_fds);
+        FD_SET(it->second.socket_fd, &write_fds);
+        
+        // Wait for socket to become writable
+        struct timeval tv;
+        tv.tv_sec = 1;  // 1 second timeout
+        tv.tv_usec = 0;
+        
+        if (select(it->second.socket_fd + 1, NULL, &write_fds, NULL, &tv) <= 0) {
+          LOG_ERROR("Failed to send to client %d: socket not writable", client_id);
+          return false;
+        }
+        continue;
+      } else {
+        LOG_ERROR("Failed to send to client %d: %s", client_id, strerror(errno));
+        return false;
+      }
+    }
+    
+    total_sent += sent;
+  }
+  
+  return true;
+}
+
+int TcpServerTransport::receive_from(ClientId client_id, void* buffer, size_t max_size)
+{
+  auto it = clients_.find(client_id);
+  if (it == clients_.end()) {
+    return -1;
+  }
+  
+  ssize_t bytes_read = recv(it->second.socket_fd, buffer, max_size, 0);
+  
+  if (bytes_read <= 0) {
+    if (bytes_read == 0) {
+      // Client disconnected
+      LOG_INFO("Client %d disconnected during receive", client_id);
+      if (disconnect_callback_) {
+        disconnect_callback_(client_id);
+      }
+      close(it->second.socket_fd);
+      clients_.erase(it);
+      return 0;
+    } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      // No data available
+      return 0;
+    } else {
+      // Error
+      LOG_ERROR("Error receiving from client %d: %s", client_id, strerror(errno));
+      return -1;
+    }
+  }
+  
+  return bytes_read;
+}
+
+bool TcpServerTransport::data_available_from(ClientId client_id, int timeout_ms)
+{
+  auto it = clients_.find(client_id);
+  if (it == clients_.end()) {
+    return false;
+  }
+  
+  fd_set read_fds;
+  FD_ZERO(&read_fds);
+  FD_SET(it->second.socket_fd, &read_fds);
+  
   struct timeval tv;
-  
-  FD_ZERO(&readfds);
-  FD_SET(client_socket_fd_, &readfds);
-  
   tv.tv_sec = timeout_ms / 1000;
   tv.tv_usec = (timeout_ms % 1000) * 1000;
   
-  int result = select(client_socket_fd_ + 1, &readfds, NULL, NULL, 
-                     timeout_ms > 0 ? &tv : NULL);
+  int result = select(it->second.socket_fd + 1, &read_fds, NULL, NULL, timeout_ms >= 0 ? &tv : NULL);
   
   if (result < 0) {
-    if (errno == EINTR) {
-      // Interrupted by signal, not an error
-      return false;
-    }
-    
-    LOG_ERROR("Select error: %s", strerror(errno));
-    
-    // Check if client socket is still valid
-    if (errno == EBADF) {
-      LOG_WARN("Client socket is no longer valid");
-      close(client_socket_fd_);
-      client_socket_fd_ = -1;
-      client_connected_ = false;
-    }
+    LOG_ERROR("select() error in data_available_from: %s", strerror(errno));
     return false;
   }
   
-  return result > 0;
+  if (result == 0) {
+    // Timeout
+    return false;
+  }
+  
+  // Check if the client has actually disconnected
+  char buffer[1];
+  ssize_t bytes_read = recv(it->second.socket_fd, buffer, sizeof(buffer), MSG_PEEK);
+  
+  if (bytes_read <= 0 && (bytes_read == 0 || errno != EAGAIN)) {
+    // Client disconnected
+    LOG_INFO("Client %d disconnected during data_available check", client_id);
+    if (disconnect_callback_) {
+      disconnect_callback_(client_id);
+    }
+    close(it->second.socket_fd);
+    clients_.erase(it);
+    return false;
+  }
+  
+  return (bytes_read > 0);
 }
 
-int TcpServerTransport::receive_data(void* buffer, size_t max_size)
+int TcpServerTransport::broadcast(const void* data, size_t size)
 {
-  // Try to accept a new connection first
-  accept_connection();
+  int success_count = 0;
   
-  if (!client_connected_ || client_socket_fd_ < 0) {
-    return -1;
-  }
-  
-  ssize_t bytes_received = recv(client_socket_fd_, buffer, max_size, 0);
-  
-  if (bytes_received < 0) {
-    if (errno == EWOULDBLOCK || errno == EAGAIN) {
-      // No data available right now, not an error
-      return 0;
+  for (const auto& client : clients_) {
+    if (send_to(client.first, data, size)) {
+      success_count++;
     }
-    LOG_ERROR("Receive error: %s", strerror(errno));
-    return -1;
   }
   
-  // Connection closed by client
-  if (bytes_received == 0) {
-    LOG_WARN("Connection closed by client");
-    close(client_socket_fd_);
-    client_socket_fd_ = -1;
-    client_connected_ = false;
-    return -1;
-  }
-  
-  return bytes_received;
+  return success_count;
 }
 
-bool TcpServerTransport::receive_exact(void* buffer, size_t size)
+// Fixed: Properly qualify ClientId in the function signature
+std::vector<ClientId> TcpServerTransport::get_client_ids() const
 {
-    // If no client is connected, try to accept one with retries
-    if (!client_connected_ || client_socket_fd_ < 0) {
-        const int max_accept_attempts = 50; // e.g., 50 * 100ms = 5 seconds total wait time
-        bool accepted_client = false;
-        LOG_DEBUG("receive_exact: No client connected. Attempting to accept one (max %d attempts).", max_accept_attempts);
-        for (int i = 0; i < max_accept_attempts; ++i) {
-            if (!listening_) {
-                LOG_WARN("receive_exact: Server is no longer listening. Cannot accept new clients.");
-                return false; // Stop trying if server socket is closed
-            }
-            if (accept_connection()) { // accept_connection() sets client_connected_ and client_socket_fd_
-                LOG_INFO("receive_exact: Client accepted on attempt %d.", i + 1);
-                accepted_client = true;
-                break; // Client connected, exit loop
-            }
-            // If accept_connection failed and we haven't reached max attempts, wait and retry
-            if (i < max_accept_attempts - 1) {
-                // LOG_DEBUG("receive_exact: No client on accept attempt %d/%d, sleeping for 100ms.", i + 1, max_accept_attempts);
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-        }
-        // After loop, check if a client was actually connected
-        if (!accepted_client) {
-            LOG_WARN("receive_exact: Failed to accept a client after %d attempts.", max_accept_attempts);
-            return false; // Still no client, cannot receive
-        }
-    }
+  std::vector<ClientId> client_ids;
+  client_ids.reserve(clients_.size());
+  
+  for (const auto& client : clients_) {
+    client_ids.push_back(client.first);
+  }
+  
+  return client_ids;
+}
 
-    // At this point, client_connected_ should be true and client_socket_fd_ should be valid.
-    if (!client_connected_ || client_socket_fd_ < 0) {
-        LOG_ERROR("receive_exact: Internal error - client should be connected but is not.");
-        return false;
-    }
+bool TcpServerTransport::is_client_connected(ClientId client_id) const
+{
+  return clients_.find(client_id) != clients_.end();
+}
 
-    LOG_DEBUG("receive_exact: Attempting to receive %zu bytes from connected client (fd: %d).", size, client_socket_fd_);
-    size_t total_received = 0;
-    char* buf_ptr = static_cast<char*>(buffer);
+void TcpServerTransport::disconnect_client(ClientId client_id)
+{
+  auto it = clients_.find(client_id);
+  if (it == clients_.end()) {
+    return;
+  }
+  
+  LOG_INFO("Disconnecting client %d", client_id);
+  
+  if (disconnect_callback_) {
+    disconnect_callback_(client_id);
+  }
+  
+  close(it->second.socket_fd);
+  clients_.erase(it);
+}
 
-    // Set a timeout for the receive operation itself, even after connection.
-    // This uses select() for timeout on the client socket.
-    fd_set read_fds;
-    struct timeval tv;
-    const int receive_timeout_seconds = 5; // Timeout for individual recv calls or overall receive phase
+void TcpServerTransport::set_connect_callback(ConnectCallback callback)
+{
+  connect_callback_ = callback;
+}
 
-    while (total_received < size) {
-        FD_ZERO(&read_fds);
-        FD_SET(client_socket_fd_, &read_fds);
+void TcpServerTransport::set_disconnect_callback(DisconnectCallback callback)
+{
+  disconnect_callback_ = callback;
+}
 
-        // Set timeout for select()
-        tv.tv_sec = receive_timeout_seconds;
-        tv.tv_usec = 0;
-
-        int activity = select(client_socket_fd_ + 1, &read_fds, nullptr, nullptr, &tv);
-
-        if (activity < 0 && errno != EINTR) { // EINTR is an interrupt, can be retried
-            LOG_ERROR("receive_exact: select() error: %s", strerror(errno));
-            // Consider this a fatal error for this receive operation
-            // The client connection might be compromised.
-            // disconnect_client(); // Helper to close client_socket_fd_ and reset flags
-            return false;
-        }
-
-        if (activity == 0) {
-            // Timeout occurred
-            LOG_ERROR("receive_exact: Timeout occurred waiting for data from client (waited %d seconds). Received %zu of %zu bytes.", receive_timeout_seconds, total_received, size);
-            return false;
-        }
-
-        // If we are here, client_socket_fd_ is ready for reading
-        ssize_t bytes_received = recv(client_socket_fd_,
-                                     buf_ptr + total_received,
-                                     size - total_received, 0); // MSG_WAITALL could be an option but select handles timeout better
-
-        if (bytes_received < 0) {
-            if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                // This shouldn't happen if select() indicated readability,
-                // but handle defensively. It means no data available right now.
-                // The select() timeout should prevent busy-looping here.
-                LOG_DEBUG("receive_exact: recv() returned EWOULDBLOCK/EAGAIN despite select, retrying select.");
-                continue; // Go back to select()
-            }
-            LOG_ERROR("receive_exact: recv() error: %s", strerror(errno));
-            // disconnect_client(); // Helper to close client_socket_fd_ and reset flags
-            return false;
-        }
-
-        if (bytes_received == 0) {
-            // Connection closed by client
-            LOG_WARN("receive_exact: Connection closed by client while receiving. Received %zu of %zu bytes.", total_received, size);
-            // disconnect_client(); // Helper to close client_socket_fd_ and reset flags
-            return false; // Return false as not all data was received
-        }
-
-        total_received += bytes_received;
-        LOG_DEBUG("receive_exact: Received %zd bytes, total %zu/%zu.", bytes_received, total_received, size);
-    }
-
-    // This check is technically redundant if the loop condition is `total_received < size`,
-    // but good for clarity or if loop logic changes.
-    if (total_received < size) {
-        LOG_ERROR("receive_exact: Failed to receive all data. Expected %zu, got %zu.", size, total_received);
-        return false;
-    }
-
-    LOG_INFO("receive_exact: Successfully received %zu bytes.", size);
-    return true;
+void TcpServerTransport::set_data_callback(DataCallback callback)
+{
+  data_callback_ = callback;
 }
 
 } // namespace gateway

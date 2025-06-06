@@ -1,5 +1,5 @@
-#include "transport/logging_utils.hpp" // Changed from modular_gateway_sender/
-#include "transport/transport_base.hpp" // Changed from modular_gateway_sender/
+#include "transport/logging_utils.hpp"
+#include "transport/transport_base.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,9 +14,13 @@
 
 namespace gateway {
 
+using ClientId = TransportBase::ClientId;
+const ClientId TransportBase::DEFAULT_CLIENT;
+
+
 TcpClientTransport::TcpClientTransport(const std::string& host, int port, int max_retries)
-  : server_host_(host), 
-    server_port_(port), 
+  : host_(host),             // Fixed: Changed server_host_ to host_ to match header
+    port_(port),             // Fixed: Changed server_port_ to port_ to match header
     max_retries_(max_retries), 
     socket_fd_(-1), 
     connected_(false)
@@ -48,21 +52,21 @@ bool TcpClientTransport::connect()
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(server_port_);
+    server_addr.sin_port = htons(port_);    // Fixed: Changed server_port_ to port_
     
-    if (inet_pton(AF_INET, server_host_.c_str(), &server_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) <= 0) {    // Fixed: Changed server_host_ to host_
       throw std::runtime_error(std::string("Invalid address: ") + strerror(errno));
     }
     
     // Connect to server
     if (::connect(socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
       // Log connection failure before throwing
-      LOG_ERROR("Connection failed to %s:%d - %s", server_host_.c_str(), server_port_, strerror(errno));
+      LOG_ERROR("Connection failed to %s:%d - %s", host_.c_str(), port_, strerror(errno));    // Fixed: Changed server_host_ to host_ and server_port_ to port_
       throw std::runtime_error(std::string("Connection failed: ") + strerror(errno));
     }
     
     connected_ = true;
-    LOG_INFO("Successfully connected to %s:%d", server_host_.c_str(), server_port_);
+    LOG_INFO("Successfully connected to %s:%d", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
     return true;
   }
   catch (const std::exception& ex) {
@@ -83,7 +87,7 @@ bool TcpClientTransport::connect()
 void TcpClientTransport::disconnect()
 {
   if (socket_fd_ >= 0) {
-    LOG_INFO("Disconnecting from %s:%d", server_host_.c_str(), server_port_);
+    LOG_INFO("Disconnecting from %s:%d", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
     close(socket_fd_);
     socket_fd_ = -1;
     connected_ = false;
@@ -105,7 +109,7 @@ bool TcpClientTransport::send_data(const void* data, size_t size)
   for (int retry = 0; retry <= max_retries_; ++retry) {
     try {
       if (retry > 0) {
-        LOG_DEBUG("Retrying send operation (attempt %d/%d) to %s:%d", retry, max_retries_, server_host_.c_str(), server_port_);
+        LOG_DEBUG("Retrying send operation (attempt %d/%d) to %s:%d", retry, max_retries_, host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Consider making delay configurable
       }
       
@@ -119,12 +123,12 @@ bool TcpClientTransport::send_data(const void* data, size_t size)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
           } else {
-            LOG_ERROR("Send failed to %s:%d - %s", server_host_.c_str(), server_port_, strerror(errno));
+            LOG_ERROR("Send failed to %s:%d - %s", host_.c_str(), port_, strerror(errno));    // Fixed: Changed server_host_ to host_ and server_port_ to port_
             throw std::runtime_error(std::string("Send failed: ") + strerror(errno));
           }
         } else if (bytes_sent == 0) {
           // According to send(2), this means the peer has performed an orderly shutdown if the socket is stream-oriented.
-          LOG_WARN("Connection closed by peer %s:%d during send.", server_host_.c_str(), server_port_);
+          LOG_WARN("Connection closed by peer %s:%d during send.", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
           throw std::runtime_error("Connection closed by peer");
         }
         
@@ -132,14 +136,14 @@ bool TcpClientTransport::send_data(const void* data, size_t size)
         remaining -= bytes_sent;
       }
       
-      LOG_DEBUG("Successfully sent %zu bytes to %s:%d", size, server_host_.c_str(), server_port_);
+      LOG_DEBUG("Successfully sent %zu bytes to %s:%d", size, host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
       return true;
     }
     catch (const std::exception& ex) {
       LOG_WARN("Exception during send (attempt %d/%d): %s", retry, max_retries_, ex.what());
       disconnect(); // Disconnect on send failure
       if (retry < max_retries_) {
-        LOG_INFO("Attempting to reconnect to %s:%d", server_host_.c_str(), server_port_);
+        LOG_INFO("Attempting to reconnect to %s:%d", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         if (!connect()) { // Try to reconnect
           LOG_ERROR("Reconnect attempt %d failed.", retry);
           if (retry == max_retries_ -1) { // if this was the second to last attempt overall
@@ -148,13 +152,13 @@ bool TcpClientTransport::send_data(const void* data, size_t size)
           }
           // continue to next retry iteration which will sleep
         } else {
-           LOG_INFO("Reconnected successfully to %s:%d. Retrying send.", server_host_.c_str(), server_port_);
+           LOG_INFO("Reconnected successfully to %s:%d. Retrying send.", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
            // Reset remaining and offset for the new attempt with the new connection
            remaining = size;
            offset = 0;
         }
       } else { // This was the last retry
-        LOG_ERROR("All send retries failed for %s:%d.", server_host_.c_str(), server_port_);
+        LOG_ERROR("All send retries failed for %s:%d.", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         return false;
       }
     }
@@ -191,7 +195,7 @@ bool TcpClientTransport::data_available(int timeout_ms) {
             LOG_DEBUG("Select call interrupted by signal.");
             return false; 
         }
-        LOG_ERROR("Select error on socket for %s:%d - %s", server_host_.c_str(), server_port_, strerror(errno));
+        LOG_ERROR("Select error on socket for %s:%d - %s", host_.c_str(), port_, strerror(errno));    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         // Consider disconnecting if EBADF, etc.
         if (errno == EBADF) {
             LOG_WARN("Socket descriptor %d is bad, disconnecting.", socket_fd_);
@@ -218,19 +222,19 @@ int TcpClientTransport::receive_data(void* buffer, size_t max_size) {
             LOG_DEBUG("Receive would block or timed out (EWOULDBLOCK/EAGAIN). No data received.");
             return 0; // Indicate no data, not an error
         }
-        LOG_ERROR("Receive error on socket for %s:%d - %s", server_host_.c_str(), server_port_, strerror(errno));
+        LOG_ERROR("Receive error on socket for %s:%d - %s", host_.c_str(), port_, strerror(errno));    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         disconnect(); // Disconnect on critical receive error
         return -1;
     }
     
     // Connection closed by peer
     if (bytes_received == 0) {
-        LOG_WARN("Connection closed by peer %s:%d during receive.", server_host_.c_str(), server_port_);
+        LOG_WARN("Connection closed by peer %s:%d during receive.", host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
         disconnect();
         return -1; // Indicate connection closed
     }
     
-    LOG_DEBUG("Received %zd bytes from %s:%d", bytes_received, server_host_.c_str(), server_port_);
+    LOG_DEBUG("Received %zd bytes from %s:%d", bytes_received, host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
     return static_cast<int>(bytes_received);
 }
 
@@ -265,30 +269,117 @@ bool TcpClientTransport::receive_exact(void* buffer, size_t size) {
                     LOG_DEBUG("Receive would block, retrying exact receive (%d/%d)", recv_attempts, max_recv_attempts);
                     continue;
                 } else {
-                    LOG_ERROR("Receive timed out after %d attempts for exact data from %s:%d. Got %zu of %zu bytes.", max_recv_attempts, server_host_.c_str(), server_port_, total_received, size);
+                    LOG_ERROR("Receive timed out after %d attempts for exact data from %s:%d. Got %zu of %zu bytes.", 
+                              max_recv_attempts, host_.c_str(), port_, total_received, size);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
                     // Do not disconnect here, as partial data might be an application-level issue or timeout.
                     return false;
                 }
             }
-            LOG_ERROR("Receive error on socket for %s:%d - %s. Needed %zu, got %zu.", server_host_.c_str(), server_port_, strerror(errno), size, total_received);
+            LOG_ERROR("Receive error on socket for %s:%d - %s. Needed %zu, got %zu.", 
+                      host_.c_str(), port_, strerror(errno), size, total_received);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
             disconnect(); // Disconnect on critical receive error
             return false;
         }
         
         // Connection closed by peer
         if (bytes_received == 0) {
-            LOG_WARN("Connection closed by peer %s:%d during receive_exact. Needed %zu, got %zu.", server_host_.c_str(), server_port_, size, total_received);
+            LOG_WARN("Connection closed by peer %s:%d during receive_exact. Needed %zu, got %zu.", 
+                     host_.c_str(), port_, size, total_received);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
             disconnect();
             return false;
         }
         
         total_received += bytes_received;
         recv_attempts = 0; // Reset attempts on successful receive
-        LOG_DEBUG("Received chunk: %zd bytes, total: %zu/%zu for exact receive from %s:%d", bytes_received, total_received, size, server_host_.c_str(), server_port_);
+        LOG_DEBUG("Received chunk: %zd bytes, total: %zu/%zu for exact receive from %s:%d", 
+                  bytes_received, total_received, size, host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
     }
     
-    LOG_INFO("Successfully received exact %zu bytes from %s:%d", size, server_host_.c_str(), server_port_);
+    LOG_INFO("Successfully received exact %zu bytes from %s:%d", size, host_.c_str(), port_);    // Fixed: Changed server_host_ to host_ and server_port_ to port_
     return true;
+}
+
+// Implementation of the other required virtual functions
+bool TcpClientTransport::send_to(ClientId client_id, const void* data, size_t size) {
+    // For client, there's only one possible destination (the server)
+    if (client_id != DEFAULT_CLIENT) {
+        LOG_ERROR("TcpClientTransport only supports sending to DEFAULT_CLIENT");
+        return false;
+    }
+    return send_data(data, size);
+}
+
+int TcpClientTransport::receive_from(ClientId client_id, void* buffer, size_t max_size) {
+    // For client, there's only one possible source (the server)
+    if (client_id != DEFAULT_CLIENT) {
+        LOG_ERROR("TcpClientTransport only supports receiving from DEFAULT_CLIENT");
+        return -1;
+    }
+    return receive_data(buffer, max_size);
+}
+
+bool TcpClientTransport::data_available_from(ClientId client_id, int timeout_ms) {
+    // For client, there's only one possible source (the server)
+    if (client_id != DEFAULT_CLIENT) {
+        LOG_ERROR("TcpClientTransport only supports checking data from DEFAULT_CLIENT");
+        return false;
+    }
+    return data_available(timeout_ms);
+}
+
+int TcpClientTransport::broadcast(const void* data, size_t size) {
+    // For client, broadcast is equivalent to send_data (to the server)
+    return send_data(data, size) ? 1 : 0;
+}
+
+std::vector<ClientId> TcpClientTransport::get_client_ids() const {
+    // For client, there's only one possible ID (the server represented by DEFAULT_CLIENT)
+    std::vector<ClientId> ids;
+    if (is_connected()) {
+        ids.push_back(DEFAULT_CLIENT);
+    }
+    return ids;
+}
+
+bool TcpClientTransport::is_client_connected(ClientId client_id) const {
+    // For client, only DEFAULT_CLIENT can be connected
+    return (client_id == DEFAULT_CLIENT) && is_connected();
+}
+
+void TcpClientTransport::disconnect_client(ClientId client_id) {
+    // For client, only DEFAULT_CLIENT can be disconnected
+    if (client_id == DEFAULT_CLIENT) {
+        disconnect();
+    }
+}
+
+void TcpClientTransport::set_connect_callback(ConnectCallback callback) {
+    connect_callback_ = callback;
+}
+
+void TcpClientTransport::set_disconnect_callback(DisconnectCallback callback) {
+    disconnect_callback_ = callback;
+}
+
+void TcpClientTransport::set_data_callback(DataCallback callback) {
+    data_callback_ = callback;
+}
+
+bool TcpClientTransport::process_events(int timeout_ms) {
+    // For a client, process_events just checks if data is available
+    if (!is_connected()) {
+        return false;
+    }
+    
+    // Use data_available to implement a non-blocking check for incoming data
+    if (data_available(timeout_ms)) {
+        if (data_callback_) {
+            data_callback_(DEFAULT_CLIENT);
+        }
+        return true;
+    }
+    
+    return true; // No activity but still connected
 }
 
 } // namespace gateway

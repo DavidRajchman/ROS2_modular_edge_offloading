@@ -71,3 +71,13 @@ services:
     networks:
       public_net:
           ipv4_address: 192.168.65.10
+
+networks:
+    public_net:
+        driver: bridge
+        name: offloading-test-net
+        ipam:
+            config:
+                - subnet: 192.168.65.0/24
+#        driver_opts:
+#            com.docker.network.bridge.name: "offloading-test-net"
