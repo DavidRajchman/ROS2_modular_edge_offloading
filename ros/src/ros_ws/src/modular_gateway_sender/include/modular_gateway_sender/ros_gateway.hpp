@@ -47,13 +47,14 @@ private:
   uint8_t id_group_;
   uint8_t identifier_in_group_;
   
-  // Existing members
   std::unique_ptr<TransportBase> transport_;
   std::map<std::string, std::shared_ptr<MessageHandlerBase>> handlers_;
   
   std::thread receiver_thread_;
   bool receiver_running_ = false;
   std::mutex transport_access_mutex_;
+  
+  std::vector<uint8_t> header_buffer_;
   
   void init_transport();
   void receiver_thread_func();

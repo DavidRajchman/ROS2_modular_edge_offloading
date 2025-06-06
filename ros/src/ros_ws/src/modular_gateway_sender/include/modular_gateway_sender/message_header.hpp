@@ -197,6 +197,65 @@ inline std::vector<uint8_t> create_header(
   return create_header(topic, type, id_group, identifier_in_group, data_size, options.to_flags());
 }
 
+
+/**
+ * @brief Creates a message header using a pre-allocated buffer.
+ * 
+ * This version fills an existing buffer rather than allocating a new one,
+ * which helps avoid memory allocation on the critical path.
+ * 
+ * @param buffer The pre-allocated buffer to fill (will be cleared first)
+ * @param topic The topic name for the message
+ * @param type The message type from MessageType enum
+ * @param id_group ID for the group
+ * @param identifier_in_group ID for the identifier in the group
+ * @param data_size Size of the message payload in bytes
+ * @param options MessageOptions struct containing flag settings
+ * @return size_t The size of the header in bytes
+ */
+inline size_t create_header_in_buffer(
+  std::vector<uint8_t>& buffer,
+  const std::string& topic,
+  MessageType type,
+  uint8_t id_group,
+  uint8_t identifier_in_group,
+  uint32_t data_size,
+  const MessageOptions& options)
+{
+  // Clear the buffer and ensure capacity
+  buffer.clear();
+  buffer.reserve(11 + topic.size());
+  
+  // Magic bytes
+  buffer.push_back(HEADER_MAGIC >> 8);     // High byte
+  buffer.push_back(HEADER_MAGIC & 0xFF);   // Low byte
+  
+  // Flags byte
+  buffer.push_back(options.to_flags());
+  
+  // Message type
+  buffer.push_back(static_cast<uint8_t>(type));
+
+  // Unique ID
+  buffer.push_back(id_group);
+  buffer.push_back(identifier_in_group);
+  
+  // Payload size (4 bytes, big endian)
+  buffer.push_back((data_size >> 24) & 0xFF);  // Most significant byte
+  buffer.push_back((data_size >> 16) & 0xFF);  
+  buffer.push_back((data_size >> 8) & 0xFF);   
+  buffer.push_back(data_size & 0xFF);          // Least significant byte
+  
+  // Topic length (1 byte)
+  uint8_t topic_len = std::min(topic.size(), static_cast<size_t>(255));
+  buffer.push_back(topic_len);
+  
+  // Topic name
+  buffer.insert(buffer.end(), topic.begin(), topic.begin() + topic_len);
+  
+  return buffer.size();
+}
+
 } // namespace gateway
 
 #endif // MESSAGE_HEADER_HPP

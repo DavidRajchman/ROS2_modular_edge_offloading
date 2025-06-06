@@ -20,7 +20,7 @@ namespace gateway {
     this->declare_parameter("auto_start_receiver", true);
     this->declare_parameter("wait_for_connection", true);
     this->declare_parameter("connection_timeout_ms", 5000);
-    this->declare_parameter("receiver_sleep_time_us", 1000);
+    this->declare_parameter("receiver_sleep_time_us", 100);
     this->declare_parameter("id_group", 0);
     this->declare_parameter("identifier_in_group", 0);
   
@@ -37,6 +37,9 @@ namespace gateway {
       transport_->disconnect();
     }
   });
+
+  // Pre-allocate header buffer with a reasonable initial capacity
+  header_buffer_.reserve(256);  // Should be enough for most topic names
   
   // Initialize transport
   init_transport();
@@ -110,24 +113,24 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
     }
   }
 
-  // Create header using the options
-  std::vector<uint8_t> header = create_header(topic, type, id_group_, identifier_in_group_, size, options);
+  // Use pre-allocated buffer instead of creating a new vector
+  create_header_in_buffer(header_buffer_, topic, type, id_group_, identifier_in_group_, size, options);
 
-{
-  std::lock_guard<std::mutex> lock(transport_access_mutex_); // Add mutex protection
+  {
+    std::lock_guard<std::mutex> lock(transport_access_mutex_);
 
-  // Send header
-  if (!transport_->send_data(header.data(), header.size())) {
-    LOG_ERROR(get_logger(), "Failed to send header");
-    return false;
+    // Send header
+    if (!transport_->send_data(header_buffer_.data(), header_buffer_.size())) {
+      LOG_ERROR(get_logger(), "Failed to send header");
+      return false;
+    }
+
+    // Send data
+    if (!transport_->send_data(data, size)) {
+      LOG_ERROR(get_logger(), "Failed to send data");
+      return false;
+    }
   }
-
-  // Send data
-  if (!transport_->send_data(data, size)) {
-    LOG_ERROR(get_logger(), "Failed to send data");
-    return false;
-  }
-}
   LOG_INFO(get_logger(), "Sent %zu bytes to topic %s", size, topic.c_str());
   return true;
 }

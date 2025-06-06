@@ -1,6 +1,9 @@
  # **TODO fixes and modifications** 
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
 
+# 0.16.0
+ - latency optimisation by prealocating msg header buffer  
+
 # 0.15.0
  - added package wide log level control to the loggin_utils macro (overides ros2 log control)
 # 0.14.0

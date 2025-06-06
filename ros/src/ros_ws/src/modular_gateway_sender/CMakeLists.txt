@@ -12,8 +12,8 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=15)
-add_definitions(-DVERSION_PATCH=1)
+add_definitions(-DVERSION_MINOR=16)
+add_definitions(-DVERSION_PATCH=0)
 
 # --- Compile-Time Log Level Control ---
 # Set the desired log level here using its numeric value.
