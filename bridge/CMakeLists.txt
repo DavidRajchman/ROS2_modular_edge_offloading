@@ -34,10 +34,13 @@ include(FetchContent)
 #ofline moodycamel
 set(moodycamel_concurrent_queue_SOURCE_DIR /home/ubuntu/external_libs/moodycamel_concurrent_queue) # Path inside the container
 
+set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
+set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 
 # Find required packages
 find_package(Threads REQUIRED)
 find_package(TransportLib REQUIRED)
+find_package(fmt REQUIRED) # Ensures fmt is found (e.g., system-installed or via FetchContent)
 
 # Add the executable for your bridge application
 add_executable(bridge
@@ -46,11 +49,12 @@ add_executable(bridge
     src/TransportHandler.cpp
 )
 
-# Explicitly add the include directory for concurrentqueue
-# This ensures that the compiler knows where to find "concurrentqueue.h"
+# Explicitly add include directories
 target_include_directories(bridge
     PRIVATE
-    ${moodycamel_concurrent_queue_SOURCE_DIR} # Add this line
+    ${moodycamel_concurrent_queue_SOURCE_DIR}
+    ${CPPLOGGER_DIR}/include
+    ${CPPCOMMON_DIR}/include
 )
 
 target_compile_definitions(bridge
@@ -62,15 +66,42 @@ target_compile_definitions(bridge
     ACTIVE_LOG_LEVEL=LOG_LEVEL_WARN
 )
 
+# Find CppCommon library
+find_library(CPPCOMMON_LIBRARY
+    NAMES cppcommon # CMake searches for libcppcommon.a or .so
+    HINTS ${CPPCOMMON_DIR}/build ${CPPCOMMON_DIR}/bin # Prefer build directory if .a is there
+    # Add more specific paths if necessary, e.g., ${CPPCOMMON_DIR}/build/lib
+)
+if(NOT CPPCOMMON_LIBRARY)
+    message(FATAL_ERROR "CppCommon library not found. Searched in ${CPPCOMMON_DIR}/build and ${CPPCOMMON_DIR}/bin. Ensure it's built.")
+endif()
+
+# Find CppLogging library
+find_library(CPPLOGGING_LIBRARY
+    NAMES cpplogging # CMake searches for libcpplogging.a or .so
+    HINTS ${CPPLOGGER_DIR}/build ${CPPLOGGER_DIR}/bin # Prefer build directory
+)
+if(NOT CPPLOGGING_LIBRARY)
+    message(FATAL_ERROR "CppLogging library not found. Searched in ${CPPLOGGER_DIR}/build and ${CPPLOGGER_DIR}/bin. Ensure it's built.")
+endif()
+
 # Link libraries
 target_link_libraries(bridge
     PRIVATE
     Threads::Threads
     TransportLib::transport
-    # moodycamel_concurrent_queue # Keep this if it's a valid target, CMake will warn if not.
-                                # For header-only, often not strictly needed if includes are set.
-)
+    fmt::fmt                # Link against the fmt library found by find_package
+    ${CPPLOGGING_LIBRARY}   # Link against the found CppLogging library
+    ${CPPCOMMON_LIBRARY}    # Link against the found CppCommon library
 
+    # Add system libraries required by CppCommon
+    bfd                     # For libbfd (binary file descriptor library)
+    uuid                    # For libuuid (UUID generation)
+    dl
+    z
+    rt                      # For dynamic linking (dlopen, dlsym, etc.)
+                            # rt might also be needed on some systems for CppCommon, but start without
+)
 # Optional: Install rule for the bridge executable
 # install(TARGETS bridge
 #     RUNTIME DESTINATION bin

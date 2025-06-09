@@ -3,6 +3,9 @@
 #include "common_types.hpp" // For MPSCQueueType, Message, RoutingKey, parse_modular_gw_header, ModGW::Header
 #include <transport/logging_utils.hpp> // Your logging
 
+#include "logging/logger.h"
+#include "logging/config.h"
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -43,8 +46,39 @@ void print_message_info(const std::string& queue_name, const std::shared_ptr<Mes
     }
 }
 
+void ConfigureLogger()
+{
+    // Create a custom text layout pattern
+    //const std::string pattern = "{UtcYear}-{UtcMonth}-{UtcDay}T{UtcHour}:{UtcMinute}:{UtcSecond}s-{Millisecond}.{Microsecond}.{Nanosecond} - [{Thread}] - {Level} - {Logger} - {Message}{EndLine}";
+
+    // Create default logging sink processor with a text layout
+    auto sink = std::make_shared<CppLogging::Processor>(std::make_shared<CppLogging::BinaryLayout>());
+    // Add console appender
+    sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
+    // Configure example logger
+    CppLogging::Config::ConfigLogger("example", sink);
+}
+
 
 int main(int argc, char* argv[]) {
+
+    // Configure logger
+    ConfigureLogger();
+    CppLogging::Config::Startup();
+    // Create example logger
+    CppLogging::Logger logger("example");
+
+
+    logger.Info("test");
+    logger.Info("tohle je test");
+    logger.Info("tohle je test");
+    logger.Info("tohle je test");
+    logger.Info("tohle je test");
+
+    for (int i = 0; i < 10; i++)
+    {
+        logger.Warn("looptest");
+    }
     // 1. Initialize Logging
     // (Assuming your logging is set up, e.g., via a static initializer or an explicit call if needed)
     LOG_INFO("Bridge Manual Test Rig Starting...");
