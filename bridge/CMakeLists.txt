@@ -69,7 +69,7 @@ target_compile_definitions(bridge
 # Find CppCommon library
 find_library(CPPCOMMON_LIBRARY
     NAMES cppcommon # CMake searches for libcppcommon.a or .so
-    HINTS ${CPPCOMMON_DIR}/build ${CPPCOMMON_DIR}/bin # Prefer build directory if .a is there
+    HINTS ${CPPCOMMON_DIR}/bin ${CPPCOMMON_DIR}/build # Prefer build directory if .a is there
     # Add more specific paths if necessary, e.g., ${CPPCOMMON_DIR}/build/lib
 )
 if(NOT CPPCOMMON_LIBRARY)
@@ -79,7 +79,7 @@ endif()
 # Find CppLogging library
 find_library(CPPLOGGING_LIBRARY
     NAMES cpplogging # CMake searches for libcpplogging.a or .so
-    HINTS ${CPPLOGGER_DIR}/build ${CPPLOGGER_DIR}/bin # Prefer build directory
+    HINTS ${CPPLOGGER_DIR}/bin ${CPPLOGGER_DIR}/build # Prefer build directory
 )
 if(NOT CPPLOGGING_LIBRARY)
     message(FATAL_ERROR "CppLogging library not found. Searched in ${CPPLOGGER_DIR}/build and ${CPPLOGGER_DIR}/bin. Ensure it's built.")

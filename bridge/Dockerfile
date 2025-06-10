@@ -3,7 +3,8 @@ FROM ubuntu:22.04
 # Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install C++ development tools and network debugging utilities
+# Install C++ development tools, network debugging utilities,
+# and dependencies for external libraries
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -16,44 +17,61 @@ RUN apt-get update && apt-get install -y \
     sudo \
     iputils-ping \
     iproute2 \
-
-    # sudo is already installed on ubuntu:22.04 base, but explicitly listing if needed by other tools
-    # For the ubuntu user created below, sudo privileges are granted via /etc/sudoers.d/
+    python3-pip \
+    binutils-dev \
+    uuid-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a user to match typical Ubuntu setup
-RUN mkdir -p /etc/sudoers.d && \
-    useradd -m ubuntu && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
-    chmod 0440 /etc/sudoers.d/ubuntu
+# Install gil (used by CppCommon and CppLogging)
+RUN pip3 install gil
 
-# --- Build and Install TransportLib ---
-# Assuming the build context in docker-compose.yml is '.', so ./cpplib is correct.
-COPY ./cpplib /home/ubuntu/cpplib_src_build_time 
+# --- Setup External Libraries (CppCommon, CppLogging, fmt, moodycamel) ---
+# Copy the cloned library sources from the host into /home/ubuntu/external_libs
+# The build context for the 'bridge' service in docker-compose.yml is '.',
+# so ./external_libs refers to the external_libs directory at the project root.
+COPY ./external_libs /home/ubuntu/external_libs
 
-# Set working directory for building TransportLib
+# --- Build CppCommon ---
+WORKDIR /home/ubuntu/external_libs/CppCommon
+RUN gil update && \
+    cd build && \
+    ./unix.sh
+
+# --- Build CppLogging ---
+WORKDIR /home/ubuntu/external_libs/CppLogging
+RUN gil update && \
+    cd build && \
+    ./unix.sh
+
+# --- Build and Install fmt ---
+## Install fmt system-wide to /usr/local
+WORKDIR /home/ubuntu/external_libs/fmt
+RUN mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
+    make -j$(nproc) && \
+    make install
+# fmt is now "installed" to /home/ubuntu/external_libs/fmt/install_local
+# moodycamel::ConcurrentQueue is header-only and is at /home/ubuntu/external_libs/moodycamel_concurrent_queue
+# --- End External Libraries Setup ---
+
+# --- Build and Install TransportLib (Your existing library) ---
+COPY ./cpplib /home/ubuntu/cpplib_src_build_time
 WORKDIR /home/ubuntu/cpplib_src_build_time/transport
-
-# Build and install TransportLib
-# This build uses the source code copied into the image at build time.
-# This RUN command executes as root, so sudo is not needed for make install.
-# Ensure the build directory is clean before starting.
 RUN rm -rf build && \
     mkdir build && \
     cd build && \
     cmake .. && \
     make -j$(nproc) && \
-    make install 
-
-# Optional: Clean up the build-time source directory to save image space.
-# If you are relying on the volume mount for the source code at runtime,
-# removing this build-time copy can save a little space.
-# However, if the volume mount is not present, the library would still be installed,
-# but its source (from build time) would be gone.
-# For maximum flexibility with volume mounts, it's often fine to leave it.
-# RUN rm -rf /home/ubuntu/cpplib_src_build_time
+    make install
+# Optional: RUN rm -rf /home/ubuntu/cpplib_src_build_time
 # --- End TransportLib Installation ---
+
+RUN mkdir -p /etc/sudoers.d && \
+    useradd -m ubuntu && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
+    chmod 0440 /etc/sudoers.d/ubuntu && \
+    chown -R ubuntu:ubuntu /home/ubuntu # Ensure ubuntu owns its home directory
 
 # Switch to ubuntu user for subsequent commands and default runtime user
 USER ubuntu
