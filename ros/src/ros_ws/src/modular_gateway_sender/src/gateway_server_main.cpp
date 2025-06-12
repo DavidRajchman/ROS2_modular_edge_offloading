@@ -5,6 +5,8 @@
 #include "modular_gateway_sender/handlers/string_handler.hpp"
 #include "modular_gateway_sender/handlers/laserscan_handler.hpp"
 
+#include "logging/logger.h"
+#include "logging/config.h"
 
 
 

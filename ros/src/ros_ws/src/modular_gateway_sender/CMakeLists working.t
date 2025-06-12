@@ -18,13 +18,39 @@ add_definitions(-DVERSION_PATCH=0)
 # --- Compile-Time Log Level Control ---
 set(PROJECT_ACTIVE_LOG_LEVEL 2) # Default to DEBUG.
 
+include(FetchContent)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG 11.0.2  # Use a version of fmt that CppLogging is compatible with (e.g., 11.x)
+  CMAKE_ARGS -DBUILD_SHARED_LIBS=OFF -DFMT_HEADER_ONLY=OFF # Ensure fmt is built as a static, compiled library
+
+)
+# Set options to avoid building tests or installing fmt from this build
+set(FMT_TEST OFF CACHE BOOL "Disable building of fmt tests" FORCE)
+FetchContent_MakeAvailable(fmt) # This makes the fmt::fmt target available from the fetched source
+
+
 # --- Find Dependencies ---
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(fmt REQUIRED)  # Use locally installed fmt
 find_package(Threads REQUIRED) # Ensure Threads is found
+
+# The FMT_SOURCE_DIR logic can be simplified or removed if you always rely on the Dockerfile-installed fmt.
+# For simplicity, we'll rely on the find_package(fmt REQUIRED) above.
+# If you had a specific FMT_SOURCE_DIR, you would set it here:
+# set(FMT_SOURCE_DIR "/path/to/correct/fmt/source")
+# if(FMT_SOURCE_DIR AND EXISTS "${FMT_SOURCE_DIR}/CMakeLists.txt")
+#   message(STATUS "Using local fmt from ${FMT_SOURCE_DIR}, adding as subdirectory.")
+#   set(FMT_INSTALL OFF CACHE BOOL "Disable installation of fmt" FORCE)
+#   set(FMT_TEST OFF CACHE BOOL "Disable building of fmt tests" FORCE)
+#   add_subdirectory(${FMT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/fmt_build EXCLUDE_FROM_ALL)
+# else()
+#   message(STATUS "FMT_SOURCE_DIR not set or invalid, relying on find_package(fmt) to find system fmt.")
+#   # find_package(fmt REQUIRED) is already called above
+# endif()
 
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")

@@ -20,7 +20,10 @@ ros-jazzy-teleop-twist-keyboard \
 ros-jazzy-slam-toolbox \
 nano \ 
 iputils-ping \
-iproute2 
+iproute2 \
+python3-pip \
+binutils-dev \
+uuid-dev 
 
 
 RUN apt install -y tmux \
@@ -31,10 +34,49 @@ ros-jazzy-rmw-cyclonedds-cpp \
 ros-jazzy-pcl-conversions \
 ros-jazzy-pcl-msgs \
 python3-scipy \
-python3-serial \
-libpaho-mqttpp-dev \
-libpaho-mqtt-dev
+python3-serial 
 
+
+# Install gil (used by CppCommon and CppLogging)
+RUN python3 -m pip config set global.break-system-packages true
+RUN pip3 install gil
+
+
+# --- Setup External Libraries (CppCommon, CppLogging, fmt, moodycamel) ---
+# Create a directory to hold the cloned sources
+ARG EXTERNAL_LIBS_DIR=/home/ubuntu/external_libs
+RUN mkdir -p ${EXTERNAL_LIBS_DIR}
+WORKDIR ${EXTERNAL_LIBS_DIR}
+
+# --- Clone CppCommon ---
+RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
+    cd CppCommon && \
+    git checkout 1.0.5.0 && \
+    gil update && \
+    cd build && \
+    ./unix.sh
+
+# --- Clone CppLogging ---
+# WORKDIR is still ${EXTERNAL_LIBS_DIR}
+RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
+    cd CppLogging && \
+    git checkout 1.0.5.0 && \
+    gil update && \
+    cd build && \
+    ./unix.sh
+
+# --- Clone and Build fmt ---
+# WORKDIR is still ${EXTERNAL_LIBS_DIR}
+RUN git clone https://github.com/fmtlib/fmt.git fmt && \
+    cd fmt && \
+    git checkout 11.0.2 && \
+    mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
+    make -j$(nproc) && \
+    make install
+# fmt is now installed to /usr/local
+
+COPY ./src/ros_ws/src /home/ubuntu/ros_ws/src/
 
 
 # Nastavení prostředí pro ROS 2
@@ -50,16 +92,6 @@ RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash"
 #RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
 #RUN /bin/bash -c "source /home/ubuntu/ros_ws/install/setup.bash"
 
-#Instalace paho.mqtt.cpp
-#RUN cd /home/ubuntu/
-#RUN mkdir cpp_libraries
-#RUN git clone https://github.com/eclipse/paho.mqtt.cpp
-#RUN cd paho.mqtt.cpp
-#RUN git checkout v1.5.2
-#RUN git submodule init
-#RUN git submodule update
-#RUN cmake -Bbuild -H. -DPAHO_WITH_MQTT_C=ON -DPAHO_BUILD_EXAMPLES=ON
-#RUN sudo cmake --build build/ --target install
 
 # Výchozí příkaz pro spuštění bash
 CMD ["bash"]
