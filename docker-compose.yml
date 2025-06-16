@@ -61,7 +61,6 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./bridge:/home/ubuntu/bridge
       - ./cpplib:/home/ubuntu/cpplib_src
-      - ./external_libs/:/home/ubuntu/external_libs/
 
     working_dir: /home/ubuntu/bridge
     privileged: true
