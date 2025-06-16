@@ -27,32 +27,45 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install gil
 
 # --- Setup External Libraries (CppCommon, CppLogging, fmt, moodycamel) ---
-# Copy the cloned library sources from the host into /home/ubuntu/external_libs
-# The build context for the 'bridge' service in docker-compose.yml is '.',
-# so ./external_libs refers to the external_libs directory at the project root.
-COPY ./external_libs /home/ubuntu/external_libs
+# Create a directory to hold the cloned sources
+ARG EXTERNAL_LIBS_DIR=/home/ubuntu/external_libs
+RUN mkdir -p ${EXTERNAL_LIBS_DIR}
+WORKDIR ${EXTERNAL_LIBS_DIR}
 
-# --- Build CppCommon ---
-WORKDIR /home/ubuntu/external_libs/CppCommon
-RUN gil update && \
+# --- Clone CppCommon ---
+RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
+    cd CppCommon && \
+    git checkout 1.0.5.0 && \
+    gil update && \
     cd build && \
     ./unix.sh
 
-# --- Build CppLogging ---
-WORKDIR /home/ubuntu/external_libs/CppLogging
-RUN gil update && \
+# --- Clone CppLogging ---
+# WORKDIR is still ${EXTERNAL_LIBS_DIR}
+RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
+    cd CppLogging && \
+    git checkout 1.0.5.0 && \
+    gil update && \
     cd build && \
     ./unix.sh
 
-# --- Build and Install fmt ---
-## Install fmt system-wide to /usr/local
-WORKDIR /home/ubuntu/external_libs/fmt
-RUN mkdir -p build && cd build && \
+# --- Clone and Build fmt ---
+# WORKDIR is still ${EXTERNAL_LIBS_DIR}
+RUN git clone https://github.com/fmtlib/fmt.git fmt && \
+    cd fmt && \
+    git checkout 11.2.0 && \
+    mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
     make -j$(nproc) && \
     make install
-# fmt is now "installed" to /home/ubuntu/external_libs/fmt/install_local
-# moodycamel::ConcurrentQueue is header-only and is at /home/ubuntu/external_libs/moodycamel_concurrent_queue
+# fmt is now installed to /usr/local
+
+# --- Clone moodycamel::ConcurrentQueue (header-only) ---
+# WORKDIR is still ${EXTERNAL_LIBS_DIR}
+RUN git clone https://github.com/cameron314/concurrentqueue.git moodycamel_concurrent_queue && \
+    cd moodycamel_concurrent_queue && \
+    git checkout v1.0.4
+# moodycamel::ConcurrentQueue is header-only and is now at ${EXTERNAL_LIBS_DIR}/moodycamel_concurrent_queue
 # --- End External Libraries Setup ---
 
 # --- Build and Install TransportLib (Your existing library) ---
