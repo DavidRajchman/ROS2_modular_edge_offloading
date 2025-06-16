@@ -38,7 +38,10 @@ RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
     git checkout 1.0.5.0 && \
     gil update && \
     cd build && \
-    ./unix.sh
+    ./unix.sh && \
+    ls -la . && \
+    echo "CppCommon build completed, contents:" && \
+    find . -name "*.a" -o -name "*.so" | head -10
 
 # --- Clone CppLogging ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}
@@ -47,7 +50,10 @@ RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
     git checkout 1.0.5.0 && \
     gil update && \
     cd build && \
-    ./unix.sh
+    ./unix.sh && \
+    ls -la . && \
+    echo "CppLogging build completed, contents:" && \
+    find . -name "*.a" -o -name "*.so" | head -10
 
 # --- Clone and Build fmt ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}
@@ -66,6 +72,18 @@ RUN git clone https://github.com/cameron314/concurrentqueue.git moodycamel_concu
     cd moodycamel_concurrent_queue && \
     git checkout v1.0.4
 # moodycamel::ConcurrentQueue is header-only and is now at ${EXTERNAL_LIBS_DIR}/moodycamel_concurrent_queue
+
+# Verify all libraries are properly built and accessible
+RUN echo "=== Final verification of external libraries ===" && \
+    ls -la ${EXTERNAL_LIBS_DIR}/ && \
+    echo "CppCommon build directory:" && \
+    ls -la ${EXTERNAL_LIBS_DIR}/CppCommon/build/ && \
+    echo "CppCommon bin directory:" && \
+    ls -la ${EXTERNAL_LIBS_DIR}/CppCommon/bin/ && \
+    echo "CppLogging build directory:" && \
+    ls -la ${EXTERNAL_LIBS_DIR}/CppLogging/build/ && \
+    echo "CppLogging bin directory:" && \
+    ls -la ${EXTERNAL_LIBS_DIR}/CppLogging/bin/
 # --- End External Libraries Setup ---
 
 # --- Build and Install TransportLib (Your existing library) ---
