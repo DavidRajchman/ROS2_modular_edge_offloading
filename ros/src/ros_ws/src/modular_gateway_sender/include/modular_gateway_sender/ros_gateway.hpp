@@ -10,6 +10,9 @@
 #include "modular_gateway_sender/message_header.hpp"
 #include "modular_gateway_sender/message_handler_base.hpp"
 
+#include "logging/logger.h"
+#include "logging/config.h"
+
 namespace gateway {
 
 enum class TransportMode {
@@ -55,6 +58,8 @@ private:
   std::mutex transport_access_mutex_;
   
   std::vector<uint8_t> header_buffer_;
+
+  CppLogging::Logger logger_;
   
   void init_transport();
   void receiver_thread_func();

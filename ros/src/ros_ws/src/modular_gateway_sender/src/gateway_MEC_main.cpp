@@ -6,39 +6,19 @@
 #include "modular_gateway_sender/handlers/laserscan_handler.hpp"
 #include "modular_gateway_sender/handlers/string_test_input_handler.hpp"
 #include "modular_gateway_sender/handlers/string_test_result_handler.hpp"
-
-#include "logging/logger.h"
-#include "logging/config.h"
 //This gateway is run in a MEC enviroment, it listens to data input and sends back the results (in terms of network connections)
 
 
-
-void ConfigureLogger()
-{
-    // Create a custom text layout pattern
-    //const std::string pattern = "{UtcYear}-{UtcMonth}-{UtcDay}T{UtcHour}:{UtcMinute}:{UtcSecond}s-{Millisecond}.{Microsecond}.{Nanosecond} - [{Thread}] - {Level} - {Logger} - {Message}{EndLine}";
-
-    // Create default logging sink processor with a text layout
-    auto sink = std::make_shared<CppLogging::Processor>(std::make_shared<CppLogging::BinaryLayout>());
-    // Add console appender
-    sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("mec_binary.log"));
-    // Configure example logger
-    CppLogging::Config::ConfigLogger("example", sink);
-}
 
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
 
-  // Configure logger
-    ConfigureLogger();
-    CppLogging::Config::Startup();
-    // Create example logger
-    CppLogging::Logger logger("example");
 
+  
 
-    logger.Info("test");
+    
   
   // Create NodeOptions to override parameters
   rclcpp::NodeOptions node_options;
@@ -64,7 +44,10 @@ int main(int argc, char * argv[])
   gateway::MessageHandlerBase::configure_handler_mode(string_test_result_handler, gateway::HandlerMode::SUBSCRIBER_ONLY);
   gateway->register_handler(string_test_result_handler);
   
-  
+  // Create example logger
+  CppLogging::Logger logger("gateway");
+  logger.Info("MEC gateway started");
+
 
   rclcpp::spin(gateway);
   rclcpp::shutdown();

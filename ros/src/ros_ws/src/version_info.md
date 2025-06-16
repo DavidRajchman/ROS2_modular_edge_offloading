@@ -1,6 +1,9 @@
  # **TODO fixes and modifications** 
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
 
+# 0.17.0
+- switched to cpplogging library with extremely low latency to diagnose latency spikes in modgw operations
+
 # 0.16.0
  - latency optimisation by prealocating msg header buffer  
 

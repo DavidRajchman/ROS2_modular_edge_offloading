@@ -64,6 +64,11 @@ add_library(gateway_transport_lib
   src/transport/tcp_client_transport.cpp
   src/transport/tcp_server_transport.cpp
 )
+target_include_directories(gateway_transport_lib PUBLIC
+    $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
+    $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 ament_target_dependencies(gateway_transport_lib rclcpp)
 
 # ROS Gateway library
