@@ -76,6 +76,14 @@ RUN git clone https://github.com/fmtlib/fmt.git fmt && \
     make install
 # fmt is now installed to /usr/local
 
+# --- Clone and Build moodycamel::readerwriterqueue ---
+RUN git clone https://github.com/cameron314/readerwriterqueue.git readerwriterqueue && \
+    cd readerwriterqueue && \
+    mkdir -p build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
+
 COPY ./src/ros_ws/src /home/ubuntu/ros_ws/src/
 
 

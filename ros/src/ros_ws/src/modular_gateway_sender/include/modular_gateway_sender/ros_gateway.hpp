@@ -55,7 +55,6 @@ private:
   
   std::thread receiver_thread_;
   bool receiver_running_ = false;
-  std::mutex transport_access_mutex_;
   
   std::vector<uint8_t> header_buffer_;
 

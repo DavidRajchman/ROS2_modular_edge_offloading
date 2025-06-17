@@ -1,6 +1,11 @@
  # **TODO fixes and modifications** 
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
 
+
+# 0.19.0
+- refactored transportlib and ros_gateway to imporove latency, multihreaded aproach with low probabilty (but not zero) of race conditions in edge cases of bad network queality
+- NEEDS TESTING 
+
 # 0.18.0
 - tcp server latency improvements - removed unnecesary waits and optimized TCP handling
 

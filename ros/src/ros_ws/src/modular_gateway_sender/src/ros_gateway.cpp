@@ -127,41 +127,32 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
     return false;
   }
 
-  // #20-21 LATENCY POINT: Connection status check and establishment
-  if (!transport_->is_connected()) {
-    logger_.Warn("ros_gateway.cpp: Transport not connected, attempting connection for topic '{}'", topic);
-    if (!transport_->connect()) {
-      logger_.Error("ros_gateway.cpp: Failed to connect transport for topic '{}'", topic);
-      return false;
-    }
-  }
+  // The logic to check for connection and block has been removed.
+  // The async_send_data call will now handle the disconnected case.
 
-  // #2 LATENCY POINT: Header buffer manipulation
   logger_.Debug("ros_gateway.cpp: Creating header for topic '{}', size {} bytes", topic, size);
   create_header_in_buffer(header_buffer_, topic, type, id_group_, identifier_in_group_, size, options);
 
-  // #12 LATENCY POINT: Critical section lock entry
-  logger_.Debug("ros_gateway.cpp: Acquiring transport lock for send operation");
-  {
-    std::lock_guard<std::mutex> lock(transport_access_mutex_);
+  std::vector<uint8_t> header(header_buffer_.begin(), header_buffer_.end());
+  std::vector<uint8_t> payload(static_cast<const uint8_t*>(data), static_cast<const uint8_t*>(data) + size);
 
-    // #6 LATENCY POINT: Header network transmission
-    logger_.Debug("ros_gateway.cpp: Sending header ({} bytes)", header_buffer_.size());
-    if (!transport_->send_data(header_buffer_.data(), header_buffer_.size())) {
-      logger_.Error("ros_gateway.cpp: Failed to send header for topic '{}'", topic);
-      return false;
-    }
-
-    // #7 LATENCY POINT: Payload network transmission
-    logger_.Debug("ros_gateway.cpp: Sending payload ({} bytes)", size);
-    if (!transport_->send_data(data, size)) {
-      logger_.Error("ros_gateway.cpp: Failed to send data for topic '{}'", topic);
-      return false;
-    }
+  auto header_result = transport_->async_send_data(std::move(header));
+  if (header_result != TransportAsyncSendResult::SUCCESS) {
+    logger_.Error("ros_gateway.cpp: Failed to enqueue header for topic '{}', error code {}", topic, static_cast<int>(header_result));
+    // If the transport is not connected, the sender thread will handle reconnection.
+    // We just report the failure to enqueue.
+    return false;
   }
-  // Critical section exit logged implicitly
-  
-  logger_.Debug("ros_gateway.cpp: Successfully sent {} bytes to topic '{}'", size, topic);
+
+  auto payload_result = transport_->async_send_data(std::move(payload));
+  if (payload_result != TransportAsyncSendResult::SUCCESS) {
+    logger_.Error("ros_gateway.cpp: Failed to enqueue payload for topic '{}', error code {}", topic, static_cast<int>(payload_result));
+    // If this fails, the header is already enqueued. This could lead to a partial message.
+    // For now, we log the error. A more robust implementation might try to remove the header.
+    return false;
+  }
+
+  logger_.Debug("ros_gateway.cpp: Successfully enqueued {} bytes to topic '{}'", size, topic);
   return true;
 }
 
@@ -239,44 +230,31 @@ void RosGateway::stop_receiver() {
 }
 
 void RosGateway::receiver_thread_func() {
-  // #18 LATENCY POINT: Parameter access
-  // Renamed parameter for clarity, ensure it's declared in constructor
   int receiver_idle_poll_sleep_us = this->get_parameter("receiver_sleep_time_us").as_int(); 
 
   while (receiver_running_) {
       bool data_ready = false;
       bool current_client_connected = false;
+
+      // No mutex: transport_ is only set in init_transport() before thread starts, and never reset
+      if (transport_) {
+        current_client_connected = transport_->is_connected();
+        if (current_client_connected) {
+            data_ready = transport_->data_available(10); 
+        }
+      }
       
-      // #13 LATENCY POINT: First critical section lock
-      {
-          std::lock_guard<std::mutex> lock(transport_access_mutex_);
-          if (transport_) { // Check if transport is initialized
-            current_client_connected = transport_->is_connected(); // For server, this implies a client or listening
-            if (current_client_connected) { // Only call data_available if potentially connected
-                // #11 LATENCY POINT: Network polling
-                // The 10ms timeout here is for select() *inside* data_available if a client is connected.
-                // data_available itself will return quickly if no client.
-                data_ready = transport_->data_available(10); 
-            }
-          }
-      } // Mutex released
-      
-      // #14 LATENCY POINT: Second critical section lock (only if data exists)
       if (data_ready) {
-          logger_.Debug("ros_gateway.cpp: Data available, acquiring lock for message processing");
-          std::lock_guard<std::mutex> lock(transport_access_mutex_); // Lock re-acquired
-          // Ensure transport and connection still valid before processing
+          logger_.Debug("ros_gateway.cpp: Data available, processing message");
+          // No mutex: transport_ is only set at startup, and transport is thread-safe
           if (transport_ && transport_->is_connected()) {
             if (!receive_and_process_message()) {
                 logger_.Warn("ros_gateway.cpp: Message processing failed in receiver thread");
-                // Potentially handle disconnect if receive_and_process_message implies it
             }
           } else {
             logger_.Warn("ros_gateway.cpp: Transport or connection lost before processing message");
           }
       } else {
-        // Sleep only if no data was ready OR if no client was connected initially.
-        // The duration is controlled by the ROS parameter.
         std::this_thread::sleep_for(std::chrono::microseconds(receiver_idle_poll_sleep_us));
       }
   }

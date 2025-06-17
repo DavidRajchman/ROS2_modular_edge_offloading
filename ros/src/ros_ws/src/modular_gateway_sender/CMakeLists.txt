@@ -7,12 +7,12 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
 endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=16)
+add_definitions(-DVERSION_MINOR=18)
 add_definitions(-DVERSION_PATCH=0)
 
 # --- Compile-Time Log Level Control ---
@@ -28,6 +28,7 @@ find_package(Threads REQUIRED) # Ensure Threads is found
 
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
+set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue") # Add this line
 
 # Find CppCommon library
 find_library(CPPCOMMON_LIBRARY
@@ -46,7 +47,11 @@ find_library(CPPLOGGING_LIBRARY
 message(STATUS "Found CppLogging library: ${CPPLOGGING_LIBRARY}")
 
 # --- Include Directories ---
-include_directories(include)
+include_directories(
+  include
+  ${MOODYCAMEL_DIR} # Add this line
+)
+
 
 # --- Library Definitions ---
 # Add handlers here
@@ -67,6 +72,8 @@ add_library(gateway_transport_lib
 target_include_directories(gateway_transport_lib PUBLIC
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
+    $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
+
     $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(gateway_transport_lib rclcpp)
@@ -76,6 +83,8 @@ add_library(ros_gateway_lib src/ros_gateway.cpp)
 target_include_directories(ros_gateway_lib PUBLIC
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
+    $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
+
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ros_gateway_lib gateway_transport_lib) # Changed from PUBLIC

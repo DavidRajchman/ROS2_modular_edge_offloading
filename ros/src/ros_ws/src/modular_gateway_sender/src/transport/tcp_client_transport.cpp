@@ -1,8 +1,8 @@
 #include "modular_gateway_sender/logging_utils.hpp"
-
-#include "modular_gateway_sender/ros_gateway.hpp"
+#include "modular_gateway_sender/transport_base.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -19,118 +19,153 @@ TcpClientTransport::TcpClientTransport(const std::string& host, int port, int ma
     server_port_(port), 
     max_retries_(max_retries), 
     socket_fd_(-1), 
-    connected_(false)
+    connected_(false),
+    connection_timestamp_(0),
+    is_reconnecting_(false),
+    outgoing_queue_(1024), // SPSC queue size
+    sender_thread_running_(true)
 {
+    sender_thread_ = std::thread(&TcpClientTransport::sender_thread_func, this);
 }
 
 TcpClientTransport::~TcpClientTransport()
 {
-  disconnect();
+    sender_thread_running_ = false;
+    if (sender_thread_.joinable()) sender_thread_.join();
+    disconnect();
+}
+
+bool TcpClientTransport::perform_connect_logic() {
+    bool expected_reconnecting = false;
+    if (!is_reconnecting_.compare_exchange_strong(expected_reconnecting, true)) {
+        LOG_WARN(logger_, "Connection attempt already in progress.");
+        return is_connected();
+    }
+
+    if (socket_fd_ >= 0) {
+        close(socket_fd_);
+        socket_fd_ = -1;
+    }
+    connected_ = false;
+
+    try {
+        int new_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (new_socket_fd < 0) {
+            throw std::runtime_error(std::string("Failed to create socket: ") + strerror(errno));
+        }
+
+        int opt = 1;
+        setsockopt(new_socket_fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+        setsockopt(new_socket_fd, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
+
+        struct sockaddr_in server_addr;
+        memset(&server_addr, 0, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(server_port_);
+        if (inet_pton(AF_INET, server_host_.c_str(), &server_addr.sin_addr) <= 0) {
+            throw std::runtime_error(std::string("Invalid address: ") + server_host_);
+        }
+
+        if (::connect(new_socket_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            throw std::runtime_error(std::string("Connection failed: ") + strerror(errno));
+        }
+
+        int flags = fcntl(new_socket_fd, F_GETFL, 0);
+        if (flags != -1) {
+            fcntl(new_socket_fd, F_SETFL, flags | O_NONBLOCK);
+        }
+
+        socket_fd_ = new_socket_fd;
+        connected_ = true;
+        connection_timestamp_++;
+        LOG_INFO(logger_, "Successfully connected to %s:%d", server_host_.c_str(), server_port_);
+        is_reconnecting_ = false;
+        return true;
+    } catch (const std::exception& ex) {
+        if (socket_fd_ >= 0) {
+            close(socket_fd_);
+            socket_fd_ = -1;
+        }
+        connected_ = false;
+        LOG_ERROR(logger_, "Connection to %s:%d failed: %s", server_host_.c_str(), server_port_, ex.what());
+        is_reconnecting_ = false;
+        return false;
+    }
 }
 
 bool TcpClientTransport::connect()
 {
-  // Close existing connection if any
-  if (socket_fd_ >= 0) {
-    close(socket_fd_);
-    socket_fd_ = -1;
-    connected_ = false;
-  }
-  
-  try {
-    // Create socket
-    socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_fd_ < 0) {
-      throw std::runtime_error(std::string("Failed to create socket: ") + strerror(errno));
-    }
-    
-    // Set up server address
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(server_port_);
-    
-    if (inet_pton(AF_INET, server_host_.c_str(), &server_addr.sin_addr) <= 0) {
-      throw std::runtime_error(std::string("Invalid address: ") + strerror(errno));
-    }
-    
-    // Connect to server
-    if (::connect(socket_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-      throw std::runtime_error(std::string("Connection failed: ") + strerror(errno));
-    }
-    
-    connected_ = true;
-    return true;
-  }
-  catch (const std::exception& ex) {
-    if (socket_fd_ >= 0) {
-      close(socket_fd_);
-      socket_fd_ = -1;
-    }
-    connected_ = false;
-    return false;
-  }
+    return perform_connect_logic();
 }
 
 void TcpClientTransport::disconnect()
 {
-  if (socket_fd_ >= 0) {
-    close(socket_fd_);
-    socket_fd_ = -1;
     connected_ = false;
-  }
+    if (socket_fd_ >= 0) {
+        close(socket_fd_);
+        socket_fd_ = -1;
+        LOG_INFO(logger_, "Disconnected from server.");
+    }
 }
 
-bool TcpClientTransport::send_data(const void* data, size_t size)
+TransportAsyncSendResult TcpClientTransport::async_send_data(std::vector<uint8_t>&& data)
 {
-  if (!connected_ || socket_fd_ < 0) {
-    return false;
-  }
-  
-  const uint8_t* buffer = static_cast<const uint8_t*>(data);
-  size_t remaining = size;
-  size_t offset = 0;
-  
-  // Retry logic
-  for (int retry = 0; retry <= max_retries_; ++retry) {
-    try {
-      if (retry > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      }
-      
-      while (remaining > 0) {
-        ssize_t bytes_sent = ::send(socket_fd_, buffer + offset, remaining, 0);
-        if (bytes_sent < 0) {
-          if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    if (!is_connected()) return TransportAsyncSendResult::NOT_CONNECTED;
+    if (!outgoing_queue_.try_enqueue(std::move(data))) {
+        return TransportAsyncSendResult::QUEUE_FULL;
+    }
+    return TransportAsyncSendResult::SUCCESS;
+}
+
+void TcpClientTransport::sender_thread_func()
+{
+    while (sender_thread_running_) {
+        if (!is_connected()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
-          } else {
-            throw std::runtime_error(std::string("Send failed: ") + strerror(errno));
-          }
-        } else if (bytes_sent == 0) {
-          throw std::runtime_error("Connection closed by peer");
         }
-        
-        offset += bytes_sent;
-        remaining -= bytes_sent;
-      }
-      
-      return true;
+
+        std::vector<uint8_t> data;
+        if (!outgoing_queue_.try_dequeue(data)) {
+            std::this_thread::sleep_for(std::chrono::microseconds(50));
+            continue;
+        }
+
+        int fd = socket_fd_.load();
+        uint64_t timestamp_before_send = connection_timestamp_.load();
+        size_t offset = 0;
+        bool send_error = false;
+
+        while (offset < data.size()) {
+            ssize_t sent = ::send(fd, data.data() + offset, data.size() - offset, MSG_NOSIGNAL);
+            if (sent < 0) {
+                if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                    LOG_ERROR(logger_, "Send failed: %s", strerror(errno));
+                    handle_disconnect_detected();
+                    send_error = true;
+                }
+                break;
+            }
+            offset += sent;
+        }
+
+        if (!send_error && timestamp_before_send != connection_timestamp_.load()) {
+            LOG_ERROR(logger_, "CRITICAL FAULT: Data sent successfully, but connection instance changed. Data delivery uncertain.");
+        }
     }
-    catch (const std::exception&) {
-      if (retry == max_retries_) {
-        connected_ = false;
-        return false;
-      }
+}
+
+void TcpClientTransport::handle_disconnect_detected()
+{
+    if (is_connected()) {
+        LOG_WARN(logger_, "Disconnect detected.");
+        disconnect();
     }
-  }
-  
-  return false;
 }
 
 bool TcpClientTransport::is_connected() const
 {
-  return connected_ && socket_fd_ >= 0;
+    return connected_.load();
 }
 
 bool TcpClientTransport::data_available(int timeout_ms) {
@@ -140,16 +175,18 @@ bool TcpClientTransport::data_available(int timeout_ms) {
     struct timeval tv;
     
     FD_ZERO(&readfds);
-    FD_SET(socket_fd_, &readfds);
+    int fd = socket_fd_.load();
+    if (fd < 0) return false;
+    FD_SET(fd, &readfds);
     
     tv.tv_sec = timeout_ms / 1000;
     tv.tv_usec = (timeout_ms % 1000) * 1000;
     
-    int result = select(socket_fd_ + 1, &readfds, NULL, NULL, 
-                       timeout_ms > 0 ? &tv : NULL);
+    int result = select(fd + 1, &readfds, NULL, NULL, timeout_ms >= 0 ? &tv : NULL);
     
     if (result < 0) {
         LOG_ERROR(logger_, "Select error: %s", strerror(errno));
+        if (errno == EBADF) handle_disconnect_detected();
         return false;
     }
     
@@ -159,17 +196,21 @@ bool TcpClientTransport::data_available(int timeout_ms) {
 int TcpClientTransport::receive_data(void* buffer, size_t size) {
     if (!is_connected()) return -1;
     
-    ssize_t bytes_received = recv(socket_fd_, buffer, size, 0);
+    int fd = socket_fd_.load();
+    if (fd < 0) return -1;
+    ssize_t bytes_received = recv(fd, buffer, size, 0);
     
     if (bytes_received < 0) {
-        LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+            LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+            handle_disconnect_detected();
+        }
         return -1;
     }
     
-    // Connection closed by peer
     if (bytes_received == 0) {
         LOG_WARN(logger_, "Connection closed by peer");
-        disconnect();
+        handle_disconnect_detected();
         return -1;
     }
     
@@ -181,21 +222,25 @@ bool TcpClientTransport::receive_exact(void* buffer, size_t size) {
     
     size_t total_received = 0;
     char* buf_ptr = static_cast<char*>(buffer);
+    int fd = socket_fd_.load();
+    if (fd < 0) return false;
     
     while (total_received < size) {
-        ssize_t bytes_received = recv(socket_fd_, 
-                                     buf_ptr + total_received, 
-                                     size - total_received, 0);
+        ssize_t bytes_received = recv(fd, buf_ptr + total_received, size - total_received, 0);
         
         if (bytes_received < 0) {
-            LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
-            return false;
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                LOG_ERROR(logger_, "Receive error in receive_exact: %s", strerror(errno));
+                handle_disconnect_detected();
+                return false;
+            }
+            std::this_thread::sleep_for(std::chrono::microseconds(50));
+            continue;
         }
         
-        // Connection closed by peer
         if (bytes_received == 0) {
-            LOG_WARN(logger_, "Connection closed by peer during receive");
-            disconnect();
+            LOG_WARN(logger_, "Connection closed by peer during receive_exact");
+            handle_disconnect_detected();
             return false;
         }
         
