@@ -2,6 +2,7 @@
 #include "modular_gateway_sender/transport_base.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h> // Added for TCP_NODELAY
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -143,9 +144,10 @@ bool TcpServerTransport::accept_connection()
   // If already connected to a client, check if the connection is still alive
   if (client_connected_ && client_socket_fd_ >= 0) {
     // Simple connection check - send 0 bytes
-    if (send(client_socket_fd_, nullptr, 0, MSG_NOSIGNAL) < 0) {
-      if (errno == EPIPE || errno == ECONNRESET) {
-        LOG_WARN(logger_, "Client disconnected: %s", strerror(errno));
+    // MSG_NOSIGNAL prevents SIGPIPE if client disconnected abruptly
+    if (::send(client_socket_fd_, nullptr, 0, MSG_NOSIGNAL) < 0) {
+      if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN || errno == EBADF) {
+        LOG_WARN(logger_, "Client disconnected (checked via send): %s", strerror(errno));
         close(client_socket_fd_);
         client_socket_fd_ = -1;
         client_connected_ = false;
@@ -180,11 +182,19 @@ bool TcpServerTransport::accept_connection()
     LOG_WARN(logger_, "Failed to set client keepalive: %s", strerror(errno));
     // Not critical, can continue
   }
+
+  // Set TCP_NODELAY for the client socket
+  if (setsockopt(client_socket_fd_, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0) {
+    LOG_WARN(logger_, "Failed to set TCP_NODELAY on client socket: %s", strerror(errno));
+    // Not critical, can continue
+  }
   
   // Make the client socket non-blocking for better performance
   int flags = fcntl(client_socket_fd_, F_GETFL, 0);
   if (flags != -1) {
     fcntl(client_socket_fd_, F_SETFL, flags | O_NONBLOCK);
+  } else {
+    LOG_WARN(logger_, "Failed to get client socket flags for O_NONBLOCK: %s", strerror(errno));
   }
   
   // Get the client's IP address as string
@@ -195,82 +205,104 @@ bool TcpServerTransport::accept_connection()
   return true;
 }
 
+// Helper function to wait for socket readiness
+inline int wait_for_fd(int fd, bool check_read, bool check_write, long timeout_us) {
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    struct timeval tv;
+    tv.tv_sec = timeout_us / 1000000;
+    tv.tv_usec = timeout_us % 1000000;
+
+    fd_set* read_fds = check_read ? &fds : nullptr;
+    fd_set* write_fds = check_write ? &fds : nullptr;
+    
+    return select(fd + 1, read_fds, write_fds, nullptr, &tv);
+}
+
+
+
 bool TcpServerTransport::send_data(const void* data, size_t size)
 {
-  // Try to accept connection multiple times before giving up
-  const int max_accept_attempts = 5;
-  for (int attempt = 0; attempt < max_accept_attempts; attempt++) {
-    // Try to accept any pending connections
+  // Try to accept connection a few times with yields if no client
+  const int max_initial_accept_attempts = 5; // Reduced attempts
+  for (int attempt = 0; attempt < max_initial_accept_attempts; attempt++) {
     accept_connection();
     
-    // If we have a client, proceed with sending
     if (client_connected_ && client_socket_fd_ >= 0) {
       break;
     }
     
-    // No client yet, wait a bit before trying again
-    if (attempt < max_accept_attempts - 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      LOG_DEBUG(logger_, "No client connected, waiting before retry %d/%d", 
-               attempt + 1, max_accept_attempts);
+    if (attempt < max_initial_accept_attempts - 1) {
+      // Yield to allow other threads (like receiver trying to accept) to run
+      std::this_thread::yield(); 
+      LOG_DEBUG(logger_, "No client connected for send, yielding before retry %d/%d", 
+               attempt + 1, max_initial_accept_attempts);
     }
   }
   
-  // If still no client after attempts, fail
   if (!client_connected_ || client_socket_fd_ < 0) {
-    LOG_WARN(logger_, "No client connected, cannot send data");
+    LOG_WARN(logger_, "No client connected after initial attempts, cannot send data");
     return false;
   }
   
-  // Send logic with timeout
   const uint8_t* buffer = static_cast<const uint8_t*>(data);
   size_t remaining = size;
   size_t offset = 0;
   
-  // Use a timeout to avoid hanging indefinitely
-  const int max_send_attempts = 50; // ~500ms max wait
+  const int max_send_attempts = 100; // Increased attempts due to shorter waits
   int send_attempts = 0;
+  const long select_timeout_us = 50; // 50 microseconds for select
   
   while (remaining > 0 && send_attempts < max_send_attempts) {
     ssize_t bytes_sent = ::send(client_socket_fd_, buffer + offset, remaining, MSG_NOSIGNAL);
     
     if (bytes_sent < 0) {
       if (errno == EWOULDBLOCK || errno == EAGAIN) {
-        // Socket buffer is full, wait a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        int select_res = wait_for_fd(client_socket_fd_, false, true, select_timeout_us);
+        if (select_res < 0) { // select error
+            LOG_ERROR(logger_, "select() error during send: %s", strerror(errno));
+            // Consider it a fatal error for this send operation
+            close(client_socket_fd_);
+            client_socket_fd_ = -1;
+            client_connected_ = false;
+            return false;
+        }
+        if (select_res == 0) { // timeout
+            std::this_thread::yield();
+        }
+        // if select_res > 0, socket is writable, loop will retry send
         send_attempts++;
         continue;
       } else if (errno == EPIPE || errno == ECONNRESET) {
-        // Client disconnected
         LOG_WARN(logger_, "Client disconnected during send: %s", strerror(errno));
         close(client_socket_fd_);
         client_socket_fd_ = -1;
         client_connected_ = false;
         return false;
       } else {
-        // Other error
         LOG_ERROR(logger_, "Send failed: %s", strerror(errno));
+        // For other errors, we might also consider the connection lost
         close(client_socket_fd_);
         client_socket_fd_ = -1;
         client_connected_ = false;
         return false;
       }
     } else if (bytes_sent == 0) {
-      // This shouldn't normally happen with non-blocking sockets
-      LOG_WARN(logger_, "Send returned 0 bytes, possible client disconnect");
+      LOG_WARN(logger_, "Send returned 0 bytes, possible client disconnect or invalid state");
+      // Treat as a condition to retry with select/yield
+      std::this_thread::yield();
       send_attempts++;
       continue;
     }
     
-    // Successful send, update counters
     offset += bytes_sent;
     remaining -= bytes_sent;
-    send_attempts = 0; // Reset attempts counter on progress
+    send_attempts = 0; 
   }
   
-  // Check if we timed out
   if (remaining > 0) {
-    LOG_ERROR(logger_, "Send timed out, %zu bytes remaining", remaining);
+    LOG_ERROR(logger_, "Send timed out after %d attempts, %zu bytes remaining", max_send_attempts, remaining);
     return false;
   }
   
@@ -279,42 +311,27 @@ bool TcpServerTransport::send_data(const void* data, size_t size)
 
 bool TcpServerTransport::data_available(int timeout_ms)
 {
-  // Try to accept a new connection first
-  accept_connection();
+  accept_connection(); // Check for new/lost connections
   
   if (!client_connected_ || client_socket_fd_ < 0) {
-    // When no client is connected, don't block in select for too long
-    // to give accept_connection() more frequent chances to run
-    if (timeout_ms > 100) timeout_ms = 100;
-    
-    // No client, check for connections after a short delay
-    std::this_thread::sleep_for(std::chrono::milliseconds(timeout_ms));
+    // No client connected, so no data available from a client.
+    // Removed sleep here; RosGateway's receiver_thread_func will handle polling sleep.
     return false;
   }
   
-  fd_set readfds;
-  struct timeval tv;
-  
-  FD_ZERO(&readfds);
-  FD_SET(client_socket_fd_, &readfds);
-  
-  tv.tv_sec = timeout_ms / 1000;
-  tv.tv_usec = (timeout_ms % 1000) * 1000;
-  
-  int result = select(client_socket_fd_ + 1, &readfds, NULL, NULL, 
-                     timeout_ms > 0 ? &tv : NULL);
+  // Use the helper, ensuring timeout_ms is converted to microseconds
+  long timeout_us = static_cast<long>(timeout_ms) * 1000;
+  if (timeout_us < 0) timeout_us = 0; // Ensure non-negative timeout for select
+
+  int result = wait_for_fd(client_socket_fd_, true, false, timeout_us);
   
   if (result < 0) {
     if (errno == EINTR) {
-      // Interrupted by signal, not an error
       return false;
     }
-    
-    LOG_ERROR(logger_, "Select error: %s", strerror(errno));
-    
-    // Check if client socket is still valid
+    LOG_ERROR(logger_, "Select error in data_available: %s", strerror(errno));
     if (errno == EBADF) {
-      LOG_WARN(logger_, "Client socket is no longer valid");
+      LOG_WARN(logger_, "Client socket is no longer valid in data_available");
       close(client_socket_fd_);
       client_socket_fd_ = -1;
       client_connected_ = false;
@@ -359,54 +376,66 @@ int TcpServerTransport::receive_data(void* buffer, size_t max_size)
 
 bool TcpServerTransport::receive_exact(void* buffer, size_t size)
 {
-  // Try to accept a new connection first
-  accept_connection();
+  // It's important that accept_connection() is efficient and doesn't block for long.
+  // The current implementation of accept_connection checks existing connection first.
+  accept_connection(); 
   
   if (!client_connected_ || client_socket_fd_ < 0) {
+    LOG_DEBUG(logger_, "receive_exact: No client connected.");
     return false;
   }
   
   size_t total_received = 0;
   char* buf_ptr = static_cast<char*>(buffer);
   
-  // Set a reasonable timeout for the entire read operation
-  const int max_recv_attempts = 50; // ~500ms max wait
+  const int max_recv_attempts = 100; // Increased attempts due to shorter waits
   int recv_attempts = 0;
-  
+  const long select_timeout_us = 50; // 50 microseconds for select
+
   while (total_received < size && recv_attempts < max_recv_attempts) {
     ssize_t bytes_received = recv(client_socket_fd_, 
                                  buf_ptr + total_received, 
-                                 size - total_received, 0);
+                                 size - total_received, 0); // MSG_DONTWAIT could also be used here
+                                                             // as socket is non-blocking, but 0 is fine.
     
     if (bytes_received < 0) {
       if (errno == EWOULDBLOCK || errno == EAGAIN) {
-        // No data available right now, wait and retry
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        int select_res = wait_for_fd(client_socket_fd_, true, false, select_timeout_us);
+        if (select_res < 0) { // select error
+            LOG_ERROR(logger_, "select() error during receive_exact: %s", strerror(errno));
+            // Consider it a fatal error for this receive operation
+            // No need to close socket here, error will propagate up
+            return false; 
+        }
+        if (select_res == 0) { // timeout
+            std::this_thread::yield();
+        }
+        // if select_res > 0, socket is readable, loop will retry recv
         recv_attempts++;
         continue;
       }
       
-      LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+      LOG_ERROR(logger_, "Receive error in receive_exact: %s", strerror(errno));
+      // For other errors, the connection might be compromised.
+      // Let higher level decide if disconnect is needed based on return false.
       return false;
     }
     
-    // Connection closed by client
     if (bytes_received == 0) {
-      LOG_WARN(logger_, "Connection closed by client during receive");
+      LOG_WARN(logger_, "Connection closed by client during receive_exact (received 0 bytes)");
       close(client_socket_fd_);
       client_socket_fd_ = -1;
       client_connected_ = false;
       return false;
     }
     
-    // Progress was made, reset attempts counter
     total_received += bytes_received;
-    recv_attempts = 0;
+    recv_attempts = 0; // Reset on progress
   }
   
-  // Check if we received all the data
   if (total_received < size) {
-    LOG_ERROR(logger_, "Receive timed out, got %zu of %zu bytes", total_received, size);
+    LOG_ERROR(logger_, "Receive_exact timed out after %d attempts, got %zu of %zu bytes", 
+              max_recv_attempts, total_received, size);
     return false;
   }
   

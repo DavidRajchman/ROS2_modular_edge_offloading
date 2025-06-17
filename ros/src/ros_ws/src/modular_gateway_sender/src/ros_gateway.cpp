@@ -7,7 +7,7 @@ void ConfigureLogger()
     auto sink = std::make_shared<CppLogging::AsyncWaitFreeProcessor>(
         std::make_shared<CppLogging::BinaryLayout>(),
         true,    // auto_start
-        8192,    // capacity (power of 2)
+        32768,    // capacity (power of 2)
         false    // don't discard - block if buffer full (prevents message loss)
     );
     
@@ -240,30 +240,44 @@ void RosGateway::stop_receiver() {
 
 void RosGateway::receiver_thread_func() {
   // #18 LATENCY POINT: Parameter access
-  int sleep_time_us = get_parameter("receiver_sleep_time_us").as_int();
+  // Renamed parameter for clarity, ensure it's declared in constructor
+  int receiver_idle_poll_sleep_us = this->get_parameter("receiver_sleep_time_us").as_int(); 
 
   while (receiver_running_) {
       bool data_ready = false;
+      bool current_client_connected = false;
       
       // #13 LATENCY POINT: First critical section lock
       {
           std::lock_guard<std::mutex> lock(transport_access_mutex_);
-          if (transport_ && transport_->is_connected()) {
-              // #11 LATENCY POINT: Network polling
-              data_ready = transport_->data_available(10);
+          if (transport_) { // Check if transport is initialized
+            current_client_connected = transport_->is_connected(); // For server, this implies a client or listening
+            if (current_client_connected) { // Only call data_available if potentially connected
+                // #11 LATENCY POINT: Network polling
+                // The 10ms timeout here is for select() *inside* data_available if a client is connected.
+                // data_available itself will return quickly if no client.
+                data_ready = transport_->data_available(10); 
+            }
           }
-      }
+      } // Mutex released
       
       // #14 LATENCY POINT: Second critical section lock (only if data exists)
       if (data_ready) {
           logger_.Debug("ros_gateway.cpp: Data available, acquiring lock for message processing");
-          std::lock_guard<std::mutex> lock(transport_access_mutex_);
-          if (!receive_and_process_message()) {
-              logger_.Warn("ros_gateway.cpp: Message processing failed in receiver thread");
+          std::lock_guard<std::mutex> lock(transport_access_mutex_); // Lock re-acquired
+          // Ensure transport and connection still valid before processing
+          if (transport_ && transport_->is_connected()) {
+            if (!receive_and_process_message()) {
+                logger_.Warn("ros_gateway.cpp: Message processing failed in receiver thread");
+                // Potentially handle disconnect if receive_and_process_message implies it
+            }
+          } else {
+            logger_.Warn("ros_gateway.cpp: Transport or connection lost before processing message");
           }
       } else {
-        // #23 LATENCY POINT: Thread sleep
-        std::this_thread::sleep_for(std::chrono::microseconds(sleep_time_us));
+        // Sleep only if no data was ready OR if no client was connected initially.
+        // The duration is controlled by the ROS parameter.
+        std::this_thread::sleep_for(std::chrono::microseconds(receiver_idle_poll_sleep_us));
       }
   }
 }
