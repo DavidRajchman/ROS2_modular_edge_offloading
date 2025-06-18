@@ -234,27 +234,27 @@ void RosGateway::receiver_thread_func() {
 
   while (receiver_running_) {
       bool data_ready = false;
-      bool current_client_connected = false;
-
-      // No mutex: transport_ is only set in init_transport() before thread starts, and never reset
+      
       if (transport_) {
-        current_client_connected = transport_->is_connected();
-        if (current_client_connected) {
-            data_ready = transport_->data_available(10); 
-        }
+          // For both client and server, data_available() is the main polling mechanism.
+          // For the server, it also handles accepting new connections.
+          // So we call it regardless of the current connection state.
+          data_ready = transport_->data_available(10);
       }
       
       if (data_ready) {
           logger_.Debug("ros_gateway.cpp: Data available, processing message");
-          // No mutex: transport_ is only set at startup, and transport is thread-safe
           if (transport_ && transport_->is_connected()) {
             if (!receive_and_process_message()) {
                 logger_.Warn("ros_gateway.cpp: Message processing failed in receiver thread");
             }
           } else {
-            logger_.Warn("ros_gateway.cpp: Transport or connection lost before processing message");
+            // This case might be hit if data was available but the client disconnected
+            // between data_available() and is_connected(). This is not an error.
+            logger_.Debug("ros_gateway.cpp: Data was available, but transport is now disconnected.");
           }
       } else {
+        // No data and no new connection, sleep for a bit.
         std::this_thread::sleep_for(std::chrono::microseconds(receiver_idle_poll_sleep_us));
       }
   }
