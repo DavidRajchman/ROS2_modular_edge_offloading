@@ -49,6 +49,8 @@ private:
 
   uint8_t id_group_;
   uint8_t identifier_in_group_;
+
+  std::map<std::string, std::shared_ptr<MessageHandlerBase>> handlers_;
   
   std::unique_ptr<TransportBase> transport_;
   std::vector<uint8_t> header_buffer_;
@@ -58,8 +60,6 @@ private:
   std::thread receiver_thread_;
   std::atomic<bool> receiver_running_{false};
   
-  std::vector<uint8_t> header_buffer_;
-
   CppLogging::Logger logger_;
   
   void init_transport();
