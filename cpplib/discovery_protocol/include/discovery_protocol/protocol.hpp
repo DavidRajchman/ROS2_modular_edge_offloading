@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
 
 namespace discovery_protocol {
 
@@ -20,120 +21,105 @@ enum class ProtocolStatus {
     INCOMPLETE_MESSAGE
 };
 
-// Component types
 enum class ComponentType {
-    VEHICLE,        // "V"
-    MEC,            // "M"
-    BRIDGE,         // "B"
-    OFFLOAD_MANAGER, // "O"
-    TEST            // "T"
+    VEHICLE,
+    MEC,
+    BRIDGE,
+    OFFLOAD_MANAGER,
+    TEST
 };
 
-// ID request types
 enum class IdRequestType {
-    AUTOMATIC,      // "A"
-    STATIC          // "S"
+    AUTOMATIC,
+    STATIC
 };
 
-// Response codes
 enum class ResponseCode {
-    SUCCESS,        // "0"
-    WAIT,           // "W"
-    ID_CONFLICT,    // "C"
-    INVALID_REQUEST, // "I"
-    GENERAL_ERROR   // "E"
+    SUCCESS,
+    WAIT,
+    ID_CONFLICT,
+    INVALID_REQUEST,
+    GENERAL_ERROR
 };
 
-// Message types
 enum class MessageType {
-    REGISTRATION_REQUEST,   // "REG"
-    REGISTRATION_RESPONSE,  // "ACK"
-    ERROR,                  // "ERR"
-    KEEPALIVE_PING,         // "PNG"
-    KEEPALIVE_RESPONSE      // "PON"
+    REGISTRATION_REQUEST,
+    REGISTRATION_RESPONSE,
+    ERROR,
+    KEEPALIVE_PING,
+    KEEPALIVE_RESPONSE
 };
 
-// Error codes
 enum class ErrorCode {
-    CONFIGURATION,  // "C"
-    NETWORK,        // "N"
-    INTERNAL,       // "I"
-    PROTOCOL        // "P"
+    CONFIGURATION,
+    NETWORK,
+    INTERNAL,
+    PROTOCOL
 };
 
-// Registration request message
 struct RegistrationRequest {
     ComponentType componentType;
     IdRequestType idRequestType;
-    uint8_t groupId;            // Only used when idRequestType is STATIC
-    uint8_t idInGroup;          // Only used when idRequestType is STATIC
+    uint8_t groupId;
+    uint8_t idInGroup;
     std::string componentName;
     std::string listenAddress;
     std::string listenPort;
     std::string humanReadableMessage;
 };
 
-// Registration response message
 struct RegistrationResponse {
     ResponseCode responseCode;
     uint8_t assignedGroupId;
     uint8_t assignedIdInGroup;
-    std::string connectionTargetType;     // Empty if no target
-    std::string connectionTargetAddress;  // Empty if no target
-    std::string connectionTargetPort;     // Empty if no target
-    uint16_t connectionTargetId;          // 0 if no target
+    std::string connectionTargetType;
+    std::string connectionTargetAddress;
+    std::string connectionTargetPort;
+    uint16_t connectionTargetId;
     std::string configJson;
     std::string humanReadableMessage;
 };
 
-// Keepalive ping message
 struct KeepalivePing {
-    std::string componentId;    // Format: "groupId.idInGroup" (e.g. "2.1")
-    std::string status;         // "OK" or "ERR"
+    std::string componentId;
+    std::string status;
     std::string humanReadableMessage;
 };
 
-// Keepalive response message
 struct KeepaliveResponse {
-    std::string response;       // "OK", "UPD" (update needed), or "DIS" (disconnect)
-    int nextIntervalMs;        // Next ping interval in milliseconds
+    std::string response;
+    int nextIntervalMs;
     std::string humanReadableMessage;
 };
 
-// Error message
 struct ErrorMessage {
     ErrorCode errorCode;
     std::string humanReadableMessage;
 };
 
-// Message base class to hold any message type
+using MessageVariant = std::variant<
+    RegistrationRequest,
+    RegistrationResponse,
+    ErrorMessage,
+    KeepalivePing,
+    KeepaliveResponse
+>;
+
 struct Message {
     MessageType type;
-    
-    union {
-        RegistrationRequest registrationRequest;
-        RegistrationResponse registrationResponse;
-        KeepalivePing keepalivePing;
-        KeepaliveResponse keepaliveResponse;
-        ErrorMessage errorMessage;
-    };
-    
-    // Constructors for union initialization
-    Message() : type(MessageType::ERROR) {}
-    explicit Message(const RegistrationRequest& req) : type(MessageType::REGISTRATION_REQUEST), registrationRequest(req) {}
-    explicit Message(const RegistrationResponse& res) : type(MessageType::REGISTRATION_RESPONSE), registrationResponse(res) {}
-    explicit Message(const KeepalivePing& ping) : type(MessageType::KEEPALIVE_PING), keepalivePing(ping) {}
-    explicit Message(const KeepaliveResponse& pong) : type(MessageType::KEEPALIVE_RESPONSE), keepaliveResponse(pong) {}
-    explicit Message(const ErrorMessage& err) : type(MessageType::ERROR), errorMessage(err) {}
+    MessageVariant data;
+
+    Message() : type(MessageType::ERROR), data(ErrorMessage{}) {}
+    explicit Message(const RegistrationRequest& req) : type(MessageType::REGISTRATION_REQUEST), data(req) {}
+    explicit Message(const RegistrationResponse& res) : type(MessageType::REGISTRATION_RESPONSE), data(res) {}
+    explicit Message(const KeepalivePing& ping) : type(MessageType::KEEPALIVE_PING), data(ping) {}
+    explicit Message(const KeepaliveResponse& pong) : type(MessageType::KEEPALIVE_RESPONSE), data(pong) {}
+    explicit Message(const ErrorMessage& err) : type(MessageType::ERROR), data(err) {}
 };
 
-// Encode a message to string
 ProtocolStatus encode_message(const Message& message, std::string& output);
-
-// Decode a string to a message
 ProtocolStatus decode_message(const std::string& input, Message& output);
 
-// Helper functions for specific message types
 ProtocolStatus encode_registration_request(const RegistrationRequest& request, std::string& output);
 ProtocolStatus decode_registration_request(const std::string& input, RegistrationRequest& output);
 
@@ -149,7 +135,6 @@ ProtocolStatus decode_keepalive_response(const std::string& input, KeepaliveResp
 ProtocolStatus encode_error_message(const ErrorMessage& error, std::string& output);
 ProtocolStatus decode_error_message(const std::string& input, ErrorMessage& output);
 
-// Helper functions
 const char* protocol_status_to_string(ProtocolStatus status);
 std::string component_type_to_string(ComponentType type);
 ComponentType string_to_component_type(const std::string& str);
@@ -158,7 +143,6 @@ ResponseCode string_to_response_code(const std::string& str);
 std::string error_code_to_string(ErrorCode code);
 ErrorCode string_to_error_code(const std::string& str);
 
-// Split a string by delimiter
 std::vector<std::string> split_string(const std::string& str, char delimiter);
 
 } // namespace discovery_protocol

@@ -60,6 +60,8 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./bridge:/home/ubuntu/bridge
+      - ./DiscoveryService:/home/ubuntu/DiscoveryService
+      
       - ./cpplib:/home/ubuntu/cpplib_src
 
     working_dir: /home/ubuntu/bridge

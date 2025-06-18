@@ -180,10 +180,12 @@ This revised document aims to provide a comprehensive understanding of the Bridg
 The DiscoveryService acts as the central discovery and configuration point for the entire distributed system. It is the only component with a static/known IP address, making it the entry point for all components joining the network. It serves as a comprehensive service discovery and configuration distribution system.
 
 ### 7.2 Core Responsibilities
+### 7.2 Core Responsibilities
 * **Component Registration:** Accept registration requests from all components (VHCs, MECs, Bridges, OM)
 * **ID Management:** Assign or validate 16-bit IDs (8-bit group ID + 8-bit instance ID)
 * **Connection Coordination:** Direct components where to connect (e.g., tell VHCs which Bridge to use)
-* **Configuration Distribution:** Distribute JSON configuration to components
+* **Configuration Distribution:** Receive a global configuration string from the Offloading Manager upon its registration and distribute it to all other components as they connect.
+> **Note:** The Offloading Manager must provide the global configuration string in the `humanReadableMessage` field of its registration request. There is no dedicated configuration field in the registration request; only the response message includes a `configJson` field.
 * **Health Monitoring:** Track component liveness via simple ping/response mechanism
 * **Topology Management:** Maintain current network topology and update the OM
 
@@ -201,17 +203,18 @@ The DiscoveryService maintains an in-memory registry of all active components wi
   * First 8 bits represent the group type ID
   * Second 8 bits represent the in-group ID
 * **ID Assignment:**
-  * Components may request static (pre-configured) IDs
+  * Components may request validation of static (pre-configured) IDs provided by the components.
   * DiscoveryService validates static IDs don't conflict with existing components
   * For components without static IDs, DiscoveryService assigns the next available ID in the appropriate group
   * A group will either have all manual IDs or all automatic IDs, never mixed
 
 ### 7.5 Component Connection Flow
-1. Component connects to DiscoveryService using its known fixed address
-2. Component sends registration with its type and optional static ID
-3. DiscoveryService validates/assigns ID and records component details
-4. DiscoveryService responds with success/failure, configuration, and connection target
-5. Periodic keepalive messages maintain registration status
+1. Component connects to DiscoveryService using its known fixed address.
+2. Component sends a registration request. The service first checks if the Offloading Manager has already registered and provided the global configuration.
+3. If the global configuration is not yet available (and the connecting component is not the OM), the service responds with a "wait" message. The component is expected to retry. If the configuration is present, the service proceeds.
+4. DiscoveryService validates/assigns an ID and records the component's details.
+5. DiscoveryService responds with a success message, which includes the global configuration and any necessary connection targets (e.g., the Bridge's address).
+6. Periodic keepalive messages between the component and the service maintain the registration status.
 
 ### 7.6 Bridge Assignment
 * Currently uses round-robin assignment for distributing VHCs across multiple Bridges
@@ -222,7 +225,9 @@ The DiscoveryService maintains an in-memory registry of all active components wi
 * **Any device connects before OM:** Same as if Bridge is missing, but with a different error code.
 
 ### 7.8 Dependencies and Failure Modes
-* **Critical Dependency on OM:** If the Offloading Manager becomes unavailable, the DiscoveryService will halt operations and report an error
+* **Critical Dependency on OM during setup:** The Offloading Manager is the designated source for the system-wide global configuration. If the OM fails to connect and register, no other component can be configured, effectively halting the setup of any experiment. The service will place all other components in a "wait" state until the OM provides this configuration.
+
+* **Critical Dependency on OM during runtime:** If the Offloading Manager becomes unavailable, the DiscoveryService will halt operations and report an error
 * **No Data Persistence:** As a research system, there is no persistence between restarts; all state is maintained in-memory
 * **Error Handling:**
   * ID conflicts result in connection refusal with appropriate error code
@@ -236,6 +241,8 @@ The DiscoveryService maintains an in-memory registry of all active components wi
 * All components in the system use the same protocol for communication with the DiscoveryService
 
 ### 7.10 Protocol Specification
+> **Note:** The protocol library now uses `std::variant` in the `Message` struct for type safety and memory correctness. Access the contained message using `std::get<T>(message.data)` where `T` is the message type.
+> **Note:** The protocol C++ API uses `std::variant` for the `Message` struct. See the C++ header for details on usage.
 * **Message Format:** Fixed header followed by semicolon-delimited fields
   * All messages start with "DISC:" magic string
   * Message type follows (e.g., "REG", "ACK", "PNG", "PON", "ERR")
@@ -275,3 +282,10 @@ The DiscoveryService maintains an in-memory registry of all active components wi
   * Missing fields: Empty fields represented by consecutive semicolons
   * ID format: In requests/responses - Group ID and In-Group ID as separate fields; In keepalives - Combined as "Group.ID" format (e.g., "2.1")
 
+### 7.11. Current Limitations & Future Work
+
+The following features are required for full functionality but are not yet implemented in the current version:
+
+1.  **Automatic ID Assignment:**
+    *   **Problem:** The current implementation only supports clients that request a specific, static ID. The protocol specifies a mechanism for clients to request automatic ID assignment (`'A'` request type), but this logic is missing.
+    *   **Solution:** The `handleRegistration` logic needs to be extended. When a request with `IdRequestType::AUTOMATIC` is received, the service should call a new method in the `ComponentRegistry` to find the next available `id_in_group` for the component's `group_id` and assign it.
