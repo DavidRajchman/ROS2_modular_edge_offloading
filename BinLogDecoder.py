@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# filepath: /home/ubuntu/ros_ws/BinLogDecoder.py
 import struct
 import sys
 import datetime
@@ -12,37 +11,75 @@ DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/ros_ws/decoded_log.txt"
 # Define CppLogging Level enum mapping
 # From: /home/ubuntu/external_libs/CppLogging/include/logging/level.h
 LOG_LEVELS = {
-    0x00: "NONE",
-    0x1F: "FATAL",
-    0x3F: "ERROR",
-    0x7F: "WARN",
-    0x9F: "INFO",
-    0xBF: "DEBUG",
-    0xFF: "ALL"
+    0x00: "NONE", 0x1F: "FATAL", 0x3F: "ERROR",
+    0x7F: "WARN", 0x9F: "INFO", 0xBF: "DEBUG", 0xFF: "ALL"
 }
 
-# ArgumentType enum value for string
-# In this binary format, string arguments are using type code 0x0E (not 0x0D as initially assumed)
-ARG_STRING_TYPE = 0x0E
+# ArgumentType enum values from CppLogging, deduced from output.
+# Using struct format strings: '<' for little-endian.
+ARG_TYPES = {
+    0x01: ('<?', 1),    # bool (1 byte)
+    0x02: ('c', 1),     # char (1 byte)
+    0x04: ('<b', 1),    # int8_t (1 byte)
+    0x05: ('<B', 1),    # uint8_t (1 byte)
+    0x06: ('<h', 2),    # int16_t (2 bytes)
+    0x07: ('<H', 2),    # uint16_t (2 bytes)
+    0x08: ('<i', 4),    # int32_t (4 bytes)
+    0x09: ('<I', 4),    # uint32_t (4 bytes)
+    0x0A: ('<q', 8),    # int64_t (8 bytes)
+    0x0B: ('<Q', 8),    # uint64_t (8 bytes)
+    0x0C: ('<f', 4),    # float (4 bytes)
+    0x0D: ('<d', 8),    # double (8 bytes)
+    0x0E: 'string',     # Special case for variable-length string
+}
 
 def format_timestamp_ns(timestamp_ns):
     """Formats a nanosecond timestamp into YYYY-MM-DDTHH:MM:SS.mmm.uuu.nnnZ"""
     if timestamp_ns < 0:
         return "InvalidTimestamp"
-    
     seconds = timestamp_ns // 1_000_000_000
     nanoseconds_remainder = timestamp_ns % 1_000_000_000
-    
-    milliseconds = nanoseconds_remainder // 1_000_000
-    microseconds_in_ms_remainder = (nanoseconds_remainder % 1_000_000) // 1_000
-    nanoseconds_in_us_remainder = nanoseconds_remainder % 1_000
-    
     try:
-        dt_object = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
-        return dt_object.strftime('%Y-%m-%dT%H:%M:%S') + \
-               f".{milliseconds:03d}.{microseconds_in_ms_remainder:03d}.{nanoseconds_in_us_remainder:03d}Z"
-    except ValueError:
+        dt = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
+        return dt.strftime('%Y-%m-%dT%H:%M:%S') + f".{nanoseconds_remainder:09d}Z"
+    except (OSError, ValueError):
         return f"TimestampError({timestamp_ns})"
+
+def _parse_argument_buffer(buffer):
+    """Parses the binary argument buffer and returns a list of Python objects."""
+    args = []
+    offset = 0
+    while offset < len(buffer):
+        try:
+            arg_type_val = buffer[offset]
+            offset += 1
+
+            if arg_type_val in ARG_TYPES:
+                handler = ARG_TYPES[arg_type_val]
+                if handler == 'string':
+                    # String: 4-byte length + N bytes of UTF-8 data
+                    if offset + 4 > len(buffer): break
+                    str_len = struct.unpack_from('<I', buffer, offset)[0]
+                    offset += 4
+                    if offset + str_len > len(buffer): break
+                    value = buffer[offset:offset+str_len].decode('utf-8', errors='replace')
+                    args.append(value)
+                    offset += str_len
+                else:
+                    # Fixed-size types
+                    fmt_char, size = handler
+                    if offset + size > len(buffer): break
+                    value = struct.unpack_from(fmt_char, buffer, offset)[0]
+                    args.append(value)
+                    offset += size
+            else:
+                # Unknown argument type
+                args.append(f"{{UNKNOWN_ARG_TYPE:0x{arg_type_val:02X}}}")
+                break # Stop parsing this record's args
+        except Exception:
+            args.append("{PARSING_ERROR}")
+            break
+    return args
 
 def parse_record(data_block):
     """Parses a single log record data block."""
@@ -61,50 +98,29 @@ def parse_record(data_block):
 
     effective_message = raw_message_str
 
-    # Check for argument buffer size field
     if offset + 4 > len(data_block):
-        return f"Warning: Truncated record before arg_buffer_size. RawMsg: '{raw_message_str}'"
+        return f"Warning: Truncated record. RawMsg: '{raw_message_str}'"
 
     arg_data_actual_len = struct.unpack_from('<I', data_block, offset)[0]
     offset += 4
 
-    # If the raw message is "{}" and there's argument data, try to parse the first argument as a string
-    if raw_message_str == "{}" and arg_data_actual_len > 0:
+    if arg_data_actual_len > 0:
         if offset + arg_data_actual_len > len(data_block):
-            return f"Warning: Arg data length {arg_data_actual_len} exceeds remaining data_block {len(data_block) - offset}. RawMsg: '{raw_message_str}'"
+            effective_message += " (TruncatedArgs)"
         else:
             arg_buffer = data_block[offset : offset + arg_data_actual_len]
-            
-            # Try to parse the first argument if it's a string
-            # Min size for string arg: 1 (type) + 4 (len_field) = 5 bytes
-            if len(arg_buffer) >= 5:
-                arg_ptr = 0 # Pointer within arg_buffer
-                
-                arg_type_val = struct.unpack_from('<B', arg_buffer, arg_ptr)[0]; arg_ptr += 1
-                
-                if arg_type_val == ARG_STRING_TYPE:
-                    if arg_ptr + 4 <= len(arg_buffer): # Check for string length field
-                        str_len_in_arg = struct.unpack_from('<I', arg_buffer, arg_ptr)[0]; arg_ptr += 4
-                        
-                        if arg_ptr + str_len_in_arg <= len(arg_buffer): # Check for string data
-                            actual_str_data = arg_buffer[arg_ptr : arg_ptr + str_len_in_arg]
-                            try:
-                                decoded_arg_str = actual_str_data.decode('utf-8', errors='replace')
-                                effective_message = decoded_arg_str # Replace "{}"
-                            except Exception as e:
-                                return f"Warning: Failed to decode string arg: {e}"
-                        # else: String data length exceeds arg_buffer, effective_message remains "{}"
-                    # else: String length field exceeds arg_buffer, effective_message remains "{}"
-                # else: First argument is not a string, effective_message remains "{}"
-            # else: Argument buffer too small for a typed string, effective_message remains "{}"
-    
-    offset += arg_data_actual_len # Advance offset past the argument data
-
-    if offset != len(data_block):
-        return f"Warning: Offset mismatch after parsing. Offset={offset}, DataBlockLen={len(data_block)}. EffectiveMsg: '{effective_message}'"
+            try:
+                parsed_args = _parse_argument_buffer(arg_buffer)
+                # Use python's format() to substitute arguments
+                effective_message = raw_message_str.format(*parsed_args)
+            except (IndexError, ValueError) as e:
+                # Formatting failed (e.g., mismatched {} count vs args)
+                args_repr = ", ".join(map(str, parsed_args))
+                effective_message = f"{raw_message_str} [FORMAT_ERROR: {e} | ARGS: {args_repr}]"
 
     formatted_timestamp = format_timestamp_ns(timestamp_ns)
-    return f"{formatted_timestamp} [0x{thread_id:X}] {level_str:<5} {logger_name} - {effective_message}"
+    # Use only the lower 32 bits of the thread ID for cleaner output, matching the C++ tool
+    return f"{formatted_timestamp} [0x{thread_id & 0xFFFFFFFF:X}] {level_str:<5} {logger_name} - {effective_message}"
 
 def decode_log_file(binary_filepath, output_filepath):
     """Decodes records from a CppLogging binary log file and writes to text file."""

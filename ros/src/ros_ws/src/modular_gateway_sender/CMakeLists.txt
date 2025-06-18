@@ -12,7 +12,7 @@ endif()
 
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=18)
+add_definitions(-DVERSION_MINOR=20)
 add_definitions(-DVERSION_PATCH=0)
 
 # --- Compile-Time Log Level Control ---

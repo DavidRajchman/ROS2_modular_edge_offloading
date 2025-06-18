@@ -2,6 +2,10 @@
  - (0.7.1) TESTING NEEDED [IMPLEMENTED] add a parameter to change the wait time before reciever polling (current 1ms)
 
 
+# 0.20.0
+- reduced the number of dynamic memory alocations in message processing by using resizable buffers
+- refactored transportlib confirmed working and with stable latency
+
 # 0.19.0
 - refactored transportlib and ros_gateway to imporove latency, multihreaded aproach with low probabilty (but not zero) of race conditions in edge cases of bad network queality
 - NEEDS TESTING 

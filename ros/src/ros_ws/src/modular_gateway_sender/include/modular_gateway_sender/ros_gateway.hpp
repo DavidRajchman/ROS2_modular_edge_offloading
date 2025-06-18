@@ -51,10 +51,12 @@ private:
   uint8_t identifier_in_group_;
   
   std::unique_ptr<TransportBase> transport_;
-  std::map<std::string, std::shared_ptr<MessageHandlerBase>> handlers_;
-  
+  std::vector<uint8_t> header_buffer_;
+  std::vector<char> topic_buffer_;
+  std::vector<uint8_t> data_buffer_;
+
   std::thread receiver_thread_;
-  bool receiver_running_ = false;
+  std::atomic<bool> receiver_running_{false};
   
   std::vector<uint8_t> header_buffer_;
 

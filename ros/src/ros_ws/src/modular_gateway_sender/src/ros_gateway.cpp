@@ -290,29 +290,39 @@ bool RosGateway::receive_and_process_message() {
     uint8_t topic_len = header_start[10];
     
     // #3 LATENCY POINT: Topic buffer allocation
-    logger_.Debug("ros_gateway.cpp: Allocating topic buffer ({} bytes)", topic_len + 1);
-    std::vector<char> topic_buf(topic_len + 1, '\0');
+    logger_.Debug("ros_gateway.cpp: Resizing topic buffer ({} bytes)", topic_len);
+    try {
+        topic_buffer_.resize(topic_len);
+    } catch (const std::bad_alloc& e) {
+        logger_.Error("ros_gateway.cpp: Failed to resize topic buffer: {}", e.what());
+        return false;
+    }
     
     // #9 LATENCY POINT: Topic name network reception
-    if (!transport_->receive_exact(topic_buf.data(), topic_len)) {
+    if (!transport_->receive_exact(topic_buffer_.data(), topic_len)) {
         logger_.Error("ros_gateway.cpp: Failed to receive topic name");
         return false;
     }
     
     // #5 LATENCY POINT: String construction
-    std::string topic(topic_buf.data(), topic_len);
+    std::string topic(topic_buffer_.data(), topic_len);
     MessageOptions options(flags);
     
     logger_.Debug("ros_gateway.cpp: Received header for '{}', type={}, from {}:{}, size={} bytes",
                   topic, static_cast<int>(type), received_id_group, received_identifier_in_group, data_size);
     
     // #4 LATENCY POINT: Large data buffer allocation
-    logger_.Debug("ros_gateway.cpp: Allocating message data buffer ({} bytes)", data_size);
-    std::vector<uint8_t> data_buffer(data_size);
+    logger_.Debug("ros_gateway.cpp: Resizing message data buffer ({} bytes)", data_size);
+    try {
+        data_buffer_.resize(data_size);
+    } catch (const std::bad_alloc& e) {
+        logger_.Error("ros_gateway.cpp: Failed to resize data buffer: {}", e.what());
+        return false;
+    }
     
     // #10 LATENCY POINT: Payload network reception
     logger_.Debug("ros_gateway.cpp: Receiving message payload ({} bytes)", data_size);
-    if (!transport_->receive_exact(data_buffer.data(), data_size)) {
+    if (!transport_->receive_exact(data_buffer_.data(), data_size)) {
         logger_.Error("ros_gateway.cpp: Failed to receive message data for topic '{}'", topic);
         return false;
     }
@@ -327,7 +337,7 @@ bool RosGateway::receive_and_process_message() {
         if (handler->is_ros_publisher_enabled() && handler->can_process_message_type(type)) {
             logger_.Debug("ros_gateway.cpp: Handler '{}' processing message", handler->get_name());
             if (handler->process_and_publish_received_msg(
-                    topic, type, data_buffer.data(), data_buffer.size(), options)) {
+                    topic, type, data_buffer_.data(), data_buffer_.size(), options)) {
                 logger_.Debug("ros_gateway.cpp: Message '{}' published to ROS by handler '{}'", 
                              topic, handler->get_name());
                 processed = true;
