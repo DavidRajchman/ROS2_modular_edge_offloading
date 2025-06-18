@@ -1,6 +1,13 @@
+#!/usr/bin/env python3
+# filepath: /home/ubuntu/ros_ws/BinLogDecoder.py
 import struct
 import sys
 import datetime
+import os
+
+# --- Configuration ---
+DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/ros_ws/mec_binary.log"
+DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/ros_ws/decoded_log.txt"
 
 # Define CppLogging Level enum mapping
 # From: /home/ubuntu/external_libs/CppLogging/include/logging/level.h
@@ -56,9 +63,7 @@ def parse_record(data_block):
 
     # Check for argument buffer size field
     if offset + 4 > len(data_block):
-        print(f"Warning: Truncated record before arg_buffer_size. RawMsg: '{raw_message_str}'", file=sys.stderr)
-        formatted_timestamp = format_timestamp_ns(timestamp_ns)
-        return f"{formatted_timestamp} [0x{thread_id:X}] {level_str:<5} {logger_name} - {effective_message} (TruncatedArgs)"
+        return f"Warning: Truncated record before arg_buffer_size. RawMsg: '{raw_message_str}'"
 
     arg_data_actual_len = struct.unpack_from('<I', data_block, offset)[0]
     offset += 4
@@ -66,7 +71,7 @@ def parse_record(data_block):
     # If the raw message is "{}" and there's argument data, try to parse the first argument as a string
     if raw_message_str == "{}" and arg_data_actual_len > 0:
         if offset + arg_data_actual_len > len(data_block):
-            print(f"Warning: Arg data length {arg_data_actual_len} exceeds remaining data_block {len(data_block) - offset}. RawMsg: '{raw_message_str}'", file=sys.stderr)
+            return f"Warning: Arg data length {arg_data_actual_len} exceeds remaining data_block {len(data_block) - offset}. RawMsg: '{raw_message_str}'"
         else:
             arg_buffer = data_block[offset : offset + arg_data_actual_len]
             
@@ -87,8 +92,7 @@ def parse_record(data_block):
                                 decoded_arg_str = actual_str_data.decode('utf-8', errors='replace')
                                 effective_message = decoded_arg_str # Replace "{}"
                             except Exception as e:
-                                print(f"Warning: Failed to decode string arg: {e}", file=sys.stderr)
-                                # effective_message remains "{}"
+                                return f"Warning: Failed to decode string arg: {e}"
                         # else: String data length exceeds arg_buffer, effective_message remains "{}"
                     # else: String length field exceeds arg_buffer, effective_message remains "{}"
                 # else: First argument is not a string, effective_message remains "{}"
@@ -97,49 +101,141 @@ def parse_record(data_block):
     offset += arg_data_actual_len # Advance offset past the argument data
 
     if offset != len(data_block):
-        print(f"Warning: Offset mismatch after parsing. Offset={offset}, DataBlockLen={len(data_block)}. EffectiveMsg: '{effective_message}'", file=sys.stderr)
+        return f"Warning: Offset mismatch after parsing. Offset={offset}, DataBlockLen={len(data_block)}. EffectiveMsg: '{effective_message}'"
 
     formatted_timestamp = format_timestamp_ns(timestamp_ns)
     return f"{formatted_timestamp} [0x{thread_id:X}] {level_str:<5} {logger_name} - {effective_message}"
 
-def decode_log_file(filepath):
-    """Decodes and prints records from a CppLogging binary log file."""
+def decode_log_file(binary_filepath, output_filepath):
+    """Decodes records from a CppLogging binary log file and writes to text file."""
+    
+    # Check if binary log file exists
+    if not os.path.exists(binary_filepath):
+        print(f"Error: Binary log file not found at '{binary_filepath}'")
+        print(f"Make sure your application has run and generated the log file.")
+        return False
+    
+    # Get file size for progress indication
+    file_size = os.path.getsize(binary_filepath)
+    if file_size == 0:
+        print(f"Warning: Binary log file '{binary_filepath}' is empty.")
+        return False
+    
+    records_processed = 0
+    warnings_count = 0
+    errors_count = 0
+    
     try:
-        with open(filepath, 'rb') as f:
+        with open(binary_filepath, 'rb') as infile, open(output_filepath, 'w', encoding='utf-8') as outfile:
+            # Write header information
+            outfile.write(f"# CppLogging Binary Log Decoder Output\n")
+            outfile.write(f"# Source: {binary_filepath}\n")
+            outfile.write(f"# Decoded at: {datetime.datetime.now().isoformat()}\n")
+            outfile.write(f"# File size: {file_size} bytes\n")
+            outfile.write("# Format: TIMESTAMP [THREAD_ID] LEVEL LOGGER - MESSAGE\n")
+            outfile.write("#" + "="*80 + "\n\n")
+            
             while True:
-                size_bytes = f.read(4)
-                if not size_bytes: break
+                size_bytes = infile.read(4)
+                if not size_bytes: 
+                    break
                 if len(size_bytes) < 4:
-                    print(f"Error: Incomplete record size field at end of file.", file=sys.stderr); break
+                    outfile.write(f"ERROR: Incomplete record size field at end of file.\n")
+                    errors_count += 1
+                    break
                 
                 data_block_size = struct.unpack('<I', size_bytes)[0]
                 
                 if data_block_size == 0: 
-                    print(f"Warning: Encountered zero-size data block. Skipping.", file=sys.stderr); continue
+                    outfile.write(f"WARNING: Encountered zero-size data block. Skipping.\n")
+                    warnings_count += 1
+                    continue
 
-                data_block = f.read(data_block_size)
+                data_block = infile.read(data_block_size)
                 if len(data_block) < data_block_size:
-                    print(f"Error: Incomplete data block. Expected {data_block_size}, got {len(data_block)}.", file=sys.stderr); break
+                    outfile.write(f"ERROR: Incomplete data block. Expected {data_block_size}, got {len(data_block)}.\n")
+                    errors_count += 1
+                    break
                 
                 try:
                     formatted_record = parse_record(data_block)
-                    print(formatted_record)
+                    outfile.write(formatted_record + "\n")
+                    records_processed += 1
+                    
+                    # Progress indicator for large files
+                    if records_processed % 1000 == 0:
+                        print(f"Processed {records_processed} records...")
+                        
                 except struct.error as e:
-                    print(f"Error parsing record (struct error): {e}. Data block size: {data_block_size}", file=sys.stderr)
+                    outfile.write(f"ERROR: Struct parsing error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
                 except UnicodeDecodeError as e:
-                    print(f"Error parsing record (unicode error): {e}. Data block size: {data_block_size}", file=sys.stderr)
+                    outfile.write(f"ERROR: Unicode decoding error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
                 except Exception as e:
-                    print(f"An unexpected error occurred while parsing a record: {e}", file=sys.stderr)
+                    outfile.write(f"ERROR: Unexpected error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
 
     except FileNotFoundError:
-        print(f"Error: File not found at '{filepath}'", file=sys.stderr)
+        print(f"Error: File not found at '{binary_filepath}'")
+        return False
+    except PermissionError:
+        print(f"Error: Permission denied accessing '{binary_filepath}' or '{output_filepath}'")
+        return False
     except Exception as e:
-        print(f"An error occurred: {e}", file=sys.stderr)
+        print(f"Error: An unexpected error occurred: {e}")
+        return False
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python BinLogDecoder.py <path_to_binary_log_file>")
+    # Summary
+    print(f"Decoding completed successfully!")
+    print(f"  Records processed: {records_processed}")
+    print(f"  Warnings: {warnings_count}")
+    print(f"  Errors: {errors_count}")
+    print(f"  Output written to: {output_filepath}")
+    print(f"  Output file size: {os.path.getsize(output_filepath)} bytes")
+    
+    return True
+
+def main():
+    """Main function with improved argument handling."""
+    
+    # Determine input and output paths
+    if len(sys.argv) == 1:
+        # No arguments - use defaults
+        binary_path = DEFAULT_BINARY_LOG_PATH
+        output_path = DEFAULT_OUTPUT_TXT_PATH
+        print(f"Using default paths:")
+        print(f"  Binary log: {binary_path}")
+        print(f"  Output txt: {output_path}")
+        
+    elif len(sys.argv) == 2:
+        # One argument - binary file path provided, use default output
+        binary_path = sys.argv[1]
+        output_path = DEFAULT_OUTPUT_TXT_PATH
+        print(f"Using provided binary path: {binary_path}")
+        print(f"Using default output path: {output_path}")
+        
+    elif len(sys.argv) == 3:
+        # Two arguments - both paths provided
+        binary_path = sys.argv[1]
+        output_path = sys.argv[2]
+        print(f"Using provided paths:")
+        print(f"  Binary log: {binary_path}")
+        print(f"  Output txt: {output_path}")
+        
+    else:
+        print("Usage:")
+        print(f"  {sys.argv[0]}                              # Use default paths")
+        print(f"  {sys.argv[0]} <binary_log_file>            # Specify binary file, use default output")
+        print(f"  {sys.argv[0]} <binary_log_file> <output.txt> # Specify both files")
+        print()
+        print(f"Default binary log path: {DEFAULT_BINARY_LOG_PATH}")
+        print(f"Default output txt path: {DEFAULT_OUTPUT_TXT_PATH}")
         sys.exit(1)
     
-    log_file_path = sys.argv[1]
-    decode_log_file(log_file_path)
+    # Validate and decode
+    if not decode_log_file(binary_path, output_path):
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
