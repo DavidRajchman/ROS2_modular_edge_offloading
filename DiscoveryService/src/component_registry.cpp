@@ -83,6 +83,14 @@ std::optional<ComponentInfo> ComponentRegistry::find_by_client_id(uint32_t clien
     return std::nullopt;
 }
 
+std::vector<ComponentInfo> ComponentRegistry::get_all_components() const {
+    std::vector<ComponentInfo> components;
+    components.reserve(registry_by_client_id_.size());
+    for (const auto& pair : registry_by_client_id_) {
+        components.push_back(pair.second);
+    }
+    return components;
+}
 
 
 

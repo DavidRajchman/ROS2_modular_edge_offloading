@@ -1,30 +1,38 @@
 #include "discovery_service.hpp"
 #include <iostream>
+#include <sstream>
 #include <transport/logging_utils.hpp>
 
 DiscoveryService::DiscoveryService(uint16_t port)
-    : port_(port), last_purge_time_(std::chrono::steady_clock::now()) { // Initialize last_purge_time_
-    // Note: The transport library uses its own logging macros.
-    // We will use them here for consistency in logs.
-    auto config = std::make_shared<Transport::TcpServerTransport::Configuration>(
-        "0.0.0.0", port, 1, true // Listen on all interfaces, single-threaded, multi-client
-    );
-    transport_ = std::make_unique<Transport::TcpServerTransport>(config);
+    : port_(port), last_purge_time_(std::chrono::steady_clock::now()), shutting_down_(false) {
+    // The constructor for TcpServerTransport is:
+    // TcpServerTransport(int port, bool multi_client_mode = false, int max_clients = 0);
+    // We enable multi-client mode to handle multiple components registering.
+    transport_ = std::make_unique<gateway::TcpServerTransport>(port, true, 0); // 0 for max_clients means system limit
 }
 
 void DiscoveryService::start() {
-    transport_->set_on_connect_cb([this](uint32_t id) { onClientConnected(id); });
-    transport_->set_on_disconnect_cb([this](uint32_t id) { onClientDisconnected(id); });
-    transport_->set_on_data_cb([this](uint32_t id, const auto& data) { onDataReceived(id, data); });
+    // Corrected function names: set_connect_callback, set_disconnect_callback, set_data_callback
+    transport_->set_connect_callback([this](uint32_t id, const std::string&, int) { onClientConnected(id); });
+    transport_->set_disconnect_callback([this](uint32_t id) { onClientDisconnected(id); });
+    transport_->set_data_callback([this](uint32_t id) { 
+        // This callback just signals data is available. We need to read it.
+        std::vector<uint8_t> buffer(1024);
+        int bytes_read = transport_->receive_from(id, buffer.data(), buffer.size());
+        if (bytes_read > 0) {
+            buffer.resize(bytes_read);
+            onDataReceived(id, buffer);
+        }
+    });
 
     LOG_INFO("Discovery Service starting on port %u...", port_);
-    if (!transport_->start()) {
+    if (!transport_->connect()) { // Use connect() to start the server
         LOG_ERROR("Failed to start TCP server on port %u.", port_);
         return;
     }
     
     // The main event loop now periodically checks for stale clients.
-    while (transport_->is_running()) { // Assumes transport has an is_running() method
+    while (!shutting_down_.load() && transport_->is_connected()) { // Use is_connected() to check server status
         // Process network events with a 1-second timeout.
         transport_->process_events(1000);
 
@@ -37,22 +45,34 @@ void DiscoveryService::start() {
     }
 }
 
+void DiscoveryService::stop() {
+    bool expected = false;
+    // Atomically check and set the flag. Only proceed if we are the first to call stop().
+    if (!shutting_down_.compare_exchange_strong(expected, true)) {
+        return; // Already shutting down, do nothing.
+    }
+
+    if (transport_) {
+        LOG_INFO("Stopping Discovery Service...");
+        transport_->disconnect();
+    }
+}
+
 void DiscoveryService::purgeStaleClients() {
     LOG_DEBUG("Running periodic check for stale clients...");
     const auto now = std::chrono::steady_clock::now();
-    auto stale_clients = registry_.get_all_client_ids(); // Need to add this method to ComponentRegistry
+    auto client_ids = registry_.get_all_client_ids();
 
-    for (uint32_t client_id : stale_clients) {
-        auto component = registry_.find_by_client_id(client_id);
-        if (component) {
-            auto time_since_last_seen = now - component->last_seen;
+    for (uint32_t client_id : client_ids) {
+        auto component_opt = registry_.find_by_client_id(client_id);
+        if (component_opt) {
+            auto& component = *component_opt;
+            auto time_since_last_seen = now - component.last_seen;
             if (time_since_last_seen > KEEPALIVE_TIMEOUT) {
                 LOG_WARN("Client '%s' (%u.%u) timed out. Last seen %.2f seconds ago. Disconnecting.",
-                         component->name.c_str(), component->group_id, component->id_in_group,
+                         component.name.c_str(), component.group_id, component.id_in_group,
                          std::chrono::duration<double>(time_since_last_seen).count());
                 
-                // Disconnecting the client will trigger the onClientDisconnected callback,
-                // which handles the actual unregistration.
                 transport_->disconnect_client(client_id);
             }
         }
@@ -63,12 +83,20 @@ void DiscoveryService::onClientConnected(uint32_t client_id) {
     LOG_INFO("Client connected with transport ID: %u", client_id);
 }
 
+
 void DiscoveryService::onClientDisconnected(uint32_t client_id) {
     auto component = registry_.find_by_client_id(client_id);
     if (component) {
-        LOG_WARN("Unregistering component '%s' (%u.%u) due to disconnect.",
-                 component->name.c_str(), component->group_id, component->id_in_group);
+        LOG_INFO("Registered component '%s' (ID: %u.%u, Transport ID: %u) disconnected.",
+                 component->name.c_str(), component->group_id, component->id_in_group, client_id);
         registry_.unregister_component(client_id);
+
+        // Only call stop() once
+        if (component->component_type == discovery_protocol::ComponentType::OFFLOAD_MANAGER
+            && !shutting_down_.load()) {
+            LOG_ERROR("The Offloading Manager has disconnected. This is a critical failure. Shutting down the system.");
+            stop();
+        }
     } else {
         LOG_INFO("Unregistered client disconnected with transport ID: %u", client_id);
     }
@@ -139,23 +167,25 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
         return;
     }
 
-    // For Vehicles, check if a Bridge is available
-    if (req.componentType == discovery_protocol::ComponentType::VEHICLE) {
-        auto bridge_info = registry_.find_available_bridge();
-        if (!bridge_info) {
-            LOG_WARN("Vehicle '%s' trying to register, but no Bridge is available. Sending WAIT.", req.componentName.c_str());
+    // For Vehicles or MECs, check if a Bridge is available
+    if (req.componentType == discovery_protocol::ComponentType::VEHICLE || req.componentType == discovery_protocol::ComponentType::MEC) {
+        auto bridge_info_opt = registry_.find_available_bridge();
+        if (!bridge_info_opt) {
+            LOG_WARN("Component '%s' (VHC/MEC) trying to register, but no Bridge is available. Sending WAIT.", req.componentName.c_str());
             resp.responseCode = discovery_protocol::ResponseCode::WAIT;
             resp.humanReadableMessage = "No Bridge component is currently available.";
             std::string response_str;
             discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
             sendResponse(client_id, response_str);
             return;
+        } else {
+            auto& bridge_info = *bridge_info_opt;
+            // Populate Bridge connection info in the response
+            resp.connectionTargetType = discovery_protocol::component_type_to_string(bridge_info.component_type);
+            resp.connectionTargetAddress = bridge_info.listen_address;
+            resp.connectionTargetPort = std::to_string(bridge_info.listen_port);
+            resp.connectionTargetId = (bridge_info.group_id << 8) | bridge_info.id_in_group;
         }
-        // Populate Bridge connection info in the response
-        resp.connectionTargetType = discovery_protocol::component_type_to_string(bridge_info->component_type);
-        resp.connectionTargetAddress = bridge_info->listen_address;
-        resp.connectionTargetPort = std::to_string(bridge_info->listen_port);
-        resp.connectionTargetId = (bridge_info->group_id << 8) | bridge_info->id_in_group;
     }
 
     // All checks passed, register the component
@@ -166,7 +196,17 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
     info.id_in_group = req.idInGroup;
     info.name = req.componentName;
     info.listen_address = req.listenAddress;
-    info.listen_port = static_cast<uint16_t>(std::stoi(req.listenPort));
+    try {
+        info.listen_port = static_cast<uint16_t>(std::stoi(req.listenPort));
+    } catch (const std::exception& e) {
+        LOG_ERROR("Invalid listen port '%s' for component '%s'.", req.listenPort.c_str(), req.componentName.c_str());
+        resp.responseCode = discovery_protocol::ResponseCode::INVALID_REQUEST;
+        resp.humanReadableMessage = "Invalid listen port format.";
+        std::string response_str;
+        discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+        sendResponse(client_id, response_str);
+        return;
+    }
     info.last_seen = std::chrono::steady_clock::now();
 
     if (registry_.register_component(info)) {
@@ -203,7 +243,7 @@ void DiscoveryService::handleKeepalive(uint32_t client_id, const discovery_proto
         
         discovery_protocol::KeepaliveResponse pong;
         pong.response = "OK";
-        pong.nextIntervalMs = 5000; // Tell client to ping again in 5 seconds
+        pong.nextIntervalMs = 5000;
         pong.humanReadableMessage = "Keepalive acknowledged.";
         
         std::string response_str;

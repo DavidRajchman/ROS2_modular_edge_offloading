@@ -117,23 +117,34 @@ bool TcpServerTransport::connect()
 
 void TcpServerTransport::disconnect()
 {
-  // Close all client connections
-  for (const auto& client_pair : clients_) {
-    if (disconnect_callback_) {
-      disconnect_callback_(client_pair.first);
-    }
-    close(client_pair.second.socket_fd);
+  // Use the running_ flag as a guard to prevent re-entrant calls.
+  if (!running_) {
+    return;
   }
-  clients_.clear();
+  running_ = false; // Mark that we are now shutting down.
+
+  // Close all client connections safely.
+  // First, make a copy of the client IDs to iterate over. This is crucial because
+  // the disconnect_client call below will trigger a callback that modifies the
+  // original clients_ map, which would invalidate iterators.
+  std::vector<ClientId> client_ids_to_disconnect;
+  client_ids_to_disconnect.reserve(clients_.size());
+  for (const auto& client_pair : clients_) {
+    client_ids_to_disconnect.push_back(client_pair.first);
+  }
+
+  // Now, disconnect each client using the copied list.
+  for (const auto& id : client_ids_to_disconnect) {
+      disconnect_client(id);
+  }
   
-  // Close server socket
+  // Close the main server socket
   if (server_socket_fd_ >= 0) {
     close(server_socket_fd_);
     server_socket_fd_ = -1;
   }
-  
-  running_ = false;
 }
+
 
 bool TcpServerTransport::is_connected() const
 {

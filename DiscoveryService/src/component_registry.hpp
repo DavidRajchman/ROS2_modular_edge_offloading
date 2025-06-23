@@ -41,6 +41,9 @@ public:
 
     // Gets a list of all currently registered client IDs.
     std::vector<uint32_t> get_all_client_ids() const;
+
+    // Gets a list of all currently registered components.
+    std::vector<ComponentInfo> get_all_components() const;
     
     // Updates the keepalive timestamp for a component.
     bool update_keepalive(uint8_t group_id, uint8_t id_in_group);

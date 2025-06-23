@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <chrono>
+#include <atomic>
+
 
 #include <transport/transport_base.hpp>
 #include <discovery_protocol/protocol.hpp>
@@ -16,6 +19,8 @@ public:
     void start();
 
 private:
+    void stop();
+
     // Callbacks for the transport layer
     void purgeStaleClients();
 
@@ -33,7 +38,7 @@ private:
     static constexpr std::chrono::seconds KEEPALIVE_TIMEOUT{15};
 
     uint16_t port_;
-    std::unique_ptr<Transport::TcpServerTransport> transport_;
+    std::unique_ptr<gateway::TcpServerTransport> transport_;
     ComponentRegistry registry_;
 
     // The global configuration string provided by the Offloading Manager.
@@ -41,4 +46,7 @@ private:
 
     // Timestamp for the last time the stale client check was performed.
     std::chrono::steady_clock::time_point last_purge_time_;
+
+    // Flag to ensure shutdown logic is only run once.
+    std::atomic<bool> shutting_down_{false};
 };
