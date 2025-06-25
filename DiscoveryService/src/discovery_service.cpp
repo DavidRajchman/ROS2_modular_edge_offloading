@@ -13,7 +13,7 @@ DiscoveryService::DiscoveryService(uint16_t port)
 
 void DiscoveryService::start() {
     // Corrected function names: set_connect_callback, set_disconnect_callback, set_data_callback
-    transport_->set_connect_callback([this](uint32_t id, const std::string&, int) { onClientConnected(id); });
+    transport_->set_connect_callback([this](uint32_t id, const std::string& ip, int) { onClientConnected(id, ip); });
     transport_->set_disconnect_callback([this](uint32_t id) { onClientDisconnected(id); });
     transport_->set_data_callback([this](uint32_t id) { 
         // This callback just signals data is available. We need to read it.
@@ -79,12 +79,14 @@ void DiscoveryService::purgeStaleClients() {
     }
 }
 
-void DiscoveryService::onClientConnected(uint32_t client_id) {
-    LOG_INFO("Client connected with transport ID: %u", client_id);
+void DiscoveryService::onClientConnected(uint32_t client_id, const std::string& ip_address) {
+    LOG_INFO("Client connected with transport ID: %u from IP: %s", client_id, ip_address.c_str());
+    client_ip_addresses_[client_id] = ip_address;
 }
 
 
 void DiscoveryService::onClientDisconnected(uint32_t client_id) {
+    client_ip_addresses_.erase(client_id);
     auto component = registry_.find_by_client_id(client_id);
     if (component) {
         LOG_INFO("Registered component '%s' (ID: %u.%u, Transport ID: %u) disconnected.",
@@ -195,7 +197,17 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
     info.group_id = req.groupId;
     info.id_in_group = req.idInGroup;
     info.name = req.componentName;
-    info.listen_address = req.listenAddress;
+    
+    // Use the auto-detected IP address instead of the one from the request.
+    auto it = client_ip_addresses_.find(client_id);
+    if (it != client_ip_addresses_.end()) {
+        info.listen_address = it->second;
+    } else {
+        // Fallback to the request's address if for some reason the IP wasn't found.
+        LOG_WARN("Could not find auto-detected IP for client %u. Using address from request: %s", client_id, req.listenAddress.c_str());
+        info.listen_address = req.listenAddress;
+    }
+
     try {
         info.listen_port = static_cast<uint16_t>(std::stoi(req.listenPort));
     } catch (const std::exception& e) {

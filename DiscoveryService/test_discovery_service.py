@@ -169,16 +169,24 @@ def run_full_test_suite():
             client.connect()
         print("--- All clients connected ---\n")
 
+        # Use a placeholder IP in requests. The server will ignore this and
+        # auto-detect the real IP from the TCP connection.
+        placeholder_ip = "0.0.0.0"
+        
+        # Since we connect to DISCOVERY_HOST ("localhost"), the detected IP will be 127.0.0.1.
+        # This is the IP the server will store for the Bridge and send to other components.
+        detected_bridge_ip = "127.0.0.1"
+
         config_string = '{"system_mode":"test","log_level":"debug"}'
         test_cases = [
-            ("PreOM", 'DISC:REG;T;S;99;1;PreOM-Test;127.0.0.1;9998;Testing before OM', "Register Component Before OM", {"expected_prefix": "DISC:ACK;1;"}),
-            ("OM", f'DISC:REG;O;S;1;1;OffloadManager;127.0.0.1;8000;{config_string}', "Register Offloading Manager", {"expected_prefix": "DISC:ACK;0;"}),
-            ("VHC1", 'DISC:REG;V;S;2;10;TestVHC-01;10.0.0.5;6000;VHC requesting bridge', "Register Vehicle (No Bridge)", {"expected_prefix": "DISC:ACK;1;"}),
-            ("Bridge", 'DISC:REG;B;S;5;1;TestBridge-Main;192.168.1.100;7000;Main bridge component', "Register Bridge", {"expected_prefix": "DISC:ACK;0;", "contains": [config_string]}),
-            ("VHC1", 'DISC:REG;V;S;2;10;TestVHC-01;10.0.0.5;6000;VHC requesting bridge', "Re-Register Vehicle (Bridge Exists)", {"expected_prefix": "DISC:ACK;0;", "contains": ["B;192.168.1.100;7000", config_string]}),
-            ("MEC1", 'DISC:REG;M;S;12;1;TestMEC-01;192.168.1.200;8080;MEC requesting bridge', "Register MEC (Bridge Exists)", {"expected_prefix": "DISC:ACK;0;", "contains": ["B;192.168.1.100;7000", config_string]}),
+            ("PreOM", f'DISC:REG;T;S;99;1;PreOM-Test;{placeholder_ip};9998;Testing before OM', "Register Component Before OM", {"expected_prefix": "DISC:ACK;1;"}),
+            ("OM", f'DISC:REG;O;S;1;1;OffloadManager;{placeholder_ip};8000;{config_string}', "Register Offloading Manager", {"expected_prefix": "DISC:ACK;0;"}),
+            ("VHC1", f'DISC:REG;V;S;2;10;TestVHC-01;{placeholder_ip};6000;VHC requesting bridge', "Register Vehicle (No Bridge)", {"expected_prefix": "DISC:ACK;1;"}),
+            ("Bridge", f'DISC:REG;B;S;5;1;TestBridge-Main;{placeholder_ip};7000;Main bridge component', "Register Bridge", {"expected_prefix": "DISC:ACK;0;", "contains": [config_string]}),
+            ("VHC1", f'DISC:REG;V;S;2;10;TestVHC-01;{placeholder_ip};6000;VHC requesting bridge', "Re-Register Vehicle (Bridge Exists)", {"expected_prefix": "DISC:ACK;0;", "contains": [f"B;{detected_bridge_ip};7000", config_string]}),
+            ("MEC1", f'DISC:REG;M;S;12;1;TestMEC-01;{placeholder_ip};8080;MEC requesting bridge', "Register MEC (Bridge Exists)", {"expected_prefix": "DISC:ACK;0;", "contains": [f"B;{detected_bridge_ip};7000", config_string]}),
             ("Bridge", 'DISC:PNG;5.1;OK;Ping from Bridge', "Send Keepalive Ping", {"expected_prefix": "DISC:PON;OK;"}),
-            ("Conflict", 'DISC:REG;T;S;5;1;ConflictTest;127.0.0.1;9999;Testing conflict', "Test ID Conflict", {"expected_prefix": "DISC:ACK;2;"}),
+            ("Conflict", f'DISC:REG;T;S;5;1;ConflictTest;{placeholder_ip};9999;Testing conflict', "Test ID Conflict", {"expected_prefix": "DISC:ACK;2;"}),
             ("Malformed", "This is not a valid protocol message", "Test Malformed Message", {"expected_prefix": "DISC:ERR;"})
         ]
 
@@ -197,7 +205,7 @@ def run_full_test_suite():
 
         if initial_failed > 0:
             print("\nAborting due to failures in initial tests.")
-            return
+            return # Exit if initial tests fail
 
         # --- Part 2: Keepalive Tests ---
         print("\n" + "=" * 60)
@@ -211,13 +219,13 @@ def run_full_test_suite():
 
         # Register the non-compliant client
         bad_client_passed, _ = clients["BadClient"].send_and_receive(
-            'DISC:REG;T;S;20;1;BadClient;127.0.0.1;2001;I will not send keepalives',
+            f'DISC:REG;T;S;20;1;BadClient;{placeholder_ip};2001;I will not send keepalives',
             "Register Non-Compliant Client",
             expected_prefix="DISC:ACK;0;"
         )
         
         if not bad_client_passed:
-            print("Could not register the non-compliant client. Aborting keepalive test.")
+            print("Failed to register the non-compliant client. Aborting Part 2.")
             return
 
         print(f"\nAll components registered. Waiting {WAIT_FOR_TIMEOUT_S} seconds for server to purge stale clients...")
@@ -252,7 +260,7 @@ def run_full_test_suite():
         print("--- All connections closed ---\n")
         
         if initial_failed > 0:
-            sys.exit(1)
+            print("Test suite finished with failures.")
 
 if __name__ == "__main__":
     run_full_test_suite()

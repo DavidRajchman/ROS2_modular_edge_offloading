@@ -7,6 +7,7 @@
 #include <string>
 #include <chrono>
 #include <atomic>
+#include <map>
 
 
 #include <transport/transport_base.hpp>
@@ -24,7 +25,7 @@ private:
     // Callbacks for the transport layer
     void purgeStaleClients();
 
-    void onClientConnected(uint32_t client_id);
+    void onClientConnected(uint32_t client_id, const std::string& ip_address);
     void onClientDisconnected(uint32_t client_id);
     void onDataReceived(uint32_t client_id, const std::vector<uint8_t>& data);
 
@@ -43,6 +44,9 @@ private:
 
     // The global configuration string provided by the Offloading Manager.
     std::optional<std::string> global_configuration_;
+
+    // Map to store the auto-detected IP address for each client.
+    std::map<uint32_t, std::string> client_ip_addresses_;
 
     // Timestamp for the last time the stale client check was performed.
     std::chrono::steady_clock::time_point last_purge_time_;
