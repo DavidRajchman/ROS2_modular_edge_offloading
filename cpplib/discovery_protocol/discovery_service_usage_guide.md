@@ -59,7 +59,7 @@ void send_vehicle_registration() {
     req.groupId = 2;
     req.idInGroup = 10;
     req.componentName = "TestVHC-01";
-    req.listenAddress = "10.0.0.5";
+    req.listenAddress = "0.0.0.0"; //placeholder adress - DiscoveryService will determine the clients adress and send it back in its response
     req.listenPort = "6000";
     req.humanReadableMessage = "VHC requesting bridge assignment";
 
@@ -96,7 +96,7 @@ void send_om_registration() {
     req.groupId = 1;
     req.idInGroup = 1;
     req.componentName = "OffloadManager";
-    req.listenAddress = "127.0.0.1";
+    req.listenAddress = "0.0.0.0"; //placeholder adress - DiscoveryService will determine the clients adress and send it back in its response
     req.listenPort = "8000";
     // 3. CRITICAL: Place the JSON config into the 'humanReadableMessage' field.
     req.humanReadableMessage = global_config;
