@@ -30,6 +30,25 @@ set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue") # Add this line
 
+# --- Fetch External Dependencies ---
+# Include the FetchContent module to enable fetching dependencies at configure time.
+include(FetchContent)
+
+# Declare the nlohmann_json dependency from its official GitHub repository.
+# We pin it to a specific GIT_TAG (version) to ensure the build is reproducible
+# and won't break if the library's main branch changes.
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3 # A recent, stable version
+)
+
+# This command will download the dependency (if not already downloaded) and
+# make its CMake targets available to our project. For nlohmann_json, this
+# creates the `nlohmann_json::nlohmann_json` target.
+FetchContent_MakeAvailable(nlohmann_json)
+
+
 # Find CppCommon library
 find_library(CPPCOMMON_LIBRARY
     NAMES cppcommon
