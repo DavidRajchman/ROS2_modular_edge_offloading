@@ -1,6 +1,6 @@
 /**
  * @file logging_utils.hpp
- * @brief Common logging utilities and version macros for the modular gateway system.
+ * @brief LEGACY - DO NOT USE FOR NEW FILES Common logging utilities and version macros for the modular gateway system.
  * 
  * This file provides versioned logging macros that automatically include version information
  * in all log messages, making it easier to track which version produced specific logs.
