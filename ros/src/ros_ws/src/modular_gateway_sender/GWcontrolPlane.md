@@ -283,6 +283,23 @@ This is the central orchestrator, tying everything together.
         3.  For each topic, it creates a new handler using the `HandlerFactory`.
         4.  It calls `data_plane_->register_handler()` with the newly created handler.
 
+*   **`RosGateway` Refactoring:**
+    1.  **Remove Node Inheritance:** `RosGateway` will no longer inherit from `rclcpp::Node`. It will be a standard C++ class.
+    2.  **Constructor Change:** The constructor will accept a `rclcpp::Node::SharedPtr` from the `GatewayController`. This pointer will be stored and passed down to the topic handlers.
+    3.  **Remove Parameter Logic:** All ROS 2 parameter handling (`declare_parameter`, `get_parameter`) will be removed from `RosGateway` and moved to `GatewayController`. Configuration values will be passed into `RosGateway`'s methods.
+    4.  **Remove Connection Logic:** The `start_receiver` and `stop_receiver` methods will be simplified. They should no longer contain any logic for initiating connections or waiting for them. They will simply start/stop the receiver thread which processes data on an already-established connection.
+
+*   **`TransportBase` and Implementations (`TcpServerTransport`) Refactoring:**
+    1.  **Passive Connection:** The `connect()` method in `TcpServerTransport` must be simplified. It should only perform the `socket()`, `bind()`, and `listen()` calls to set up a listening socket. It must **not** call `accept()`.
+    2.  **Explicit `accept()`:** A new method, `accept_connection()`, will be responsible for the blocking `accept()` call. The `GatewayController`'s thread will call this method at the appropriate time in its state machine.
+    3.  **Remove Internal `accept()` Calls:** The internal calls to `accept_connection()` from within other methods like `data_available()` and `receive_data()` in `TcpServerTransport` **must be removed**. These methods should only operate on an existing connection and not have the side effect of creating a new one.
+    4.  **Remove Auto-Reconnection:** Any automatic reconnection or retry logic within the transport classes must be removed. All connection lifecycle decisions will be made by the `GatewayController`.
+
+*   **`MessageHandlerBase` and Handler Refactoring:**
+    1.  **Node Pointer Propagation:** The `MessageHandlerBase` constructor will be modified to accept the `rclcpp::Node::SharedPtr` from the `RosGateway`.
+    2.  **Handler ROS Operations:** All handlers (e.g., `StringHandler`) will be updated to use this stored node pointer to create their subscriptions and publishers (e.g., `node_ptr_->create_subscription(...)`). They will no longer call these methods on the `gateway_` pointer.
+
+This refactoring ensures a clean separation of concerns: `GatewayController` handles the "when" (state and timing), while `RosGateway` and `TransportBase` handle the "how" (reading and writing bytes).
 
 ### 4. Key Operational Scenarios
 
