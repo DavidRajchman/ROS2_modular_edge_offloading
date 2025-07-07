@@ -11,25 +11,17 @@
 #include "modular_gateway_sender/message_handler_base.hpp"
 
 #include "logging/logger.h"
-#include "logging/config.h"
 
 namespace gateway {
 
-enum class TransportMode {
-  CLIENT,
-  SERVER
-};
-
-class RosGateway : public rclcpp::Node {
+class RosGateway {
 public:
   RosGateway(
-    const std::string& node_name, 
-    TransportMode transport_mode = TransportMode::CLIENT, 
-    const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
+    rclcpp::Node::SharedPtr node,
+    std::unique_ptr<TransportBase> transport
   );
   ~RosGateway();
   
-  // Existing methods
   bool send_message(const std::string& topic, MessageType type,
                    const void* data, size_t size,
                    const MessageOptions& options);
@@ -39,16 +31,17 @@ public:
   void enable_handler(const std::string& handler_name);
   void disable_handler(const std::string& handler_name);
   
-  bool start_receiver(bool wait_for_connection = true, int timeout_ms = 5000);
+  void start_receiver();
   void stop_receiver();
 
-  void set_gateway_id(uint8_t id_group, uint8_t identifier_in_group);
+  void set_identity(uint8_t id_group, uint8_t identifier_in_group);
   
-private:
-  TransportMode transport_mode_;
+  TransportBase* get_transport();
 
-  uint8_t id_group_;
-  uint8_t identifier_in_group_;
+private:
+  rclcpp::Node::SharedPtr node_;
+  uint8_t id_group_ = 0;
+  uint8_t identifier_in_group_ = 0;
 
   std::map<std::string, std::shared_ptr<MessageHandlerBase>> handlers_;
   
@@ -62,7 +55,6 @@ private:
   
   CppLogging::Logger logger_;
   
-  void init_transport();
   void receiver_thread_func();
   bool receive_and_process_message();
 };

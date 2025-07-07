@@ -26,6 +26,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(fmt REQUIRED)  # Use locally installed fmt
 find_package(Threads REQUIRED) # Ensure Threads is found
 
+find_package(ControlPlaneProtocol REQUIRED)
+
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue") # Add this line
@@ -103,6 +105,10 @@ target_include_directories(ros_gateway_lib PUBLIC
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
     $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
+    src/ros_gateway.cpp
+    src/message_handler_base.cpp
+    src/gateway_controller.cpp
+    src/logging_setup.cpp
 
     $<INSTALL_INTERFACE:include>
 )

@@ -1,4 +1,3 @@
-#include "modular_gateway_sender/logging_utils.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -22,6 +21,7 @@ TcpClientTransport::TcpClientTransport(const std::string& host, int port, int ma
     connected_(false),
     connection_timestamp_(0),
     is_reconnecting_(false),
+    logger_(CppLogging::Logger("gateway")),
     outgoing_queue_(1024), // SPSC queue size
     sender_thread_running_(true)
 {
@@ -38,7 +38,7 @@ TcpClientTransport::~TcpClientTransport()
 bool TcpClientTransport::perform_connect_logic() {
     bool expected_reconnecting = false;
     if (!is_reconnecting_.compare_exchange_strong(expected_reconnecting, true)) {
-        LOG_WARN(logger_, "Connection attempt already in progress.");
+        logger_.Warn("tcp_client_transport.cpp: Connection attempt already in progress.");
         return is_connected();
     }
 
@@ -78,7 +78,7 @@ bool TcpClientTransport::perform_connect_logic() {
         socket_fd_ = new_socket_fd;
         connected_ = true;
         connection_timestamp_++;
-        LOG_INFO(logger_, "Successfully connected to %s:%d", server_host_.c_str(), server_port_);
+        logger_.Info("tcp_client_transport.cpp: Successfully connected to {}:{}", server_host_, server_port_);
         is_reconnecting_ = false;
         return true;
     } catch (const std::exception& ex) {
@@ -87,7 +87,7 @@ bool TcpClientTransport::perform_connect_logic() {
             socket_fd_ = -1;
         }
         connected_ = false;
-        LOG_ERROR(logger_, "Connection to %s:%d failed: %s", server_host_.c_str(), server_port_, ex.what());
+        logger_.Error("tcp_client_transport.cpp: Connection to {}:{} failed: {}", server_host_, server_port_, ex.what());
         is_reconnecting_ = false;
         return false;
     }
@@ -104,7 +104,7 @@ void TcpClientTransport::disconnect()
     if (socket_fd_ >= 0) {
         close(socket_fd_);
         socket_fd_ = -1;
-        LOG_INFO(logger_, "Disconnected from server.");
+        logger_.Info("tcp_client_transport.cpp: Disconnected from server.");
     }
 }
 
@@ -140,7 +140,7 @@ void TcpClientTransport::sender_thread_func()
             ssize_t sent = ::send(fd, data.data() + offset, data.size() - offset, MSG_NOSIGNAL);
             if (sent < 0) {
                 if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                    LOG_ERROR(logger_, "Send failed: %s", strerror(errno));
+                    logger_.Error("tcp_client_transport.cpp: Send failed: {}", strerror(errno));
                     handle_disconnect_detected();
                     send_error = true;
                 }
@@ -150,7 +150,7 @@ void TcpClientTransport::sender_thread_func()
         }
 
         if (!send_error && timestamp_before_send != connection_timestamp_.load()) {
-            LOG_ERROR(logger_, "CRITICAL FAULT: Data sent successfully, but connection instance changed. Data delivery uncertain.");
+            logger_.Error("tcp_client_transport.cpp: CRITICAL FAULT: Data sent successfully, but connection instance changed. Data delivery uncertain.");
         }
     }
 }
@@ -158,7 +158,7 @@ void TcpClientTransport::sender_thread_func()
 void TcpClientTransport::handle_disconnect_detected()
 {
     if (is_connected()) {
-        LOG_WARN(logger_, "Disconnect detected.");
+        logger_.Warn("tcp_client_transport.cpp: Disconnect detected.");
         disconnect();
     }
 }
@@ -185,7 +185,7 @@ bool TcpClientTransport::data_available(int timeout_ms) {
     int result = select(fd + 1, &readfds, NULL, NULL, timeout_ms >= 0 ? &tv : NULL);
     
     if (result < 0) {
-        LOG_ERROR(logger_, "Select error: %s", strerror(errno));
+        logger_.Error("tcp_client_transport.cpp: Select error: {}", strerror(errno));
         if (errno == EBADF) handle_disconnect_detected();
         return false;
     }
@@ -202,14 +202,14 @@ int TcpClientTransport::receive_data(void* buffer, size_t size) {
     
     if (bytes_received < 0) {
         if (errno != EWOULDBLOCK && errno != EAGAIN) {
-            LOG_ERROR(logger_, "Receive error: %s", strerror(errno));
+            logger_.Error("tcp_client_transport.cpp: Receive error: {}", strerror(errno));
             handle_disconnect_detected();
         }
         return -1;
     }
     
     if (bytes_received == 0) {
-        LOG_WARN(logger_, "Connection closed by peer");
+        logger_.Warn("tcp_client_transport.cpp: Connection closed by peer");
         handle_disconnect_detected();
         return -1;
     }
@@ -230,7 +230,7 @@ bool TcpClientTransport::receive_exact(void* buffer, size_t size) {
         
         if (bytes_received < 0) {
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                LOG_ERROR(logger_, "Receive error in receive_exact: %s", strerror(errno));
+                logger_.Error("tcp_client_transport.cpp: Receive error in receive_exact: {}", strerror(errno));
                 handle_disconnect_detected();
                 return false;
             }
@@ -239,7 +239,7 @@ bool TcpClientTransport::receive_exact(void* buffer, size_t size) {
         }
         
         if (bytes_received == 0) {
-            LOG_WARN(logger_, "Connection closed by peer during receive_exact");
+            logger_.Warn("tcp_client_transport.cpp: Connection closed by peer during receive_exact");
             handle_disconnect_detected();
             return false;
         }

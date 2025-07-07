@@ -7,19 +7,17 @@
 
 namespace gateway {
 
-// Add this enum definition
 enum class HandlerMode {
-  SUBSCRIBER_ONLY,  // Subscribe to ROS topics, send to network
-  PUBLISHER_ONLY,   // Receive from network, publish to ROS topics
-  BOTH              // Both modes enabled
+  SUBSCRIBER_ONLY,
+  PUBLISHER_ONLY,
+  BOTH
 };
-
 
 class RosGateway; // Forward declaration
 
 class MessageHandlerBase {
 public:
-  MessageHandlerBase(RosGateway* gateway, const std::string& handler_name);
+  MessageHandlerBase(RosGateway* gateway, rclcpp::Node::SharedPtr node, const std::string& handler_name);
   virtual ~MessageHandlerBase() = default;
   
   virtual void initialize() = 0;
@@ -30,7 +28,6 @@ public:
   void enable() { enabled_ = true; }
   void disable() { enabled_ = false; }
   
-  // ROS Publisher/Subscriber mode control
   void enable_ros_publisher_mode() { ros_publisher_enabled_ = true; }
   void disable_ros_publisher_mode() { ros_publisher_enabled_ = false; }
   void enable_ros_subscriber_mode() { ros_subscriber_enabled_ = true; }
@@ -41,30 +38,27 @@ public:
   
   static void configure_handler_mode(std::shared_ptr<MessageHandlerBase> handler, HandlerMode mode);
 
-
-  // New method to check if handler can process a message type
   virtual bool can_process_message_type(MessageType /* type */) const {
-    return false; // Default implementation processes no message types
+    return false;
   }
   
-  // New method to process and publish received messages to ROS
   virtual bool process_and_publish_received_msg(
       const std::string& /* topic */,
       MessageType /* type */,
       const void* /* data */,
       size_t /* size */,
       const MessageOptions& /* options */) {
-    return false; // Default implementation does no processing
+    return false;
   }
   
 protected:
-  RosGateway* gateway_; // Non-owning pointer to parent gateway
+  RosGateway* gateway_;
+  rclcpp::Node::SharedPtr node_;
   std::string handler_name_;
   bool enabled_ = false;
-  bool ros_publisher_enabled_ = true;  // Default: can publish to ROS topics (receive from network)
-  bool ros_subscriber_enabled_ = true; // Default: can subscribe to ROS topics (send to network)
+  bool ros_publisher_enabled_ = true;
+  bool ros_subscriber_enabled_ = true;
   
-  // Helper methods for handlers to send messages through the gateway
   bool send_message(const std::string& topic, MessageType type,
                     const void* data, size_t size,
                     const MessageOptions& options);

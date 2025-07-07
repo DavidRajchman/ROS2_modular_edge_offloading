@@ -3,13 +3,14 @@
 
 #include "modular_gateway_sender/message_handler_base.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "logging/logger.h"
 #include <map>
 
 namespace gateway {
 
 class StringTestInputHandler : public MessageHandlerBase {
 public:
-  StringTestInputHandler(RosGateway* gateway);
+  StringTestInputHandler(RosGateway* gateway, rclcpp::Node::SharedPtr node);
   
   void initialize() override;
   void shutdown() override;
@@ -30,8 +31,8 @@ private:
   
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
   std::string topic_name_;
-  
   std::map<std::string, rclcpp::Publisher<std_msgs::msg::String>::SharedPtr> publishers_;
+  CppLogging::Logger logger_;
 };
 
 } // namespace gateway

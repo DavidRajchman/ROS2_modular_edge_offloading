@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <atomic>
 #include "readerwriterqueue.h" 
+#include "logging/logger.h"
 
 namespace gateway {
 
@@ -32,6 +33,9 @@ public:
   virtual bool data_available(int timeout_ms = 0) = 0;
   virtual int receive_data(void* buffer, size_t max_size) = 0;
   virtual bool receive_exact(void* buffer, size_t size) = 0;
+
+  // Make accept_connection a public part of the interface for server transports
+  virtual bool accept_connection() { return false; } // Default implementation for clients
 };
 
 class TcpServerTransport : public TransportBase {
@@ -46,6 +50,7 @@ public:
   bool data_available(int timeout_ms = 0) override;
   int receive_data(void* buffer, size_t max_size) override;
   bool receive_exact(void* buffer, size_t size) override;
+  bool accept_connection() override;
 
 private:
   int port_;
@@ -57,13 +62,12 @@ private:
   std::atomic<uint64_t> connection_timestamp_;
   std::atomic<bool> is_reconnecting_;
   std::atomic<int> io_operation_active_count_;
-  rclcpp::Logger logger_{rclcpp::get_logger("tcp_server_transport")};
+  CppLogging::Logger logger_; // Use the correct logger type
 
   moodycamel::ReaderWriterQueue<std::vector<uint8_t>> outgoing_queue_;
   std::atomic<bool> sender_thread_running_;
   std::thread sender_thread_;
 
-  bool accept_connection();
   void sender_thread_func();
   void handle_disconnect_detected();
 };
@@ -92,7 +96,7 @@ private:
   std::atomic<uint64_t> connection_timestamp_;
   std::atomic<bool> is_reconnecting_;
   
-  rclcpp::Logger logger_{rclcpp::get_logger("tcp_client_transport")};
+  CppLogging::Logger logger_; // Use the correct logger type
 
   moodycamel::ReaderWriterQueue<std::vector<uint8_t>> outgoing_queue_;
   std::atomic<bool> sender_thread_running_;

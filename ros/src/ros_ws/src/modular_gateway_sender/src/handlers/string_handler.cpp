@@ -1,39 +1,34 @@
-// string_handler.cpp
-#include "modular_gateway_sender/logging_utils.hpp"
 #include "modular_gateway_sender/handlers/string_handler.hpp"
 #include "modular_gateway_sender/ros_gateway.hpp"
 
 namespace gateway {
 
-StringHandler::StringHandler(RosGateway* gateway)
-  : MessageHandlerBase(gateway, "string_handler")
+StringHandler::StringHandler(RosGateway* gateway, rclcpp::Node::SharedPtr node)
+  : MessageHandlerBase(gateway, node, "string_handler"),
+    logger_(CppLogging::Logger("gateway"))
 {
 }
 
 void StringHandler::initialize()
 {
-  // Get parameters
-  gateway_->declare_parameter("string_handler.topic", "topic");
-  topic_name_ = gateway_->get_parameter("string_handler.topic").as_string();
+  node_->declare_parameter("string_handler.topic", "topic");
+  topic_name_ = node_->get_parameter("string_handler.topic").as_string();
   
-  // Create subscription
-  subscription_ = gateway_->create_subscription<std_msgs::msg::String>(
+  subscription_ = node_->create_subscription<std_msgs::msg::String>(
     topic_name_, 10,
     [this](const std_msgs::msg::String::SharedPtr msg) {
       this->handle_message(topic_name_, msg);
     }
   );
+  logger_.Info("string_handler.cpp: Initialized for topic: {}", topic_name_);
 }
 
 void StringHandler::shutdown()
 {
   subscription_.reset();
-  
-  // Clean up the publishers
   publishers_.clear();
-  
-  // Disable the handler
   enabled_ = false;
+  logger_.Info("string_handler.cpp: Shut down for topic {}", topic_name_);
 }
 
 void StringHandler::handle_message(const std::string& topic, 
@@ -41,13 +36,11 @@ void StringHandler::handle_message(const std::string& topic,
 {
   if (!is_enabled() || !is_ros_subscriber_enabled()) return;
   
-  LOG_INFO(gateway_->get_logger(), "StringHandler received: %s", msg->data.c_str());
+  logger_.Info("string_handler.cpp: Received: {}", msg->data);
 
   MessageOptions options;
   
-  
-  // Send message with default options (no flags)
-  send_message(topic, MessageType::STRING, msg->data.c_str(), msg->data.size(),options);
+  send_message(topic, MessageType::STRING, msg->data.c_str(), msg->data.size(), options);
 }
 
 bool StringHandler::process_and_publish_received_msg(
@@ -61,30 +54,26 @@ bool StringHandler::process_and_publish_received_msg(
     return false;
   }
 
-  // Find or create publisher for this topic
   auto it = publishers_.find(topic);
   if (it == publishers_.end()) {
-    auto publisher = gateway_->create_publisher<std_msgs::msg::String>(topic, 10);
+    auto publisher = node_->create_publisher<std_msgs::msg::String>(topic, 10);
     it = publishers_.emplace(topic, publisher).first;
-    RCLCPP_INFO(gateway_->get_logger(), "Created string publisher for topic: %s", topic.c_str());
+    logger_.Info("string_handler.cpp: Created string publisher for topic: {}", topic);
   }
 
-  // Process based on serialization flag
   if (options.serialized) {
-    //serialization not implemented for string messages
-    LOG_ERROR(gateway_->get_logger(), "Serialized string messages are not supported for processing");
+    logger_.Error("string_handler.cpp: Serialized string messages are not supported for processing");
   }
   else {
-    // Handle raw string data
     std_msgs::msg::String msg;
     msg.data = std::string(static_cast<const char*>(data), size);
     it->second->publish(msg);
     
-    RCLCPP_INFO(gateway_->get_logger(), "Published string to topic %s: %s", 
-              topic.c_str(), msg.data.c_str());
+    logger_.Info("string_handler.cpp: Published string to topic {}: {}", 
+              topic, msg.data);
   }
 
-return true;
+  return true;
 }
 
 } // namespace gateway

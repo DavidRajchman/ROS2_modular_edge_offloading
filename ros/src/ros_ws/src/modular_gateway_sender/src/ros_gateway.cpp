@@ -1,120 +1,29 @@
-#include "modular_gateway_sender/logging_utils.hpp"
 #include "modular_gateway_sender/ros_gateway.hpp"
-
-void ConfigureLogger()
-{
-    // Use AsyncWaitFreeProcessor for optimal multithreaded performance
-    auto sink = std::make_shared<CppLogging::AsyncWaitFreeProcessor>(
-        std::make_shared<CppLogging::BinaryLayout>(),
-        true,    // auto_start
-        32768,    // capacity (power of 2)
-        false    // don't discard - block if buffer full (prevents message loss)
-    );
-    
-    sink->appenders().push_back(
-        std::make_shared<CppLogging::FileAppender>("mec_binary.log"));
-    
-    CppLogging::Config::ConfigLogger("gateway", sink);
-}
 
 namespace gateway {
 
 RosGateway::RosGateway(
-    const std::string& node_name,
-    TransportMode transport_mode,
-    const rclcpp::NodeOptions& options)
-  : Node(node_name, options),
-    transport_mode_(transport_mode)
+    rclcpp::Node::SharedPtr node,
+    std::unique_ptr<TransportBase> transport)
+  : node_(node),
+    transport_(std::move(transport)),
+    logger_(CppLogging::Logger("gateway"))
 {
-    // Initialize parameters with defaults for client mode
-    this->declare_parameter("transport_type", "tcp");
-    this->declare_parameter("server_host", "127.0.0.1");
-    this->declare_parameter("server_port", 12888);
-    this->declare_parameter("max_retries", 3);
-    this->declare_parameter("auto_start_receiver", true);
-    this->declare_parameter("wait_for_connection", true);
-    this->declare_parameter("connection_timeout_ms", 5000);
-    this->declare_parameter("receiver_sleep_time_us", 100);
-    this->declare_parameter("id_group", 0);
-    this->declare_parameter("identifier_in_group", 0);
+    logger_.Info("ros_gateway.cpp: RosGateway (Data Plane) constructed.");
 
-    ConfigureLogger();
-    CppLogging::Config::Startup();
-    
-    logger_ = CppLogging::Logger("gateway");
-    logger_.Info("ros_gateway.cpp: Gateway constructor starting for node '{}'", node_name);
-
-    id_group_ = static_cast<uint8_t>(this->get_parameter("id_group").as_int());
-    identifier_in_group_ = static_cast<uint8_t>(this->get_parameter("identifier_in_group").as_int());
-  
-    logger_.Info("ros_gateway.cpp: Gateway configured with ID Group: {}, Identifier: {}", 
-                 id_group_, identifier_in_group_);
-
-    // Set up shutdown handler
-    rclcpp::on_shutdown([this]() { 
-      logger_.Info("ros_gateway.cpp: Shutdown signal received, stopping receiver");
-      stop_receiver();
-
-      if (transport_) {
-        transport_->disconnect();
-      }
-    });
-
-    // #1 LATENCY POINT: Buffer allocation
-    logger_.Debug("ros_gateway.cpp: Pre-allocating header buffer");
+    // Pre-allocate buffers to reduce runtime allocations
     header_buffer_.reserve(256);
-    
-    // Initialize transport
-    init_transport();
-    
-    // Automatically start receiver if parameter is set
-    if (get_parameter("auto_start_receiver").as_bool()) {
-      bool wait = get_parameter("wait_for_connection").as_bool();
-      int timeout = get_parameter("connection_timeout_ms").as_int();
-      logger_.Info("ros_gateway.cpp: Auto-starting receiver (wait={}, timeout={}ms)", wait, timeout);
-      start_receiver(wait, timeout);
-    }
+    topic_buffer_.reserve(256);
+    data_buffer_.reserve(1024 * 1024); // Reserve 1MB for data buffer
 }
 
 RosGateway::~RosGateway()
 {
-  logger_.Info("ros_gateway.cpp: Gateway destructor called");
+  logger_.Info("ros_gateway.cpp: RosGateway destructor called");
   stop_receiver();
 
   if (transport_) {
     transport_->disconnect();
-  }
-}
-
-void RosGateway::init_transport()
-{
-  // #18 LATENCY POINT: Parameter access
-  logger_.Debug("ros_gateway.cpp: Loading transport configuration parameters");
-  std::string transport_type = get_parameter("transport_type").as_string();
-  
-  if (transport_type == "tcp") {
-    if (transport_mode_ == TransportMode::CLIENT) {
-      std::string server_host = get_parameter("server_host").as_string();
-      int server_port = get_parameter("server_port").as_int();
-      int max_retries = get_parameter("max_retries").as_int();
-      
-      transport_ = std::make_unique<TcpClientTransport>(server_host, server_port, max_retries);
-      logger_.Info("ros_gateway.cpp: Initialized TCP client transport to {}:{}", 
-                   server_host, server_port);
-    }
-    else { // SERVER mode
-      int server_port = get_parameter("server_port").as_int();
-      int max_connections = 1;
-      
-      transport_ = std::make_unique<TcpServerTransport>(server_port, max_connections);
-      logger_.Info("ros_gateway.cpp: Initialized TCP server transport on port {}", server_port);
-    }
-  } 
-  else if (transport_type == "udp") {
-    logger_.Error("ros_gateway.cpp: UDP transport not yet implemented");
-  }
-  else {
-    logger_.Error("ros_gateway.cpp: Unknown transport type: {}", transport_type);
   }
 }
 
@@ -127,8 +36,10 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
     return false;
   }
 
-  // The logic to check for connection and block has been removed.
-  // The async_send_data call will now handle the disconnected case.
+  if (!transport_->is_connected()) {
+    logger_.Warn("ros_gateway.cpp: send_message called but transport is not connected.");
+    return false;
+  }
 
   logger_.Debug("ros_gateway.cpp: Creating header for topic '{}', size {} bytes", topic, size);
   create_header_in_buffer(header_buffer_, topic, type, id_group_, identifier_in_group_, size, options);
@@ -139,16 +50,12 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
   auto header_result = transport_->async_send_data(std::move(header));
   if (header_result != TransportAsyncSendResult::SUCCESS) {
     logger_.Error("ros_gateway.cpp: Failed to enqueue header for topic '{}', error code {}", topic, static_cast<int>(header_result));
-    // If the transport is not connected, the sender thread will handle reconnection.
-    // We just report the failure to enqueue.
     return false;
   }
 
   auto payload_result = transport_->async_send_data(std::move(payload));
   if (payload_result != TransportAsyncSendResult::SUCCESS) {
     logger_.Error("ros_gateway.cpp: Failed to enqueue payload for topic '{}', error code {}", topic, static_cast<int>(payload_result));
-    // If this fails, the header is already enqueued. This could lead to a partial message.
-    // For now, we log the error. A more robust implementation might try to remove the header.
     return false;
   }
 
@@ -156,63 +63,23 @@ bool RosGateway::send_message(const std::string& topic, MessageType type,
   return true;
 }
 
-bool RosGateway::start_receiver(bool wait_for_connection, int timeout_ms) {
+void RosGateway::start_receiver() {
     if (receiver_running_) {
         logger_.Warn("ros_gateway.cpp: Receiver thread already running");
-        return false;
+        return;
     }
     
     if (!transport_) {
         logger_.Error("ros_gateway.cpp: Cannot start receiver - no transport initialized");
-        return false;
+        return;
     }
 
-    // Special handling based on transport mode
-    if (transport_mode_ == TransportMode::CLIENT) {
-        if (wait_for_connection && !transport_->is_connected()) {
-            logger_.Info("ros_gateway.cpp: Waiting for connection (timeout={}ms)", timeout_ms);
-            
-            const int retry_interval_ms = 100;
-            int time_waited = 0;
-            
-            // #20-22 LATENCY POINT: Connection retry loop
-            while (!transport_->is_connected() && (timeout_ms <= 0 || time_waited < timeout_ms)) {
-                logger_.Debug("ros_gateway.cpp: Connection attempt {}", time_waited / retry_interval_ms + 1);
-                if (!transport_->connect()) {
-                    logger_.Debug("ros_gateway.cpp: Connection failed, retrying in {}ms", retry_interval_ms);
-                } else {
-                    logger_.Info("ros_gateway.cpp: Transport connected after {}ms", time_waited);
-                    break;
-                }
-                
-                // #23 LATENCY POINT: Thread sleep
-                std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_ms));
-                time_waited += retry_interval_ms;
-            }
-            if (!transport_->is_connected()) {
-                logger_.Error("ros_gateway.cpp: Failed to connect transport after {}ms", time_waited);
-                return false;
-            }
-        }
-        else if (!transport_->is_connected()) {
-            logger_.Error("ros_gateway.cpp: Cannot start receiver - transport not connected");
-            return false;
-        }
-    } 
-    else {
-        // #20 LATENCY POINT: Server transport connection
-        logger_.Debug("ros_gateway.cpp: Starting server transport");
-        if (!transport_->connect()) {
-            logger_.Error("ros_gateway.cpp: Failed to start server transport");
-            return false;
-        }
-        logger_.Info("ros_gateway.cpp: Server transport listening for connections");
-    }
+    // The controller is now responsible for ensuring transport is connected.
+    // This method just starts the processing thread.
     
     receiver_running_ = true;
     receiver_thread_ = std::thread(&RosGateway::receiver_thread_func, this);
     logger_.Info("ros_gateway.cpp: Started message receiver thread");
-    return true;
 }
 
 void RosGateway::stop_receiver() {
@@ -222,7 +89,6 @@ void RosGateway::stop_receiver() {
     
     receiver_running_ = false;
     if (receiver_thread_.joinable()) {
-        // #24 LATENCY POINT: Thread synchronization
         logger_.Debug("ros_gateway.cpp: Waiting for receiver thread to join");
         receiver_thread_.join();
     }
@@ -230,32 +96,25 @@ void RosGateway::stop_receiver() {
 }
 
 void RosGateway::receiver_thread_func() {
-  int receiver_idle_poll_sleep_us = this->get_parameter("receiver_sleep_time_us").as_int(); 
+  // Parameter for sleep time should be passed from controller if needed.
+  // For now, using a small default.
+  int receiver_idle_poll_sleep_us = 100; 
 
   while (receiver_running_) {
       bool data_ready = false;
       
-      if (transport_) {
-          // For both client and server, data_available() is the main polling mechanism.
-          // For the server, it also handles accepting new connections.
-          // So we call it regardless of the current connection state.
-          data_ready = transport_->data_available(10);
+      if (transport_ && transport_->is_connected()) {
+          data_ready = transport_->data_available(100); // Poll with a timeout
       }
       
       if (data_ready) {
-          logger_.Debug("ros_gateway.cpp: Data available, processing message");
-          if (transport_ && transport_->is_connected()) {
-            if (!receive_and_process_message()) {
-                logger_.Warn("ros_gateway.cpp: Message processing failed in receiver thread");
-            }
-          } else {
-            // This case might be hit if data was available but the client disconnected
-            // between data_available() and is_connected(). This is not an error.
-            logger_.Debug("ros_gateway.cpp: Data was available, but transport is now disconnected.");
+          if (!receive_and_process_message()) {
+              logger_.Warn("ros_gateway.cpp: Failed to process message or peer disconnected.");
+              // The transport layer now handles the disconnect. We just continue.
           }
       } else {
-        // No data and no new connection, sleep for a bit.
-        std::this_thread::sleep_for(std::chrono::microseconds(receiver_idle_poll_sleep_us));
+          if (!receiver_running_) break;
+          std::this_thread::sleep_for(std::chrono::microseconds(receiver_idle_poll_sleep_us));
       }
   }
 }
@@ -264,14 +123,12 @@ bool RosGateway::receive_and_process_message() {
     constexpr size_t HEADER_MIN_SIZE = 11;
     uint8_t header_start[HEADER_MIN_SIZE];
     
-    // #8 LATENCY POINT: Header network reception
     logger_.Debug("ros_gateway.cpp: Receiving message header ({} bytes)", HEADER_MIN_SIZE);
     if (!transport_->receive_exact(header_start, HEADER_MIN_SIZE)) {
         logger_.Error("ros_gateway.cpp: Failed to receive header start");
         return false;
     }
     
-    // #25-26 LATENCY POINT: Magic number verification and data extraction
     uint16_t magic = (header_start[0] << 8) | header_start[1];
     if (magic != HEADER_MAGIC) {
         logger_.Error("ros_gateway.cpp: Invalid header magic: 0x{:04X} (expected 0x{:04X})", 
@@ -289,7 +146,6 @@ bool RosGateway::receive_and_process_message() {
                          static_cast<uint32_t>(header_start[9]);
     uint8_t topic_len = header_start[10];
     
-    // #3 LATENCY POINT: Topic buffer allocation
     logger_.Debug("ros_gateway.cpp: Resizing topic buffer ({} bytes)", topic_len);
     try {
         topic_buffer_.resize(topic_len);
@@ -298,20 +154,17 @@ bool RosGateway::receive_and_process_message() {
         return false;
     }
     
-    // #9 LATENCY POINT: Topic name network reception
     if (!transport_->receive_exact(topic_buffer_.data(), topic_len)) {
         logger_.Error("ros_gateway.cpp: Failed to receive topic name");
         return false;
     }
     
-    // #5 LATENCY POINT: String construction
     std::string topic(topic_buffer_.data(), topic_len);
     MessageOptions options(flags);
     
     logger_.Debug("ros_gateway.cpp: Received header for '{}', type={}, from {}:{}, size={} bytes",
                   topic, static_cast<int>(type), received_id_group, received_identifier_in_group, data_size);
     
-    // #4 LATENCY POINT: Large data buffer allocation
     logger_.Debug("ros_gateway.cpp: Resizing message data buffer ({} bytes)", data_size);
     try {
         data_buffer_.resize(data_size);
@@ -320,14 +173,12 @@ bool RosGateway::receive_and_process_message() {
         return false;
     }
     
-    // #10 LATENCY POINT: Payload network reception
     logger_.Debug("ros_gateway.cpp: Receiving message payload ({} bytes)", data_size);
     if (!transport_->receive_exact(data_buffer_.data(), data_size)) {
         logger_.Error("ros_gateway.cpp: Failed to receive message data for topic '{}'", topic);
         return false;
     }
     
-    // #15-16 LATENCY POINT: Handler processing loop
     bool processed = false;
     logger_.Debug("ros_gateway.cpp: Processing message through {} handlers", handlers_.size());
     
@@ -335,11 +186,7 @@ bool RosGateway::receive_and_process_message() {
         auto& handler = handler_pair.second;
         
         if (handler->is_ros_publisher_enabled() && handler->can_process_message_type(type)) {
-            logger_.Debug("ros_gateway.cpp: Handler '{}' processing message", handler->get_name());
-            if (handler->process_and_publish_received_msg(
-                    topic, type, data_buffer_.data(), data_buffer_.size(), options)) {
-                logger_.Debug("ros_gateway.cpp: Message '{}' published to ROS by handler '{}'", 
-                             topic, handler->get_name());
+            if (handler->process_and_publish_received_msg(topic, type, data_buffer_.data(), data_size, options)) {
                 processed = true;
             }
         }
@@ -411,11 +258,16 @@ void RosGateway::disable_handler(const std::string& handler_name)
   logger_.Info("ros_gateway.cpp: Disabled handler: {}", handler_name);
 }
 
-void RosGateway::set_gateway_id(uint8_t id_group, uint8_t identifier_in_group) {
+void RosGateway::set_identity(uint8_t id_group, uint8_t identifier_in_group) {
   id_group_ = id_group;
   identifier_in_group_ = identifier_in_group;
   logger_.Info("ros_gateway.cpp: Gateway ID explicitly set to Group: {}, Identifier: {}",
                id_group_, identifier_in_group_);
+}
+
+TransportBase* RosGateway::get_transport()
+{
+    return transport_.get();
 }
 
 } // namespace gateway

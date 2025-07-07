@@ -85,6 +85,8 @@ RUN git clone https://github.com/cameron314/readerwriterqueue.git readerwriterqu
     make install
 
 COPY ./src/ros_ws/src /home/ubuntu/ros_ws/src/
+COPY .github /home/ubuntu/ros_ws/.github
+
 
 
 # Nastavení prostředí pro ROS 2

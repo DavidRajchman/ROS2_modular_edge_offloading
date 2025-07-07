@@ -16,6 +16,8 @@ services:
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
       - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
+      - ./cpplib:/home/ubuntu/cpplib_src
+
     privileged: true
     tty: true
     command: /bin/bash 
@@ -41,6 +43,8 @@ services:
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
       - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
+      - ./cpplib:/home/ubuntu/cpplib_src
+
     privileged: true
     tty: true
     command: /bin/bash # Example: different command, or another rviz2 if display handles it
