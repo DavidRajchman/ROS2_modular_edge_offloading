@@ -40,8 +40,16 @@ install(DIRECTORY include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+# Install the INTERFACE library target. This command doesn't install any files for
+# an INTERFACE library, but it crucially adds the target to the specified export set,
+# making it available for the install(EXPORT ...) command below.
+install(TARGETS control_plane_protocol
+    EXPORT ControlPlaneProtocolTargets
+)
+
 # --- CMake Package Configuration ---
 # This section generates the files that allow `find_package(ControlPlaneProtocol)` to work.
+# This command now works because ControlPlaneProtocolTargets was created above.
 install(EXPORT ControlPlaneProtocolTargets
     FILE ControlPlaneProtocolTargets.cmake
     NAMESPACE ControlPlaneProtocol::
