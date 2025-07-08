@@ -15,43 +15,33 @@ add_definitions(-DVERSION_MAJOR=0)
 add_definitions(-DVERSION_MINOR=20)
 add_definitions(-DVERSION_PATCH=0)
 
-# --- Compile-Time Log Level Control ---
-set(PROJECT_ACTIVE_LOG_LEVEL 2) # Default to DEBUG.
-
 # --- Find Dependencies ---
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(fmt REQUIRED)  # Use locally installed fmt
-find_package(Threads REQUIRED) # Ensure Threads is found
-
+find_package(fmt REQUIRED)
+find_package(Threads REQUIRED)
+# Add /usr/local to the search path for packages installed outside the workspace
+list(APPEND CMAKE_PREFIX_PATH "/usr/local")
 find_package(ControlPlaneProtocol REQUIRED)
+find_package(DiscoveryProtocol REQUIRED)
 
+# --- Define paths to external libraries ---
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
-set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue") # Add this line
+set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue")
 
-# --- Fetch External Dependencies ---
-# Include the FetchContent module to enable fetching dependencies at configure time.
+# --- Fetch nlohmann_json via FetchContent ---
 include(FetchContent)
-
-# Declare the nlohmann_json dependency from its official GitHub repository.
-# We pin it to a specific GIT_TAG (version) to ensure the build is reproducible
-# and won't break if the library's main branch changes.
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        v3.11.3 # A recent, stable version
+  GIT_TAG        v3.11.3
 )
-
-# This command will download the dependency (if not already downloaded) and
-# make its CMake targets available to our project. For nlohmann_json, this
-# creates the `nlohmann_json::nlohmann_json` target.
 FetchContent_MakeAvailable(nlohmann_json)
 
-
-# Find CppCommon library
+# --- Find pre-built external libraries ---
 find_library(CPPCOMMON_LIBRARY
     NAMES cppcommon
     HINTS ${CPPCOMMON_DIR}/bin ${CPPCOMMON_DIR}/build
@@ -59,7 +49,6 @@ find_library(CPPCOMMON_LIBRARY
 )
 message(STATUS "Found CppCommon library: ${CPPCOMMON_LIBRARY}")
 
-# Find CppLogging library
 find_library(CPPLOGGING_LIBRARY
     NAMES cpplogging
     HINTS ${CPPLOGGER_DIR}/bin ${CPPLOGGER_DIR}/build
@@ -67,25 +56,15 @@ find_library(CPPLOGGING_LIBRARY
 )
 message(STATUS "Found CppLogging library: ${CPPLOGGING_LIBRARY}")
 
-# --- Include Directories ---
+# --- Global Include Directories ---
 include_directories(
   include
-  ${MOODYCAMEL_DIR} # Add this line
+  ${MOODYCAMEL_DIR}
 )
-
 
 # --- Library Definitions ---
-# Add handlers here
-add_library(handlers
-  src/handlers/string_handler.cpp
-  src/handlers/laserscan_handler.cpp
-  src/handlers/string_test_input_handler.cpp  
-  src/handlers/string_test_result_handler.cpp
-)
-target_link_libraries(handlers message_handler_base) # Changed from PUBLIC
-ament_target_dependencies(handlers rclcpp std_msgs sensor_msgs)
 
-# Transport library
+# Transport library (TCP client/server implementations)
 add_library(gateway_transport_lib
   src/transport/tcp_client_transport.cpp
   src/transport/tcp_server_transport.cpp
@@ -94,107 +73,91 @@ target_include_directories(gateway_transport_lib PUBLIC
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
     $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
-
     $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(gateway_transport_lib rclcpp)
 
-# ROS Gateway library
-add_library(ros_gateway_lib src/ros_gateway.cpp)
-target_include_directories(ros_gateway_lib PUBLIC
+# Message Handler Base library
+add_library(message_handler_base_lib src/message_handler_base.cpp)
+target_include_directories(message_handler_base_lib PUBLIC
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
-    $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
-    src/ros_gateway.cpp
-    src/message_handler_base.cpp
-    src/gateway_controller.cpp
-    src/logging_setup.cpp
-
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(ros_gateway_lib gateway_transport_lib) # Changed from PUBLIC
+ament_target_dependencies(message_handler_base_lib rclcpp)
+
+# Handlers library (all concrete message handlers)
+add_library(handlers_lib
+  src/handlers/string_handler.cpp
+  src/handlers/laserscan_handler.cpp
+  src/handlers/string_test_input_handler.cpp
+  src/handlers/string_test_result_handler.cpp
+)
+target_link_libraries(handlers_lib message_handler_base_lib)
+ament_target_dependencies(handlers_lib rclcpp std_msgs sensor_msgs)
+
+# RosGateway library (Data Plane core)
+add_library(ros_gateway_lib src/ros_gateway.cpp)
+target_link_libraries(ros_gateway_lib
+  gateway_transport_lib
+  message_handler_base_lib
+)
 ament_target_dependencies(ros_gateway_lib rclcpp)
 
-# Message handler base
-add_library(message_handler_base src/message_handler_base.cpp)
-target_include_directories(message_handler_base PUBLIC
-    $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
-    $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
+# GatewayController library (Control Plane core)
+add_library(gateway_controller_lib
+    src/gateway_controller.cpp
+    src/logging_setup.cpp
+    src/discovery_client.cpp
+    src/bridge_cp_client.cpp
+    src/handler_factory.cpp
 )
-target_link_libraries(message_handler_base ros_gateway_lib) # Changed from PUBLIC
-ament_target_dependencies(message_handler_base rclcpp)
-
-# --- Executable Definitions ---
-set(COMMON_EXEC_INCLUDE_DIRS
-    PRIVATE
-    # If executables directly use moodycamel, add its include dir here
-    # ${MOODYCAMEL_CONCURRENTQUEUE_SOURCE_DIR}
-    # CppLogger and CppCommon includes are typically brought in via linked libraries
+target_link_libraries(gateway_controller_lib
+    ros_gateway_lib
+    handlers_lib
+    ${ControlPlaneProtocol_LIBRARIES}
+    ${DiscoveryProtocol_LIBRARIES}
+    nlohmann_json::nlohmann_json
 )
+ament_target_dependencies(gateway_controller_lib rclcpp)
 
-# COMMON_EXEC_LIBS should be a plain list of libraries for plain signature linking
-set(COMMON_EXEC_LIBS
-    # PRIVATE # Keyword removed from the list itself
-    ros_gateway_lib # This should bring its dependencies
-    handlers
-    Threads::Threads      # Link pthreads
+# --- Executable Definition ---
+# The single, unified executable for the new architecture.
+add_executable(gateway_controller src/main.cpp)
+target_link_libraries(gateway_controller
+    gateway_controller_lib
+    Threads::Threads
     ${CPPLOGGING_LIBRARY}
     ${CPPCOMMON_LIBRARY}
-    fmt::fmt              # Link fmt library
-
+    fmt::fmt
     bfd
     uuid
     dl
     z
     rt
 )
-
-# Client executable
-add_executable(gateway_client src/gateway_client_main.cpp)
-target_include_directories(gateway_client ${COMMON_EXEC_INCLUDE_DIRS})
-target_link_libraries(gateway_client ${COMMON_EXEC_LIBS}) # This will now be a plain signature call
-ament_target_dependencies(gateway_client rclcpp std_msgs sensor_msgs)
-
-# Server executable
-add_executable(gateway_server src/gateway_server_main.cpp)
-target_include_directories(gateway_server ${COMMON_EXEC_INCLUDE_DIRS})
-target_link_libraries(gateway_server ${COMMON_EXEC_LIBS}) # Plain signature call
-ament_target_dependencies(gateway_server rclcpp std_msgs sensor_msgs)
-
-# VHC executable
-add_executable(gateway_VHC src/gateway_VHC_main.cpp)
-target_include_directories(gateway_VHC ${COMMON_EXEC_INCLUDE_DIRS})
-target_link_libraries(gateway_VHC ${COMMON_EXEC_LIBS}) # Plain signature call
-ament_target_dependencies(gateway_VHC rclcpp std_msgs sensor_msgs)
-
-# MEC executable
-add_executable(gateway_MEC src/gateway_MEC_main.cpp)
-target_include_directories(gateway_MEC ${COMMON_EXEC_INCLUDE_DIRS})
-target_link_libraries(gateway_MEC ${COMMON_EXEC_LIBS}) # Plain signature call
-ament_target_dependencies(gateway_MEC rclcpp std_msgs sensor_msgs)
+ament_target_dependencies(gateway_controller rclcpp)
 
 # --- Installation ---
-# ...existing code...
 install(TARGETS
-  gateway_client
-  gateway_server
-  gateway_VHC
-  gateway_MEC
+  gateway_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(TARGETS
   gateway_transport_lib
   ros_gateway_lib
-  message_handler_base
-  handlers
+  message_handler_base_lib
+  handlers_lib
+  gateway_controller_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY include/
-  DESTINATION include/${PROJECT_NAME}
+install(
+  DIRECTORY include/
+  DESTINATION include
 )
 
 ament_package()

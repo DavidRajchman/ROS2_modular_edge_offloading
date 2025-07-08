@@ -56,16 +56,22 @@ void BridgeCpClient::stop() {
 
 void BridgeCpClient::client_thread_func() {
     while (running_) {
-        if (transport_ && transport_->data_available(1000)) { // Check for data with a 1s timeout
+        if (transport_ && transport_->is_connected() && transport_->data_available(1000)) { // Check for data with a 1s timeout
             std::vector<uint8_t> buffer(4096); // Buffer for incoming data
-            int bytes_received = transport_->receive_data(buffer.data(), buffer.size());
+            int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
+
             if (bytes_received > 0) {
+                buffer[bytes_received] = '\0'; // Null-terminate the received data
+                std::string json_str(reinterpret_cast<char*>(buffer.data()));
                 try {
-                    json received_json = json::parse(buffer.begin(), buffer.begin() + bytes_received);
-                    handle_received_message(received_json);
+                    json msg = json::parse(json_str);
+                    handle_received_message(msg);
                 } catch (const json::parse_error& e) {
-                    logger_.Error("bridge_cp_client.cpp: JSON parse error: {}", e.what());
+                    logger_.Error("bridge_cp_client.cpp: JSON parse error: {}. Received data: {}", e.what(), json_str);
                 }
+            } else if (bytes_received < 0) {
+                // An error occurred, or the connection was closed. The transport handles logging this.
+                // The loop will continue, and is_connected() will eventually be false.
             }
         }
         // Periodically check for messages that need to be re-sent
@@ -92,20 +98,34 @@ void BridgeCpClient::handle_received_message(const json& msg) {
 
     switch (code) {
         case 200: // SESSION_APPROVED
-            if (on_session_approved_) on_session_approved_(msg["payload"]["request_id"]);
+            if (on_session_approved_ && msg.contains("payload") && msg["payload"].contains("request_id")) {
+                on_session_approved_(msg["payload"]["request_id"]);
+            } else {
+                logger_.Error("bridge_cp_client.cpp: Malformed SESSION_APPROVED message.");
+            }
             break;
         case 201: // SESSION_DENIED
-            if (on_session_denied_) on_session_denied_(msg["payload"]["request_id"], msg["payload"]["reason_description"]);
+            if (on_session_denied_ && msg.contains("payload") && msg["payload"].contains("request_id") && msg["payload"].contains("reason_description")) {
+                on_session_denied_(msg["payload"]["request_id"], msg["payload"]["reason_description"]);
+            } else {
+                logger_.Error("bridge_cp_client.cpp: Malformed SESSION_DENIED message.");
+            }
             break;
         case 202: // DP_CONNECTION_CONFIRMED
-            if (on_dp_confirmed_) on_dp_confirmed_();
+            if (on_dp_confirmed_) {
+                on_dp_confirmed_();
+            }
             break;
         case 900: // ACK
         {
-            int ack_seq_num = msg["payload"]["ack_sequence_number"];
-            std::lock_guard<std::mutex> lock(pending_acks_mutex_);
-            if (pending_acks_.erase(ack_seq_num)) {
-                logger_.Info("bridge_cp_client.cpp: Received ACK for sequence number {}", ack_seq_num);
+            if (msg.contains("payload") && msg["payload"].contains("ack_sequence_number")) {
+                int ack_seq_num = msg["payload"]["ack_sequence_number"];
+                std::lock_guard<std::mutex> lock(pending_acks_mutex_);
+                if (pending_acks_.erase(ack_seq_num)) {
+                    logger_.Info("bridge_cp_client.cpp: Received ACK for sequence number {}", ack_seq_num);
+                }
+            } else {
+                logger_.Error("bridge_cp_client.cpp: Malformed ACK message.");
             }
             break;
         }
@@ -118,14 +138,23 @@ void BridgeCpClient::handle_received_message(const json& msg) {
 void BridgeCpClient::check_for_timeouts() {
     std::lock_guard<std::mutex> lock(pending_acks_mutex_);
     auto now = std::chrono::steady_clock::now();
+    std::vector<json> messages_to_resend;
+
     for (auto const& [seq_num, pending] : pending_acks_) {
         if (now - pending.time_sent > ack_timeout_) {
-            logger_.Warn("bridge_cp_client.cpp: ACK timeout for sequence number {}. Re-sending.", seq_num);
-            std::string msg_str = pending.message.dump();
-            std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
-            transport_->async_send_data(std::move(data));
-            // Note: In a real implementation, you'd update the time_sent or add a retry counter.
+            logger_.Warn("bridge_cp_client.cpp: ACK timeout for sequence number {}. Resending.", seq_num);
+            messages_to_resend.push_back(pending.message);
         }
+    }
+
+    // Resend outside the loop to avoid iterator invalidation issues if we were modifying the map
+    for (const auto& msg : messages_to_resend) {
+        std::string msg_str = msg.dump();
+        std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
+        transport_->async_send_data(std::move(data));
+        // Also update the time_sent for the resent message
+        uint64_t seq_num = msg["sequence_number"];
+        pending_acks_[seq_num].time_sent = std::chrono::steady_clock::now();
     }
 }
 
@@ -210,10 +239,4 @@ void BridgeCpClient::send_session_terminate_request(const std::string& component
         {"message_code", 102},
         {"message_type", "SESSION_TERMINATE_REQUEST"},
         {"payload", {
-            {"request_id", request_id}
-        }}
-    };
-    send_reliable_message(msg);
-}
-
-} // namespace gateway
+            {"request_id",

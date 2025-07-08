@@ -2,6 +2,7 @@
 #define HANDLER_FACTORY_HPP
 
 #include "logging/logger.h"
+#include "rclcpp/rclcpp.hpp"
 
 #include <string>
 #include <functional>

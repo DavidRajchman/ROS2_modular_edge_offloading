@@ -3,8 +3,12 @@
 
 #include "modular_gateway_sender/message_handler_base.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "logging/logger.h"
+#include "rclcpp/rclcpp.hpp"
+
+#include <string>
+#include <vector>
 #include <map>
+
 
 namespace gateway {
 

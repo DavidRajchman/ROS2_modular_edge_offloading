@@ -1,24 +1,5 @@
-You are absolutely right. My previous response was a high-level sketch and critically lacked the detailed protocol specifications necessary for implementation. An AI or human developer would be blocked without that information. I apologize for the oversight.
-
-This revised document is a complete implementation specification, significantly expanded to include exhaustive details on all protocols, components, and operational flows, as you requested.
-
-### My Understanding of Your Goal
-
-**The Problem:** You have a functional but static "data plane" (`RosGateway`). It needs a "control plane" to transform it into a dynamic, intelligent component capable of participating in a managed offloading ecosystem. The previous design document I provided was a skeleton that correctly identified the necessary components but failed to provide the most critical information: the precise language (the protocols) these components must speak to communicate.
-
-**Your Proposed Solution:** You require a comprehensive, standalone design document that serves as a complete blueprint for the control plane. This document must be detailed enough for another developer (AI or human) to implement the entire feature set with access only to the existing repository and this specification. It must thoroughly detail:
-1.  **The Discovery Protocol:** The exact text-based protocol for finding and registering with the `DiscoveryService`.
-2.  **The Bridge Control Protocol:** The exact JSON-based protocol for negotiating and managing offloading sessions with the Bridge.
-3.  **Component Architecture:** A deep dive into the responsibilities, methods, and internal logic of each new class (`GatewayController`, `DiscoveryClient`, `BridgeControlClient`, `GenericTopicHandler`).
-4.  **Operational Scenarios:** Step-by-step walkthroughs of key processes like startup and offloading requests, showing how all the components and protocols interact.
-
-This revised document is my attempt to provide that level of detail.
-
-### Correction of Assumptions
-
-Your high-level design and assumptions are sound. The dual-plane architecture is the correct model, and the requirements for reliability on the control channels are critical. The plan outlined below builds directly upon these correct assumptions without modification.
-
----
+# TODO:
+* Write service definitions for new ros2 service to enable and disable offloading
 
 ## Modular Gateway Control Plane: Implementation Specification (v2.0)
 
@@ -39,7 +20,7 @@ This document details the design and implementation steps for creating the Modul
 * **request** - a request to offload a single task. It is initiated by the VHC and sent to the BridgeCP. if aproved by the OM, the BridgeCP will construct a DP path that will forward the messages between VHC and MEC. The request is identified by a request_id and a component_id. The request is sent to the BridgeCP as a JSON message. It needs to be maintained by periodic keepalive messages from the VHC. If they timeout, the bridgeCP will teardown the DP path and notify the VHC that the request was denied. Timeout of the request is a valid way to end the offloading session. 
 * **session** - a single offloaded task that is being processed by the VHC and MEC. It is identified by a the request_id and VHC component_id. also refered to as offloading session. There is no explicit session id used in the comunication.   
 
-### 0.5. Logging Configuration
+### 0.5. Logging Configuration - OUTDATED way to configure the library
 
 To ensure consistent and manageable logging across all components, the project will use a centralized configuration strategy for the `CppLogging` library.
 
@@ -62,7 +43,7 @@ To ensure consistent and manageable logging across all components, the project w
 The control plane will be implemented as a new primary class, `GatewayController`, which will be a ROS 2 node. This controller will orchestrate three main components:
 1.  **The Data Plane (`RosGateway`):** The existing `RosGateway` class, which will be owned by the controller and used exclusively for high-speed data transfer.
 2.  **The Discovery Client (`DiscoveryClient`):** A new helper class responsible for all communication with the `DiscoveryService`.
-3.  **The Bridge Control Client (`BridgeControlClient`):** A new helper class responsible for all communication with the Bridge's control plane.
+3.  **The Bridge Control Plane Client (`BridgeCPClient`):** A new helper class responsible for all communication with the Bridge's control plane.
 
 The system is fundamentally multi-threaded to ensure responsiveness and handle concurrent operations:
 *   **ROS 2 Threads:** Managed by `rclcpp::spin`, handling incoming service calls from other ROS 2 nodes. These threads must be non-blocking and will delegate long-running tasks to the control logic thread via thread-safe queues.
@@ -71,19 +52,152 @@ The system is fundamentally multi-threaded to ensure responsiveness and handle c
 
 ### 1.5. Startup and Connection Sequence (CRITICAL)
 
-To minimize latency, the Modular Gateway (MGW) MUST establish all necessary network connections during its initialization phase. The roles are distinct for each plane:
-*   **Control Plane:** The MGW acts as a **TCP Client**.
-*   **Data Plane:** The MGW acts as a **TCP Server**, listening on a pre-configured port.
+The startup sequence is a multi-stage, event-driven process orchestrated by the `GatewayController`'s state machine. The controller does not proceed linearly but transitions between states based on the successful completion of asynchronous operations, which are communicated via callbacks from its client helpers (`DiscoveryClient`, `BridgeCpClient`).
 
-The precise startup sequence is as follows:
-1.  **MGW Initialization:** The `GatewayController` node starts and reads its configuration, including the port its Data Plane will listen on.
-2.  **Data Plane Server Start:** The controller instantiates the `RosGateway` with a `TcpServerTransport`, which immediately begins listening for an incoming connection from the Bridge's Data Plane. A dedicated thread is launched to accept and manage this connection.
-3.  **Discovery (Future Step):** The controller uses the `DiscoveryClient` to find the address of the Bridge's Control Plane. (For now, this is hardcoded).
-4.  **Control Plane Connection:** The controller instantiates and connects the `BridgeControlClient` (as a client) to the Bridge's Control Plane (server).
-5.  **Configuration Exchange:** Immediately upon connecting, the `BridgeControlClient` sends a registration message to the Bridge, providing the IP address and listening port of the MGW's Data Plane.
-6.  **Bridge-Side Connection:** The Bridge's Control Plane receives this message and instructs its own Data Plane (as a client) to connect to the now-listening MGW Data Plane server.
-7.  **Connection Confirmation:** Once the Bridge confirms its Data Plane has successfully connected, it sends a confirmation message back to the MGW over the control plane link.
-8.  **Ready State:** With both control and data planes connected and stable, the `GatewayController` is now fully operational and ready to process offloading requests.
+The process is as follows:
+
+1.  **Initialization (`INITIALIZING` state):** The `GatewayController` is created. It immediately starts its data plane transport layer in listening mode (e.g., a `TcpServerTransport` waiting for the Bridge's data plane to connect). It then transitions to the `DISCOVERING` state.
+2.  **Discovery (`DISCOVERING` state):** The controller starts the `DiscoveryClient`. The client connects to the `DiscoveryService`, sends a registration request, and waits for a response. This is a blocking wait *within the state*, not blocking the entire application.
+3.  **Discovery Callback:** Upon receiving a successful registration response, the `DiscoveryClient` invokes the `on_discovery_success` callback in the `GatewayController`. This callback provides the host and port of the Bridge Control Plane. The controller stores this information and transitions to the `CONNECTING_TO_BRIDGE` state.
+4.  **Bridge Connection (`CONNECTING_TO_BRIDGE` state):** The controller uses the discovered address to start the `BridgeCpClient`. The client connects to the Bridge's control plane and immediately sends a `DP_INFO` message, advertising its own data plane listening address. The controller then transitions to the `WAITING_FOR_DP_CONNECTION` state.
+5.  **Data Plane Link-Up (Concurrent):** In parallel to the control plane setup, the Bridge's data plane connects to the listening socket of the `RosGateway`. The connection is accepted, but data processing does not begin yet.
+6.  **Confirmation Callback:** The Bridge Control Plane, having received the `DP_INFO` and confirmed the data plane connection, sends a `DP_CONNECTION_CONFIRMED` message back. The `BridgeCpClient` receives this and invokes the `on_dp_confirmed` callback in the `GatewayController`.
+7.  **Operational Transition:** The `on_dp_confirmed` callback is the final trigger. It calls `RosGateway::start_receiver()` to begin processing incoming data from the newly confirmed data plane connection. It then transitions the controller's state to `OPERATIONAL`. The gateway is now fully ready to handle offloading sessions.
+
+This sequence is visualized below:
+
+```mermaid
+sequenceDiagram
+    participant User as User/ROS2
+    participant GC as GatewayController
+    participant RG as RosGateway (DP)
+    participant BridgeDP
+    participant BridgeCP
+    participant DS as DiscoveryService\
+
+    User->>GC: Creates GatewayController
+    GC->>GC: Starts control_thread_func()
+    GC->>RG: Starts DP listening (via data_plane_connection_thread)
+    Note over GC: State: INITIALIZING
+
+    GC->>DS: Starts DiscoveryClient, sends REG_REQ
+    Note over GC: State: DISCOVERING
+    DS-->>GC: Responds with REG_RESP (contains BridgeCP address and MGW own IP a.)
+    
+    Note right of GC: on_discovery_success() callback is invoked
+    GC->>BridgeCP: Starts BridgeCpClient, sends DP_INFO
+    Note over GC: State: CONNECTING_TO_BRIDGE
+    
+    BridgeDP->>RG: Connects to listening data plane socket
+    RG-->>BridgeDP: Accepts connection
+    Note over GC: State: WAITING_FOR_DP_CONNECTION
+
+    BridgeCP-->>GC: Sends DP_CONNECTION_CONFIRMED
+    Note right of GC: on_dp_confirmed() callback is invoked
+    GC->>RG: Calls start_receiver()
+    Note over GC: State becomes OPERATIONAL
+```
+
+### 1.6. Threading Model and Interactions
+
+The Modular Gateway is heavily multi-threaded to handle network I/O, ROS 2 communication, and internal state management without blocking. The following diagrams illustrate the key threads and their interactions during different operational phases.
+
+#### High-Level Thread Overview
+
+This diagram shows the primary components and the threads they own and manage.
+
+```mermaid
+graph TD
+    subgraph ROS 2
+        A[ROS 2 Executor Threads]
+    end
+
+    subgraph GatewayController
+        B[Control Logic Thread]
+        C[DP Connection Thread]
+    end
+
+    subgraph "RosGateway (Data Plane)"
+        D[Receiver Thread]
+    end
+
+    subgraph "Control Plane Clients"
+        E[DiscoveryClient Thread]
+        F[BridgeCpClient Thread]
+    end
+    
+    subgraph "Transport Layer"
+        G[Transport Sender Thread]
+    end
+
+    A -- Service Calls --> B;
+    B -- Manages --> C;
+    B -- Manages --> D;
+    B -- Manages --> E;
+    B -- Manages --> F;
+    F -- Uses --> G;
+    D -- Uses --> G;
+```
+
+#### Control Plane: Offloading Request and Approval Flow
+
+This sequence shows how a request from an external ROS node is processed and how the asynchronous approval from the Bridge is handled.
+
+```mermaid
+sequenceDiagram
+    participant UserNode as External ROS Node
+    participant ROST as ROS 2 Executor Thread
+    participant GC_CTRL as GC Control Thread
+    participant BCC_TH as BridgeCpClient Thread
+    participant Bridge
+    
+    UserNode->>+ROST: Calls 'request_offloading' service
+    Note right of ROST: GatewayController::offloading_request_service_handler()
+    ROST->>GC_CTRL: Enqueues request in 'offloading_request_queue_'
+    ROST-->>-UserNode: Returns service response (e.g., "queued")
+
+    GC_CTRL-->>GC_CTRL: Wakes up, dequeues request
+    GC_CTRL->>BCC_TH: Calls BridgeCpClient::send_offload_request()
+    BCC_TH->>Bridge: Sends OFFLOAD_REQUEST message
+
+    loop Session Active
+        Bridge-->>+BCC_TH: Receives SESSION_APPROVED
+        Note right of BCC_TH: BridgeCpClient::handle_received_message()
+        BCC_TH->>GC_CTRL: Invokes on_session_approved() callback
+        Note right of GC_CTRL: Now running in BCC_TH context
+        GC_CTRL->>GC_CTRL: Creates/registers handlers via HandlerFactory
+        GC_CTRL-->>BCC_TH: Callback returns
+        deactivate BCC_TH
+    end
+```
+
+#### Data Plane: Bidirectional Message Flow
+
+This diagram illustrates both data paths: a message being subscribed from a ROS topic and sent to the network, and a message being received from the network and published to a ROS topic.
+
+```mermaid
+sequenceDiagram
+    participant ROST as ROS 2 Executor Thread
+    participant MH as MessageHandler
+    participant RG_RECV as RosGateway Receiver Thread
+    participant TR_SEND as Transport Sender Thread
+    participant Network
+
+    Note over ROST, Network: Flow: ROS Topic -> Network
+    ROST->>+MH: ROS message received (subscription callback)
+    MH->>TR_SEND: Calls RosGateway::send_message(), which enqueues data in Transport
+    TR_SEND->>Network: Dequeues and sends header + payload
+    deactivate MH
+    
+    Note over ROST, Network: Flow: Network -> ROS Topic
+    Network-->>+RG_RECV: Data arrives on socket
+    Note right of RG_RECV: RosGateway::receiver_thread_func()
+    RG_RECV->>RG_RECV: Calls Transport::receive_exact() to read header & payload
+    RG_RECV->>+MH: Finds correct handler, calls process_and_publish_received_msg()
+    MH->>ROST: Calls rclcpp::Publisher::publish()
+    deactivate MH
+    deactivate RG_RECV
+```
 
 ### 2. Protocol Specifications
 

@@ -2,9 +2,8 @@
 #include "modular_gateway_sender/transport/tcp_server_transport.hpp"
 #include "modular_gateway_sender/discovery_client.hpp"
 #include "discovery_protocol/protocol.hpp"
+#include "modular_gateway_sender/handler_factory.hpp"
 
-// These will be created in a subsequent step
-// #include "modular_gateway_sender/handler_factory.hpp"
 
 namespace gateway {
 
@@ -32,6 +31,14 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   data_plane_listen_port_ = this->get_parameter("data_plane.listen_port").as_int();
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
+  // --- Mock Task Database Initialization ---
+  task_database_["NAV_BASIC"] = {"Navigation Basic", {"sensor_msgs/msg/LaserScan"}};
+  task_database_["TELEOP_FULL"] = {"Teleoperation Full", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}};
+  task_database_["TEST_INPUT_ONLY"] = {"Test Input Only", {"test/string_input"}};
+  task_database_["TEST_RESULT_ONLY"] = {"Test Result Only", {"test/string_result"}};
+  logger_.Info("gateway_controller.cpp: Initialized mock task database with {} tasks.", task_database_.size());
+  // -----------------------------------------
+
   // Create the data plane transport and the RosGateway instance
   auto data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
   gateway_ = std::make_unique<RosGateway>(this->shared_from_this(), std::move(data_plane_transport));
@@ -40,10 +47,15 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   // Create the handler factory
   handler_factory_ = std::make_unique<HandlerFactory>(gateway_.get(), this->shared_from_this());
 
-  // Create the ROS 2 service for offloading requests
+  // Create the ROS 2 services
   offloading_service_ = this->create_service<modular_gateway_sender::srv::RequestOffloading>(
     "request_offloading",
     std::bind(&GatewayController::offloading_request_service_handler, this, std::placeholders::_1, std::placeholders::_2)
+  );
+
+  terminate_offloading_service_ = this->create_service<modular_gateway_sender::srv::TerminateOffloading>(
+    "terminate_offloading",
+    std::bind(&GatewayController::terminate_offloading_service_handler, this, std::placeholders::_1, std::placeholders::_2)
   );
 
   // Start the main control logic thread
@@ -93,6 +105,14 @@ void GatewayController::offloading_request_service_handler(
         return;
     }
 
+    // Check if the requested task exists in our database
+    if (task_database_.find(request->task_id) == task_database_.end()) {
+        logger_.Error("gateway_controller.cpp: Offloading request for unknown task_id '{}'. Rejecting.", request->task_id);
+        response->approved = false;
+        response->message = "Unknown task_id: " + request->task_id;
+        return;
+    }
+
     logger_.Info("gateway_controller.cpp: Queuing offloading request for task_id: {}", request->task_id);
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
@@ -105,7 +125,32 @@ void GatewayController::offloading_request_service_handler(
     response->message = "Request queued for processing by the bridge.";
 }
 
+void GatewayController::terminate_offloading_service_handler(
+  const std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Request> request,
+  std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Response> response)
+{
+    if (state_.load() != State::OPERATIONAL) {
+        logger_.Warn("gateway_controller.cpp: Terminate request for session '{}' received, but controller is not operational. Rejecting.", request->request_id);
+        response->success = false;
+        response->message = "Gateway is not in OPERATIONAL state.";
+        return;
+    }
+
+    logger_.Info("gateway_controller.cpp: Queuing termination request for session_id: {}", request->request_id);
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        termination_request_queue_.push(request->request_id);
+    }
+    queue_cv_.notify_one();
+
+    response->success = true;
+    response->message = "Termination request queued.";
+}
+
 void GatewayController::control_thread_func() {
+    // Define keepalive interval
+    const auto keepalive_interval = std::chrono::seconds(15);
+
     while(running_) {
         State current_state = state_.load();
         logger_.Info("gateway_controller.cpp: Control thread processing state: {}", static_cast<int>(current_state));
@@ -183,23 +228,64 @@ void GatewayController::control_thread_func() {
             }
             case State::OPERATIONAL:
             {
-                // In operational state, we process the offloading request queue.
+                // In operational state, we process queues and send keepalives.
+                // Wait for a new request or for the keepalive timeout.
                 std::unique_lock<std::mutex> lock(queue_mutex_);
-                queue_cv_.wait(lock, [this]{ return !offloading_request_queue_.empty() || !running_; });
+                queue_cv_.wait_for(lock, std::chrono::seconds(5), [this]{ 
+                    return !offloading_request_queue_.empty() || !termination_request_queue_.empty() || !running_; 
+                });
 
                 if (!running_) break;
 
-                OffloadingRequestData request = offloading_request_queue_.front();
-                offloading_request_queue_.pop();
+                // 1. Process termination requests
+                while (!termination_request_queue_.empty()) {
+                    std::string request_id_to_terminate = termination_request_queue_.front();
+                    termination_request_queue_.pop();
+                    lock.unlock(); // Unlock while handling
+                    
+                    logger_.Info("gateway_controller.cpp: Dequeued termination request for session '{}'", request_id_to_terminate);
+                    bridge_cp_client_->send_session_terminate_request(component_id_, request_id_to_terminate);
+                    handle_session_teardown(request_id_to_terminate);
+
+                    lock.lock(); // Re-lock to check queue condition
+                }
+
+                // 2. Process new offloading requests
+                while (!offloading_request_queue_.empty()) {
+                    OffloadingRequestData request = offloading_request_queue_.front();
+                    offloading_request_queue_.pop();
+                    lock.unlock(); // Unlock while handling
+
+                    logger_.Info("gateway_controller.cpp: Dequeued and processing offloading request for task '{}'", request.task_id);
+                    
+                    auto db_it = task_database_.find(request.task_id);
+                    if (db_it == task_database_.end()) {
+                        logger_.Error("gateway_controller.cpp: Dequeued task '{}' but it's not in the database. This should not happen.", request.task_id);
+                    } else {
+                        std::string task_name = db_it->second.task_name;
+                        std::string request_id = component_id_ + ":" + std::to_string(request_id_counter_++);
+
+                        {
+                            std::lock_guard<std::mutex> session_lock(session_mutex_);
+                            active_sessions_[request_id] = {request_id, request.task_id, std::chrono::steady_clock::now()};
+                        }
+
+                        bridge_cp_client_->send_offload_request(component_id_, request_id, request.task_id, task_name);
+                    }
+                    lock.lock(); // Re-lock to check queue condition
+                }
                 lock.unlock();
 
-                logger_.Info("gateway_controller.cpp: Dequeued and processing offloading request for task '{}'", request.task_id);
-                
-                // TODO: Look up task_name from a task database using task_id
-                std::string task_name = "task_name_placeholder"; 
-                std::string request_id = component_id_ + ":" + std::to_string(request_id_counter_++);
-
-                bridge_cp_client_->send_offload_request(component_id_, request_id, request.task_id, task_name);
+                // 3. Send keepalives for active sessions
+                std::lock_guard<std::mutex> session_lock(session_mutex_);
+                auto now = std::chrono::steady_clock::now();
+                for (auto& pair : active_sessions_) {
+                    if (now - pair.second.last_keepalive_sent > keepalive_interval) {
+                        logger_.Info("gateway_controller.cpp: Sending keepalive for session '{}'", pair.first);
+                        bridge_cp_client_->send_session_keepalive(component_id_, pair.first);
+                        pair.second.last_keepalive_sent = now;
+                    }
+                }
                 break;
             }
             case State::FAILED:
@@ -248,6 +334,31 @@ void GatewayController::data_plane_connection_thread_func()
   }
 }
 
+void GatewayController::handle_session_teardown(const std::string& request_id) {
+    std::lock_guard<std::mutex> lock(session_mutex_);
+    auto session_it = active_sessions_.find(request_id);
+    if (session_it == active_sessions_.end()) {
+        logger_.Warn("gateway_controller.cpp: Teardown requested for unknown or already terminated session '{}'.", request_id);
+        return;
+    }
+
+    const std::string& task_id = session_it->second.task_id;
+    auto task_it = task_database_.find(task_id);
+    if (task_it != task_database_.end()) {
+        const auto& required_handlers = task_it->second.required_handlers;
+        logger_.Info("gateway_controller.cpp: Tearing down session '{}'. Unregistering {} handlers for task '{}'.", request_id, required_handlers.size(), task_id);
+        for (const auto& handler_type : required_handlers) {
+            // The handler name is the same as its type string in our current factory implementation
+            gateway_->unregister_handler(handler_type);
+        }
+    } else {
+        logger_.Error("gateway_controller.cpp: Could not find task details for task_id '{}' during teardown of session '{}'.", task_id, request_id);
+    }
+
+    active_sessions_.erase(session_it);
+    logger_.Info("gateway_controller.cpp: Session '{}' removed.", request_id);
+}
+
 // --- Callback Implementations ---
 
 void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port) {
@@ -287,10 +398,25 @@ void GatewayController::on_dp_confirmed() {
 void GatewayController::on_session_approved(const std::string& request_id) {
     logger_.Info("gateway_controller.cpp: Session with request_id '{}' approved by Bridge.", request_id);
     
-    // TODO: Look up task details from a session map using the request_id.
-    // The task details should include a list of message types to handle.
-    // For now, we'll use a hardcoded example list.
-    std::vector<std::string> required_handlers = {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"};
+    std::lock_guard<std::mutex> lock(session_mutex_);
+    auto session_it = active_sessions_.find(request_id);
+    if (session_it == active_sessions_.end()) {
+        logger_.Error("gateway_controller.cpp: Received approval for unknown or already handled request_id '{}'.", request_id);
+        return;
+    }
+
+    // Update the keepalive timestamp to start the timer now that it's approved
+    session_it->second.last_keepalive_sent = std::chrono::steady_clock::now();
+
+    const std::string& task_id = session_it->second.task_id;
+    auto task_it = task_database_.find(task_id);
+    if (task_it == task_database_.end()) {
+        logger_.Error("gateway_controller.cpp: Could not find task details for task_id '{}' from approved session '{}'.", task_id, request_id);
+        return;
+    }
+
+    const auto& required_handlers = task_it->second.required_handlers;
+    logger_.Info("gateway_controller.cpp: Activating {} handlers for task '{}' (session {}).", required_handlers.size(), task_id, request_id);
 
     for (const auto& handler_type : required_handlers) {
         auto handler = handler_factory_->create_handler(handler_type);
@@ -299,13 +425,15 @@ void GatewayController::on_session_approved(const std::string& request_id) {
             // TODO: Configure handler mode (Subscriber/Publisher) based on task details.
             // For now, default to subscriber only.
             MessageHandlerBase::configure_handler_mode(handler, HandlerMode::SUBSCRIBER_ONLY);
+        } else {
+            logger_.Error("gateway_controller.cpp: HandlerFactory failed to create handler of type '{}' for task '{}'.", handler_type, task_id);
         }
     }
 }
 
 void GatewayController::on_session_denied(const std::string& request_id, const std::string& reason) {
     logger_.Warn("gateway_controller.cpp: Session with request_id '{}' denied by Bridge: {}", request_id, reason);
-    // TODO: Clean up any state related to this request_id
+    handle_session_teardown(request_id);
 }
 
-} //
+} // namespace

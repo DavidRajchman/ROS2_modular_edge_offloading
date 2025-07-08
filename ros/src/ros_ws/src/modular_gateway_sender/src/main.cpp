@@ -1,0 +1,35 @@
+#include "modular_gateway_sender/gateway_controller.hpp"
+#include "modular_gateway_sender/logging_setup.hpp"
+#include "rclcpp/rclcpp.hpp"
+
+int main(int argc, char * argv[])
+{
+  // This is the single entry point for any component running the GatewayController.
+  // The specific behavior (VHC, MEC, etc.) is determined by the parameters
+  // passed to the node at runtime.
+
+  // 1. Initialize ROS 2
+  rclcpp::init(argc, argv);
+
+  // 2. Create a temporary node to read the component_type for logging.
+  //    This is necessary so we can name the log file correctly before the main
+  //    controller node, which also creates a logger, is constructed.
+  auto param_fetcher_node = std::make_shared<rclcpp::Node>("gateway_param_fetcher");
+  param_fetcher_node->declare_parameter<std::string>("identity.component_type", "UNKNOWN");
+  std::string component_type = param_fetcher_node->get_parameter("identity.component_type").as_string();
+
+  // 3. Set up the centralized logging system. This MUST be done before any
+  //    other part of the gateway is constructed.
+  gateway::setup_logging(component_type);
+
+  // 4. Create and spin the main GatewayController node.
+  //    The controller will handle all discovery, connection, and session logic.
+  auto controller_node = std::make_shared<gateway::GatewayController>(rclcpp::NodeOptions());
+  
+  rclcpp::spin(controller_node);
+
+  // 5. Shut down ROS 2
+  rclcpp::shutdown();
+  
+  return 0;
+}

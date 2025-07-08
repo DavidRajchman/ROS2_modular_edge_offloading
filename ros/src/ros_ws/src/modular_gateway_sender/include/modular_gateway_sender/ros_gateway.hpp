@@ -1,16 +1,16 @@
 #ifndef ROS_GATEWAY_HPP
 #define ROS_GATEWAY_HPP
 
+#include "modular_gateway_sender/transport_base.hpp"
+#include "modular_gateway_sender/message_handler_base.hpp"
+#include "logging/logger.h"
+#include "rclcpp/rclcpp.hpp"
+
+#include <string>
+#include <vector>
 #include <memory>
 #include <map>
-#include <mutex>
-#include <thread>
-#include "rclcpp/rclcpp.hpp"
-#include "modular_gateway_sender/transport_base.hpp"
-#include "modular_gateway_sender/message_header.hpp"
-#include "modular_gateway_sender/message_handler_base.hpp"
 
-#include "logging/logger.h"
 
 namespace gateway {
 

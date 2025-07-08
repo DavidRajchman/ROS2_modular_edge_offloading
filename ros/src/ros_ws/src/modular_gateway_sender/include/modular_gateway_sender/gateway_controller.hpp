@@ -8,6 +8,7 @@
 #include "modular_gateway_sender/discovery_client.hpp"
 #include "modular_gateway_sender/handler_factory.hpp"
 #include "modular_gateway_sender/srv/request_offloading.hpp"
+#include "modular_gateway_sender/srv/terminate_offloading.hpp"
 #include "logging/logger.h"
 
 #include <thread>
@@ -15,6 +16,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <map>
+#include <vector>
+#include <chrono>
 
 namespace gateway {
 
@@ -22,6 +26,19 @@ namespace gateway {
 struct OffloadingRequestData {
     std::string task_id;
     // We can add the response promise here if we need to reply later
+};
+
+// Represents the details of a specific offloading task
+struct TaskDetails {
+    std::string task_name;
+    std::vector<std::string> required_handlers; // e.g., {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}
+};
+
+// Represents the state of a single offloading session
+struct SessionState {
+    std::string request_id;
+    std::string task_id;
+    std::chrono::steady_clock::time_point last_keepalive_sent;
 };
 
 class GatewayController : public rclcpp::Node {
@@ -50,19 +67,27 @@ private:
   std::mutex state_mutex_;
   std::condition_variable state_cv_;
 
-  // Asynchronous request queue for ROS services
+  // Asynchronous request queues for ROS services
   std::queue<OffloadingRequestData> offloading_request_queue_;
+  std::queue<std::string> termination_request_queue_; // Holds request_ids to terminate
   std::mutex queue_mutex_;
   std::condition_variable queue_cv_;
 
-  // ROS 2 Service Handler (non-blocking)
+  // ROS 2 Service Handlers (non-blocking)
   void offloading_request_service_handler(
     const std::shared_ptr<modular_gateway_sender::srv::RequestOffloading::Request> request,
     std::shared_ptr<modular_gateway_sender::srv::RequestOffloading::Response> response);
+  
+  void terminate_offloading_service_handler(
+    const std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Request> request,
+    std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Response> response);
 
   // Data Plane Connection Management
   void data_plane_connection_thread_func();
   std::thread data_plane_connection_thread_;
+
+  // Session Teardown Logic
+  void handle_session_teardown(const std::string& request_id);
 
   // Callbacks for async clients
   void on_discovery_success(const std::string& bridge_host, int bridge_port);
@@ -79,7 +104,14 @@ private:
   
   // ROS 2 Members
   rclcpp::Service<modular_gateway_sender::srv::RequestOffloading>::SharedPtr offloading_service_;
+  rclcpp::Service<modular_gateway_sender::srv::TerminateOffloading>::SharedPtr terminate_offloading_service_;
   
+  // Session and Task Management
+  std::atomic<uint64_t> request_id_counter_{1};
+  std::map<std::string, TaskDetails> task_database_;
+  std::map<std::string, SessionState> active_sessions_; // Maps request_id to session state
+  std::mutex session_mutex_;
+
   // Identity & Configuration
   std::string component_id_;
   std::string component_type_;
