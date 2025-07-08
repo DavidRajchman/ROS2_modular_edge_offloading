@@ -69,6 +69,22 @@ The system is fundamentally multi-threaded to ensure responsiveness and handle c
 *   **Control Logic Thread:** A dedicated thread within `GatewayController` running the main state machine. This is the "brain" of the control plane.
 *   **Network I/O Threads:** The existing sender/receiver threads within each `TransportLib` instance used by the `DiscoveryClient` and `BridgeControlClient`.
 
+### 1.5. Startup and Connection Sequence (CRITICAL)
+
+To minimize latency, the Modular Gateway (MGW) MUST establish all necessary network connections during its initialization phase. The roles are distinct for each plane:
+*   **Control Plane:** The MGW acts as a **TCP Client**.
+*   **Data Plane:** The MGW acts as a **TCP Server**, listening on a pre-configured port.
+
+The precise startup sequence is as follows:
+1.  **MGW Initialization:** The `GatewayController` node starts and reads its configuration, including the port its Data Plane will listen on.
+2.  **Data Plane Server Start:** The controller instantiates the `RosGateway` with a `TcpServerTransport`, which immediately begins listening for an incoming connection from the Bridge's Data Plane. A dedicated thread is launched to accept and manage this connection.
+3.  **Discovery (Future Step):** The controller uses the `DiscoveryClient` to find the address of the Bridge's Control Plane. (For now, this is hardcoded).
+4.  **Control Plane Connection:** The controller instantiates and connects the `BridgeControlClient` (as a client) to the Bridge's Control Plane (server).
+5.  **Configuration Exchange:** Immediately upon connecting, the `BridgeControlClient` sends a registration message to the Bridge, providing the IP address and listening port of the MGW's Data Plane.
+6.  **Bridge-Side Connection:** The Bridge's Control Plane receives this message and instructs its own Data Plane (as a client) to connect to the now-listening MGW Data Plane server.
+7.  **Connection Confirmation:** Once the Bridge confirms its Data Plane has successfully connected, it sends a confirmation message back to the MGW over the control plane link.
+8.  **Ready State:** With both control and data planes connected and stable, the `GatewayController` is now fully operational and ready to process offloading requests.
+
 ### 2. Protocol Specifications
 
 This section defines the exact wire formats for all control-plane communication.
@@ -335,3 +351,525 @@ This refactoring ensures a clean separation of concerns: `GatewayController` han
 9.  `GatewayController::on_bridge_session_approved_` uses the `request_id` from the payload to look up the task's details in its local session map and in the Task Database.
 10. It loops through the topics for the approved task, using the `HandlerFactory` to create and register a specific handler (which inherits from `MessageHandlerBase`) for each one via `data_plane_->register_handler()`.
 11. The data plane is now live for that task. Data begins to flow.
+
+
+
+### APENDIX A - control plane protocol library
+``` cpp
+#ifndef CONTROL_PLANE_PROTOCOL_HPP
+#define CONTROL_PLANE_PROTOCOL_HPP
+
+#include <string>
+#include <vector>
+#include <nlohmann/json.hpp>
+
+namespace gateway::protocol {
+
+// Use nlohmann::json for convenience
+using json = nlohmann::json;
+
+/**
+ * @brief Defines the types of messages in the Control Plane Protocol.
+ */
+enum class ControlPlaneMessageType {
+    UNKNOWN,
+    REQUEST_OFFLOADING,
+    REQUEST_RESPONSE,
+    SESSION_KEEPALIVE,
+    SESSION_TEARDOWN
+};
+
+/**
+ * @brief Represents a request from the Gateway to the Bridge to offload a task.
+ */
+struct OffloadingRequest {
+    std::string request_id;
+    std::string component_id; // e.g., "10:1"
+    std::string task_id;
+};
+
+/**
+ * @brief Represents the Bridge's response to an offloading request.
+ */
+struct OffloadingResponse {
+    std::string request_id;
+    bool approved;
+    std::string message;
+    std::string data_plane_host; // The host for the data connection
+    int data_plane_port;         // The port for the data connection
+};
+
+/**
+ * @brief Represents a keepalive message to maintain an active session.
+ */
+struct SessionKeepalive {
+    std::string request_id;
+    std::string component_id;
+};
+
+// --- Serialization Functions ---
+
+/**
+ * @brief Serializes an OffloadingRequest to a JSON string.
+ */
+inline std::string serialize(const OffloadingRequest& req) {
+    json j = {
+        {"type", "REQUEST_OFFLOADING"},
+        {"request_id", req.request_id},
+        {"component_id", req.component_id},
+        {"task_id", req.task_id}
+    };
+    return j.dump();
+}
+
+/**
+ * @brief Serializes a SessionKeepalive to a JSON string.
+ */
+inline std::string serialize(const SessionKeepalive& req) {
+    json j = {
+        {"type", "SESSION_KEEPALIVE"},
+        {"request_id", req.request_id},
+        {"component_id", req.component_id}
+    };
+    return j.dump();
+}
+
+
+// --- Deserialization Functions ---
+
+/**
+ * @brief Deserializes a JSON string into an OffloadingResponse.
+ * @throws std::invalid_argument if parsing or validation fails.
+ */
+inline OffloadingResponse deserialize_response(const std::string& json_str) {
+    OffloadingResponse resp;
+    try {
+        json j = json::parse(json_str);
+        if (j.at("type") != "REQUEST_RESPONSE") {
+            throw std::invalid_argument("Invalid message type for response.");
+        }
+        j.at("request_id").get_to(resp.request_id);
+        j.at("approved").get_to(resp.approved);
+        j.at("message").get_to(resp.message);
+        if (resp.approved) {
+            j.at("data_plane_host").get_to(resp.data_plane_host);
+            j.at("data_plane_port").get_to(resp.data_plane_port);
+        }
+    } catch (const json::exception& e) {
+        throw std::invalid_argument("Failed to parse OffloadingResponse: " + std::string(e.what()));
+    }
+    return resp;
+}
+
+/**
+ * @brief Gets the message type from a raw JSON string.
+ */
+inline ControlPlaneMessageType get_message_type(const std::string& json_str) {
+    try {
+        json j = json::parse(json_str);
+        std::string type_str = j.value("type", "UNKNOWN");
+        if (type_str == "REQUEST_RESPONSE") return ControlPlaneMessageType::REQUEST_RESPONSE;
+        if (type_str == "SESSION_TEARDOWN") return ControlPlaneMessageType::SESSION_TEARDOWN;
+    } catch (const json::exception&) {
+        return ControlPlaneMessageType::UNKNOWN;
+    }
+    return ControlPlaneMessageType::UNKNOWN;
+}
+
+} // namespace gateway::protocol
+
+#endif // CONTROL_PLANE_PROTOCOL_HPP
+
+
+```
+### APENDIX B Discovery protocol library 
+``` cpp
+#ifndef DISCOVERY_PROTOCOL_HPP
+#define DISCOVERY_PROTOCOL_HPP
+
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <optional>
+#include <variant>
+
+namespace discovery_protocol {
+
+// Error codes for protocol operations
+enum class ProtocolStatus {
+    OK = 0,
+    BUFFER_TOO_SMALL,
+    INVALID_MESSAGE_TYPE,
+    MALFORMED_MESSAGE,
+    MISSING_REQUIRED_FIELDS,
+    INVALID_FORMAT,
+    FIELD_TOO_LONG,
+    INCOMPLETE_MESSAGE
+};
+
+enum class ComponentType {
+    VEHICLE,
+    MEC,
+    BRIDGE,
+    OFFLOAD_MANAGER,
+    TEST
+};
+
+enum class IdRequestType {
+    AUTOMATIC,
+    STATIC
+};
+
+enum class ResponseCode {
+    SUCCESS,
+    WAIT,
+    ID_CONFLICT,
+    INVALID_REQUEST,
+    GENERAL_ERROR
+};
+
+enum class MessageType {
+    REGISTRATION_REQUEST,
+    REGISTRATION_RESPONSE,
+    ERROR,
+    KEEPALIVE_PING,
+    KEEPALIVE_RESPONSE
+};
+
+enum class ErrorCode {
+    CONFIGURATION,
+    NETWORK,
+    INTERNAL,
+    PROTOCOL
+};
+
+struct RegistrationRequest {
+    ComponentType componentType;
+    IdRequestType idRequestType;
+    uint8_t groupId;
+    uint8_t idInGroup;
+    std::string componentName;
+    std::string listenAddress;
+    std::string listenPort;
+    std::string humanReadableMessage;
+};
+
+struct RegistrationResponse {
+    ResponseCode responseCode;
+    uint8_t assignedGroupId;
+    uint8_t assignedIdInGroup;
+    std::string connectionTargetType;
+    std::string connectionTargetAddress;
+    std::string connectionTargetPort;
+    uint16_t connectionTargetId;
+    std::string configJson;
+    std::string humanReadableMessage;
+};
+
+struct KeepalivePing {
+    std::string componentId;
+    std::string status;
+    std::string humanReadableMessage;
+};
+
+struct KeepaliveResponse {
+    std::string response;
+    int nextIntervalMs;
+    std::string humanReadableMessage;
+};
+
+struct ErrorMessage {
+    ErrorCode errorCode;
+    std::string humanReadableMessage;
+};
+
+using MessageVariant = std::variant<
+    RegistrationRequest,
+    RegistrationResponse,
+    ErrorMessage,
+    KeepalivePing,
+    KeepaliveResponse
+>;
+
+struct Message {
+    MessageType type;
+    MessageVariant data;
+
+    Message() : type(MessageType::ERROR), data(ErrorMessage{}) {}
+    explicit Message(const RegistrationRequest& req) : type(MessageType::REGISTRATION_REQUEST), data(req) {}
+    explicit Message(const RegistrationResponse& res) : type(MessageType::REGISTRATION_RESPONSE), data(res) {}
+    explicit Message(const KeepalivePing& ping) : type(MessageType::KEEPALIVE_PING), data(ping) {}
+    explicit Message(const KeepaliveResponse& pong) : type(MessageType::KEEPALIVE_RESPONSE), data(pong) {}
+    explicit Message(const ErrorMessage& err) : type(MessageType::ERROR), data(err) {}
+};
+
+ProtocolStatus encode_message(const Message& message, std::string& output);
+ProtocolStatus decode_message(const std::string& input, Message& output);
+
+ProtocolStatus encode_registration_request(const RegistrationRequest& request, std::string& output);
+ProtocolStatus decode_registration_request(const std::string& input, RegistrationRequest& output);
+
+ProtocolStatus encode_registration_response(const RegistrationResponse& response, std::string& output);
+ProtocolStatus decode_registration_response(const std::string& input, RegistrationResponse& output);
+
+ProtocolStatus encode_keepalive_ping(const KeepalivePing& ping, std::string& output);
+ProtocolStatus decode_keepalive_ping(const std::string& input, KeepalivePing& output);
+
+ProtocolStatus encode_keepalive_response(const KeepaliveResponse& response, std::string& output);
+ProtocolStatus decode_keepalive_response(const std::string& input, KeepaliveResponse& output);
+
+ProtocolStatus encode_error_message(const ErrorMessage& error, std::string& output);
+ProtocolStatus decode_error_message(const std::string& input, ErrorMessage& output);
+
+const char* protocol_status_to_string(ProtocolStatus status);
+std::string component_type_to_string(ComponentType type);
+ComponentType string_to_component_type(const std::string& str);
+std::string response_code_to_string(ResponseCode code);
+ResponseCode string_to_response_code(const std::string& str);
+std::string error_code_to_string(ErrorCode code);
+ErrorCode string_to_error_code(const std::string& str);
+
+std::vector<std::string> split_string(const std::string& str, char delimiter);
+
+} // namespace discovery_protocol
+
+#endif // DISCOVERY_PROTOCOL_HPP
+
+```
+``` cpp
+#include "discovery_protocol/protocol.hpp"
+#include <sstream>
+#include <cstring>
+#include <vector>
+#include <algorithm>
+
+namespace discovery_protocol {
+
+// Helper function to split strings, useful for parsing
+std::vector<std::string> split_string(const std::string& str, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(str);
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+// --- Enum to String Conversion ---
+
+const char* protocol_status_to_string(ProtocolStatus status) {
+    switch (status) {
+        case ProtocolStatus::OK: return "OK";
+        case ProtocolStatus::BUFFER_TOO_SMALL: return "BUFFER_TOO_SMALL";
+        case ProtocolStatus::INVALID_MESSAGE_TYPE: return "INVALID_MESSAGE_TYPE";
+        case ProtocolStatus::MALFORMED_MESSAGE: return "MALFORMED_MESSAGE";
+        case ProtocolStatus::MISSING_REQUIRED_FIELDS: return "MISSING_REQUIRED_FIELDS";
+        case ProtocolStatus::INVALID_FORMAT: return "INVALID_FORMAT";
+        case ProtocolStatus::FIELD_TOO_LONG: return "FIELD_TOO_LONG";
+        case ProtocolStatus::INCOMPLETE_MESSAGE: return "INCOMPLETE_MESSAGE";
+        default: return "UNKNOWN_STATUS";
+    }
+}
+
+std::string component_type_to_string(ComponentType type) {
+    switch (type) {
+        case ComponentType::VEHICLE: return "V";
+        case ComponentType::MEC: return "M";
+        case ComponentType::BRIDGE: return "B";
+        case ComponentType::OFFLOAD_MANAGER: return "O";
+        case ComponentType::TEST: return "T";
+        default: return "?";
+    }
+}
+
+ComponentType string_to_component_type(const std::string& str) {
+    if (str == "V") return ComponentType::VEHICLE;
+    if (str == "M") return ComponentType::MEC;
+    if (str == "B") return ComponentType::BRIDGE;
+    if (str == "O") return ComponentType::OFFLOAD_MANAGER;
+    if (str == "T") return ComponentType::TEST;
+    return ComponentType::TEST; // Default/unknown
+}
+
+// --- Message-level encode/decode ---
+
+ProtocolStatus encode_message(const Message& message, std::string& output) {
+    switch (message.type) {
+        case MessageType::REGISTRATION_REQUEST:
+            return encode_registration_request(std::get<RegistrationRequest>(message.data), output);
+        case MessageType::REGISTRATION_RESPONSE:
+            return encode_registration_response(std::get<RegistrationResponse>(message.data), output);
+        case MessageType::KEEPALIVE_PING:
+            return encode_keepalive_ping(std::get<KeepalivePing>(message.data), output);
+        case MessageType::KEEPALIVE_RESPONSE:
+            return encode_keepalive_response(std::get<KeepaliveResponse>(message.data), output);
+        case MessageType::ERROR:
+            return encode_error_message(std::get<ErrorMessage>(message.data), output);
+        default:
+            return ProtocolStatus::INVALID_MESSAGE_TYPE;
+    }
+}
+
+ProtocolStatus decode_message(const std::string& input, Message& output) {
+    if (input.size() < 8 || input.substr(0, 5) != "DISC:") {
+        return ProtocolStatus::INVALID_MESSAGE_TYPE;
+    }
+    std::string msg_type = input.substr(5, 3);
+    if (msg_type == "REG") {
+        RegistrationRequest req;
+        ProtocolStatus status = decode_registration_request(input, req);
+        if (status == ProtocolStatus::OK) output = Message(req);
+        return status;
+    } else if (msg_type == "ACK") {
+        RegistrationResponse res;
+        ProtocolStatus status = decode_registration_response(input, res);
+        if (status == ProtocolStatus::OK) output = Message(res);
+        return status;
+    } else if (msg_type == "PNG") {
+        KeepalivePing ping;
+        ProtocolStatus status = decode_keepalive_ping(input, ping);
+        if (status == ProtocolStatus::OK) output = Message(ping);
+        return status;
+    } else if (msg_type == "PON") {
+        KeepaliveResponse pong;
+        ProtocolStatus status = decode_keepalive_response(input, pong);
+        if (status == ProtocolStatus::OK) output = Message(pong);
+        return status;
+    } else if (msg_type == "ERR") {
+        ErrorMessage err;
+        ProtocolStatus status = decode_error_message(input, err);
+        if (status == ProtocolStatus::OK) output = Message(err);
+        return status;
+    }
+    return ProtocolStatus::INVALID_MESSAGE_TYPE;
+}
+
+// --- Individual Message Type Implementations ---
+
+ProtocolStatus encode_registration_request(const RegistrationRequest& request, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:REG;"
+       << component_type_to_string(request.componentType) << ";"
+       << (request.idRequestType == IdRequestType::AUTOMATIC ? "A" : "S") << ";"
+       << static_cast<int>(request.groupId) << ";"
+       << static_cast<int>(request.idInGroup) << ";"
+       << request.componentName << ";"
+       << request.listenAddress << ";"
+       << request.listenPort << ";"
+       << request.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_registration_request(const std::string& input, RegistrationRequest& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 9) return ProtocolStatus::MALFORMED_MESSAGE;
+    try {
+        output.componentType = string_to_component_type(parts[1]);
+        output.idRequestType = (parts[2] == "A") ? IdRequestType::AUTOMATIC : IdRequestType::STATIC;
+        output.groupId = static_cast<uint8_t>(std::stoi(parts[3]));
+        output.idInGroup = static_cast<uint8_t>(std::stoi(parts[4]));
+        output.componentName = parts[5];
+        output.listenAddress = parts[6];
+        output.listenPort = parts[7];
+        output.humanReadableMessage = parts[8];
+    } catch (const std::exception&) {
+        return ProtocolStatus::INVALID_FORMAT;
+    }
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus encode_registration_response(const RegistrationResponse& response, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:ACK;"
+       << static_cast<int>(response.responseCode) << ";"
+       << static_cast<int>(response.assignedGroupId) << ";"
+       << static_cast<int>(response.assignedIdInGroup) << ";"
+       << response.connectionTargetType << ";"
+       << response.connectionTargetAddress << ";"
+       << response.connectionTargetPort << ";"
+       << response.connectionTargetId << ";"
+       << response.configJson << ";"
+       << response.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_registration_response(const std::string& input, RegistrationResponse& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 10) return ProtocolStatus::MALFORMED_MESSAGE;
+    try {
+        output.responseCode = static_cast<ResponseCode>(std::stoi(parts[1]));
+        output.assignedGroupId = static_cast<uint8_t>(std::stoi(parts[2]));
+        output.assignedIdInGroup = static_cast<uint8_t>(std::stoi(parts[3]));
+        output.connectionTargetType = parts[4];
+        output.connectionTargetAddress = parts[5];
+        output.connectionTargetPort = parts[6];
+        output.connectionTargetId = static_cast<uint16_t>(std::stoi(parts[7]));
+        output.configJson = parts[8];
+        output.humanReadableMessage = parts[9];
+    } catch (const std::exception&) {
+        return ProtocolStatus::INVALID_FORMAT;
+    }
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus encode_keepalive_ping(const KeepalivePing& ping, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:PNG;" << ping.componentId << ";" << ping.status << ";" << ping.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_keepalive_ping(const std::string& input, KeepalivePing& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 4) return ProtocolStatus::MALFORMED_MESSAGE;
+    output.componentId = parts[1];
+    output.status = parts[2];
+    output.humanReadableMessage = parts[3];
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus encode_keepalive_response(const KeepaliveResponse& response, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:PON;" << response.response << ";" << response.nextIntervalMs << ";" << response.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_keepalive_response(const std::string& input, KeepaliveResponse& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 4) return ProtocolStatus::MALFORMED_MESSAGE;
+    try {
+        output.response = parts[1];
+        output.nextIntervalMs = std::stoi(parts[2]);
+        output.humanReadableMessage = parts[3];
+    } catch (const std::exception&) {
+        return ProtocolStatus::INVALID_FORMAT;
+    }
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus encode_error_message(const ErrorMessage& error, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:ERR;" << static_cast<int>(error.errorCode) << ";" << error.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_error_message(const std::string& input, ErrorMessage& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 3) return ProtocolStatus::MALFORMED_MESSAGE;
+    try {
+        output.errorCode = static_cast<ErrorCode>(std::stoi(parts[1]));
+        output.humanReadableMessage = parts[2];
+    } catch (const std::exception&) {
+        return ProtocolStatus::INVALID_FORMAT;
+    }
+    return ProtocolStatus::OK;
+}
+
+} // namespace discovery_protocol
+
+```
