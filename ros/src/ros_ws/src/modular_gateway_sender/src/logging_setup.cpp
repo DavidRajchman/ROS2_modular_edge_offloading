@@ -1,8 +1,6 @@
 #include "modular_gateway_sender/logging_setup.hpp"
 #include "logging/logger.h"
-#include "logging/sinks/async_wait_free_processor.h"
-#include "logging/sinks/file_appender.h"
-#include "logging/layouts/binary_layout.h"
+#include "logging/config.h"
 
 namespace gateway {
 

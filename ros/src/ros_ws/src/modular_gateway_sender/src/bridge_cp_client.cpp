@@ -1,5 +1,5 @@
 #include "modular_gateway_sender/bridge_cp_client.hpp"
-#include "modular_gateway_sender/transport/tcp_client_transport.hpp"
+#include "modular_gateway_sender/transport_base.hpp"
 #include <vector>
 
 namespace gateway {

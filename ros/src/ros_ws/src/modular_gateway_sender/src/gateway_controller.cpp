@@ -1,8 +1,9 @@
 #include "modular_gateway_sender/gateway_controller.hpp"
-#include "modular_gateway_sender/transport/tcp_server_transport.hpp"
 #include "modular_gateway_sender/discovery_client.hpp"
 #include "discovery_protocol/protocol.hpp"
 #include "modular_gateway_sender/handler_factory.hpp"
+#include "modular_gateway_sender/transport_base.hpp"
+
 
 
 namespace gateway {

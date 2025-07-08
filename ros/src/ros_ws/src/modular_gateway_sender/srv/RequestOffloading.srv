@@ -1,0 +1,20 @@
+# Service to request the offloading of a specific computational task.
+
+# --- Request ---
+# The unique identifier for the task to be offloaded, as defined in the
+# system's task database (e.g., "NAV_BASIC", "TEST_INPUT_ONLY").
+string task_id
+
+---
+# --- Response ---
+# A unique identifier for this specific offloading request/session.
+# This ID is used to manage the session's lifecycle (e.g., for keepalives or termination).
+string request_id
+
+# Indicates whether the offloading request was successfully queued for processing.
+# Note: This does not mean the session is approved, only that the request was received.
+bool success
+
+# A human-readable message providing details about the outcome of the request.
+# (e.g., "Request queued successfully", "Invalid task_id").
+string message

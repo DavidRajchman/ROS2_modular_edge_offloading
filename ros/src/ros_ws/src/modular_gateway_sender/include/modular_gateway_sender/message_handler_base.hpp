@@ -3,6 +3,7 @@
 
 #include "logging/logger.h"
 #include "rclcpp/rclcpp.hpp"
+#include "modular_gateway_sender/message_header.hpp"
 #include <string>
 #include <vector>
 #include <memory>

@@ -7,8 +7,7 @@
 #include "modular_gateway_sender/bridge_cp_client.hpp"
 #include "modular_gateway_sender/discovery_client.hpp"
 #include "modular_gateway_sender/handler_factory.hpp"
-#include "modular_gateway_sender/srv/request_offloading.hpp"
-#include "modular_gateway_sender/srv/terminate_offloading.hpp"
+
 #include "logging/logger.h"
 
 #include <thread>

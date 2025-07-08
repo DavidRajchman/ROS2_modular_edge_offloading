@@ -596,7 +596,7 @@ inline ControlPlaneMessageType get_message_type(const std::string& json_str) {
 
 
 ```
-### APENDIX B Discovery protocol library 
+### APENDIX B Discovery protocol library NOT THE CONTROL PLANE PROTOCOL
 ``` cpp
 #ifndef DISCOVERY_PROTOCOL_HPP
 #define DISCOVERY_PROTOCOL_HPP

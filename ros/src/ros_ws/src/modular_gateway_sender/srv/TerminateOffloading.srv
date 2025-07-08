@@ -1,0 +1,15 @@
+# Service to request the termination of an active offloading session.
+
+# --- Request ---
+# The unique identifier of the session to be terminated.
+# This must match the 'request_id' returned by a successful RequestOffloading call.
+string request_id
+
+---
+# --- Response ---
+# Indicates whether the termination request was successfully processed.
+bool success
+
+# A human-readable message providing details about the outcome.
+# (e.g., "Session terminated", "Session not found").
+string message
