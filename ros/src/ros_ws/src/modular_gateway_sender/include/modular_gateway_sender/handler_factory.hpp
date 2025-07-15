@@ -15,11 +15,6 @@ namespace gateway {
 class MessageHandlerBase;
 class RosGateway;
 
-// Forward declare rclcpp::Node to avoid including the full ROS 2 header
-namespace rclcpp {
-class Node;
-}
-
 class HandlerFactory {
 public:
     // A CreatorFunc is a function that can create a specific handler instance.

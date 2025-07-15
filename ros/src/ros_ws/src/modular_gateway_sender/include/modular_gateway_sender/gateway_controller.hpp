@@ -10,6 +10,10 @@
 
 #include "logging/logger.h"
 
+// Include the auto-generated service headers
+#include "modular_gateway_sender/srv/request_offloading.hpp"
+#include "modular_gateway_sender/srv/terminate_offloading.hpp"
+
 #include <thread>
 #include <atomic>
 #include <mutex>

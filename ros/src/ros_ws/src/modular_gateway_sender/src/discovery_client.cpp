@@ -63,12 +63,11 @@ void DiscoveryClient::client_thread_func() {
 
     logger_.Info("discovery_client.cpp: Connected to DiscoveryService. Sending registration for component type '{}'.", discovery_protocol::component_type_to_string(component_type_));
     
-    discovery_protocol::Message reg_msg;
-    reg_msg.type = discovery_protocol::MessageType::REGISTRATION_REQUEST;
-    reg_msg.payload.emplace<discovery_protocol::RegistrationRequest>({
-        component_type_,
-        component_name_
-    });
+    discovery_protocol::RegistrationRequest request_payload;
+    request_payload.componentType = component_type_;
+    request_payload.componentName = component_name_;
+
+    discovery_protocol::Message reg_msg(request_payload);
 
     std::string encoded_msg;
     if (discovery_protocol::encode_message(reg_msg, encoded_msg) != discovery_protocol::ProtocolStatus::OK) {
@@ -80,9 +79,9 @@ void DiscoveryClient::client_thread_func() {
     std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
     transport_->async_send_data(std::move(reg_data));
 
-    // Wait for the ACK response
+    // Wait for the response
     if (transport_->data_available(5000)) { // 5 second timeout
-        std::vector<uint8_t> buffer(1024);
+        std::vector<uint8_t> buffer(2048);
         int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
         if (bytes_received > 0) {
             buffer[bytes_received] = '\0'; // Null-terminate
@@ -91,10 +90,18 @@ void DiscoveryClient::client_thread_func() {
             discovery_protocol::Message response_msg;
             if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
                 if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
-                    auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.payload);
-                    if (resp_payload.responseCode == discovery_protocol::ResponseCode::OK) {
-                        logger_.Info("discovery_client.cpp: Discovery successful. Bridge at {}:{}", resp_payload.bridgeCpInfo.host, resp_payload.bridgeCpInfo.port);
-                        if (success_cb_) success_cb_(resp_payload.bridgeCpInfo.host, resp_payload.bridgeCpInfo.port);
+                    auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
+                    if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
+                        logger_.Info("discovery_client.cpp: Discovery successful. Bridge target at {}:{}", resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
+                        try {
+                            int bridge_port = std::stoi(resp_payload.connectionTargetPort);
+                            if (success_cb_) {
+                                success_cb_(resp_payload.connectionTargetAddress, bridge_port);
+                            }
+                        } catch (const std::invalid_argument& e) {
+                            logger_.Error("discovery_client.cpp: Invalid port number received from DiscoveryService: '{}'", resp_payload.connectionTargetPort);
+                            if (failure_cb_) failure_cb_("Invalid port number from DiscoveryService.");
+                        }
                     } else {
                         logger_.Error("discovery_client.cpp: Registration denied by DiscoveryService: {}", resp_payload.humanReadableMessage);
                         if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);

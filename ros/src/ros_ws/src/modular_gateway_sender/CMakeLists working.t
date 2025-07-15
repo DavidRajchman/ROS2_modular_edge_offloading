@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(modular_gateway_sender)
 
+#IN CASE OF ISSUES WITH discovery_protocol or control_layer_protocol LIBRARIES, THEY NEED TO BE BUILD AND INSTALLED. 
+#THE PROTOCOL LIBRARIES ARE CONFIRMED TO BE WORKING IN THIS VERSION OF THE CMAKELIST
+
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)

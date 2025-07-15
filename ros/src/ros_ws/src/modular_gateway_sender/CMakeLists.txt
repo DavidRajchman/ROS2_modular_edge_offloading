@@ -20,12 +20,20 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Threads REQUIRED)
 # Add /usr/local to the search path for packages installed outside the workspace
 list(APPEND CMAKE_PREFIX_PATH "/usr/local")
 find_package(ControlPlaneProtocol REQUIRED)
 find_package(DiscoveryProtocol REQUIRED)
+
+# --- Generate ROS 2 Service Definitions ---
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/RequestOffloading.srv"
+  "srv/TerminateOffloading.srv"
+  DEPENDENCIES std_msgs
+)
 
 # --- Define paths to external libraries ---
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
@@ -70,19 +78,21 @@ add_library(gateway_transport_lib
   src/transport/tcp_server_transport.cpp
 )
 target_include_directories(gateway_transport_lib PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
     $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
-    $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(gateway_transport_lib rclcpp)
 
 # Message Handler Base library
 add_library(message_handler_base_lib src/message_handler_base.cpp)
 target_include_directories(message_handler_base_lib PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
-    $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(message_handler_base_lib rclcpp)
 
@@ -93,14 +103,22 @@ add_library(handlers_lib
   src/handlers/string_test_input_handler.cpp
   src/handlers/string_test_result_handler.cpp
 )
-target_link_libraries(handlers_lib message_handler_base_lib)
+target_link_libraries(handlers_lib PRIVATE message_handler_base_lib)
+target_include_directories(handlers_lib PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 ament_target_dependencies(handlers_lib rclcpp std_msgs sensor_msgs)
 
 # RosGateway library (Data Plane core)
 add_library(ros_gateway_lib src/ros_gateway.cpp)
-target_link_libraries(ros_gateway_lib
+target_link_libraries(ros_gateway_lib PRIVATE
   gateway_transport_lib
   message_handler_base_lib
+)
+target_include_directories(ros_gateway_lib PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(ros_gateway_lib rclcpp)
 
@@ -112,19 +130,24 @@ add_library(gateway_controller_lib
     src/bridge_cp_client.cpp
     src/handler_factory.cpp
 )
-target_link_libraries(gateway_controller_lib
+target_link_libraries(gateway_controller_lib PRIVATE
     ros_gateway_lib
     handlers_lib
     ${ControlPlaneProtocol_LIBRARIES}
     ${DiscoveryProtocol_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
+target_include_directories(gateway_controller_lib PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
+)
 ament_target_dependencies(gateway_controller_lib rclcpp)
 
 # --- Executable Definition ---
 # The single, unified executable for the new architecture.
 add_executable(gateway_controller src/main.cpp)
-target_link_libraries(gateway_controller
+target_link_libraries(gateway_controller PRIVATE
     gateway_controller_lib
     Threads::Threads
     ${CPPLOGGING_LIBRARY}
@@ -137,6 +160,10 @@ target_link_libraries(gateway_controller
     rt
 )
 ament_target_dependencies(gateway_controller rclcpp)
+
+# --- Make sure the service headers are available to the gateway_controller_lib ---
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(gateway_controller_lib PRIVATE "${cpp_typesupport_target}")
 
 # --- Installation ---
 install(TARGETS
@@ -158,6 +185,11 @@ install(TARGETS
 install(
   DIRECTORY include/
   DESTINATION include
+)
+
+install(
+    DIRECTORY srv
+    DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

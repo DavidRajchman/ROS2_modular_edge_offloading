@@ -10,6 +10,8 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <thread>
+#include <atomic>
 
 
 namespace gateway {
@@ -17,7 +19,7 @@ namespace gateway {
 class RosGateway {
 public:
   RosGateway(
-    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<rclcpp::Node> node,
     std::unique_ptr<TransportBase> transport
   );
   ~RosGateway();
@@ -39,7 +41,7 @@ public:
   TransportBase* get_transport();
 
 private:
-  rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<rclcpp::Node> node_;
   uint8_t id_group_ = 0;
   uint8_t identifier_in_group_ = 0;
 

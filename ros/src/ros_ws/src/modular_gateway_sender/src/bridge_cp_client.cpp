@@ -239,4 +239,10 @@ void BridgeCpClient::send_session_terminate_request(const std::string& component
         {"message_code", 102},
         {"message_type", "SESSION_TERMINATE_REQUEST"},
         {"payload", {
-            {"request_id",
+            {"request_id", request_id}
+        }}
+    };
+    send_reliable_message(msg);
+}
+
+} // namespace gateway
