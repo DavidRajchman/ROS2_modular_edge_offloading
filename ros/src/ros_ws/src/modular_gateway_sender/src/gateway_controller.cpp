@@ -13,8 +13,8 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   logger_.Info("gateway_controller.cpp: Constructing GatewayController...");
 
   // Declare and load all required parameters
-  this->declare_parameter<std::string>("discovery_service.host", "127.0.0.1");
-  this->declare_parameter<int>("discovery_service.port", 19900);
+  this->declare_parameter<std::string>("discovery_service.host", "192.168.65.10");
+  this->declare_parameter<int>("discovery_service.port", 9090);
   this->declare_parameter<std::string>("identity.component_type", "VHC");
   this->declare_parameter<std::string>("identity.component_name", "default_vhc");
   this->declare_parameter<int>("identity.group_id", 1);
@@ -163,6 +163,7 @@ void GatewayController::terminate_offloading_service_handler(
 void GatewayController::control_thread_func() {
     // Define keepalive interval
     const auto keepalive_interval = std::chrono::seconds(15);
+    const auto discovery_retry_delay = std::chrono::seconds(10);
 
     while(running_) {
         State current_state = state_.load();
@@ -199,6 +200,12 @@ void GatewayController::control_thread_func() {
                     break;
                 }
                 
+                // Clean up previous discovery client if it exists
+                if (discovery_client_) {
+                    discovery_client_->stop();
+                    discovery_client_.reset();
+                }
+                
                 discovery_client_ = std::make_unique<DiscoveryClient>();
                 if (discovery_client_->start(
                     discovery_host_, discovery_port_, comp_type, component_name_,
@@ -206,11 +213,24 @@ void GatewayController::control_thread_func() {
                     std::bind(&GatewayController::on_discovery_failure, this, std::placeholders::_1))) {
                     
                     logger_.Info("gateway_controller.cpp: Discovery client started. Waiting for response...");
+                    
+                    // Wait for discovery result or timeout
                     std::unique_lock<std::mutex> lock(state_mutex_);
-                    state_cv_.wait(lock, [this] { return state_ != State::DISCOVERING || !running_; });
+                    if (state_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return state_ != State::DISCOVERING || !running_; })) {
+                        // State changed (success or failure handled by callbacks)
+                        if (state_ == State::DISCOVERING && running_) {
+                            // Still in DISCOVERING state after callback - this means failure occurred
+                            logger_.Info("gateway_controller.cpp: Discovery attempt failed. Retrying in {}s...", discovery_retry_delay.count());
+                            std::this_thread::sleep_for(discovery_retry_delay);
+                        }
+                    } else {
+                        // Timeout occurred
+                        logger_.Warn("gateway_controller.cpp: Discovery attempt timed out. Retrying in {}s...", discovery_retry_delay.count());
+                        std::this_thread::sleep_for(discovery_retry_delay);
+                    }
                 } else {
-                    logger_.Error("gateway_controller.cpp: Failed to start discovery client. Retrying in 10s.");
-                    std::this_thread::sleep_for(std::chrono::seconds(10));
+                    logger_.Error("gateway_controller.cpp: Failed to start discovery client. Retrying in {}s...", discovery_retry_delay.count());
+                    std::this_thread::sleep_for(discovery_retry_delay);
                 }
                 break;
             }
@@ -373,13 +393,10 @@ void GatewayController::on_discovery_success(const std::string& bridge_host, int
 
 void GatewayController::on_discovery_failure(const std::string& error_message) {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    logger_.Error("gateway_controller.cpp: Discovery failed: {}. Retrying in 10s.", error_message);
-    // Instead of failing, we will retry discovery after a delay
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-    if (state_ == State::DISCOVERING) {
-        // Stay in DISCOVERING state to retry
-    }
-    state_cv_.notify_one(); // Wake up the control thread to retry
+    logger_.Error("gateway_controller.cpp: Discovery failed: {}", error_message);
+    // Do not change state here - let the control thread handle the retry logic
+    // Just notify the condition variable to wake up the control thread
+    state_cv_.notify_one();
 }
 
 void GatewayController::on_dp_confirmed() {

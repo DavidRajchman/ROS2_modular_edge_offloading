@@ -1,41 +1,85 @@
+#!/usr/bin/env python3
 import struct
 import sys
 import datetime
+import os
+
+# --- Configuration ---
+DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/ros_ws/UNKNOWN_binary.log"
+DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/ros_ws/decoded_log.txt"
 
 # Define CppLogging Level enum mapping
 # From: /home/ubuntu/external_libs/CppLogging/include/logging/level.h
 LOG_LEVELS = {
-    0x00: "NONE",
-    0x1F: "FATAL",
-    0x3F: "ERROR",
-    0x7F: "WARN",
-    0x9F: "INFO",
-    0xBF: "DEBUG",
-    0xFF: "ALL"
+    0x00: "NONE", 0x1F: "FATAL", 0x3F: "ERROR",
+    0x7F: "WARN", 0x9F: "INFO", 0xBF: "DEBUG", 0xFF: "ALL"
 }
 
-# ArgumentType enum value for string
-# In this binary format, string arguments are using type code 0x0E (not 0x0D as initially assumed)
-ARG_STRING_TYPE = 0x0E
+# ArgumentType enum values from CppLogging, deduced from output.
+# Using struct format strings: '<' for little-endian.
+ARG_TYPES = {
+    0x01: ('<?', 1),    # bool (1 byte)
+    0x02: ('c', 1),     # char (1 byte)
+    0x04: ('<b', 1),    # int8_t (1 byte)
+    0x05: ('<B', 1),    # uint8_t (1 byte)
+    0x06: ('<h', 2),    # int16_t (2 bytes)
+    0x07: ('<H', 2),    # uint16_t (2 bytes)
+    0x08: ('<i', 4),    # int32_t (4 bytes)
+    0x09: ('<I', 4),    # uint32_t (4 bytes)
+    0x0A: ('<q', 8),    # int64_t (8 bytes)
+    0x0B: ('<Q', 8),    # uint64_t (8 bytes)
+    0x0C: ('<f', 4),    # float (4 bytes)
+    0x0D: ('<d', 8),    # double (8 bytes)
+    0x0E: 'string',     # Special case for variable-length string
+}
 
 def format_timestamp_ns(timestamp_ns):
     """Formats a nanosecond timestamp into YYYY-MM-DDTHH:MM:SS.mmm.uuu.nnnZ"""
     if timestamp_ns < 0:
         return "InvalidTimestamp"
-    
     seconds = timestamp_ns // 1_000_000_000
     nanoseconds_remainder = timestamp_ns % 1_000_000_000
-    
-    milliseconds = nanoseconds_remainder // 1_000_000
-    microseconds_in_ms_remainder = (nanoseconds_remainder % 1_000_000) // 1_000
-    nanoseconds_in_us_remainder = nanoseconds_remainder % 1_000
-    
     try:
-        dt_object = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
-        return dt_object.strftime('%Y-%m-%dT%H:%M:%S') + \
-               f".{milliseconds:03d}.{microseconds_in_ms_remainder:03d}.{nanoseconds_in_us_remainder:03d}Z"
-    except ValueError:
+        dt = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
+        return dt.strftime('%Y-%m-%dT%H:%M:%S') + f".{nanoseconds_remainder:09d}Z"
+    except (OSError, ValueError):
         return f"TimestampError({timestamp_ns})"
+
+def _parse_argument_buffer(buffer):
+    """Parses the binary argument buffer and returns a list of Python objects."""
+    args = []
+    offset = 0
+    while offset < len(buffer):
+        try:
+            arg_type_val = buffer[offset]
+            offset += 1
+
+            if arg_type_val in ARG_TYPES:
+                handler = ARG_TYPES[arg_type_val]
+                if handler == 'string':
+                    # String: 4-byte length + N bytes of UTF-8 data
+                    if offset + 4 > len(buffer): break
+                    str_len = struct.unpack_from('<I', buffer, offset)[0]
+                    offset += 4
+                    if offset + str_len > len(buffer): break
+                    value = buffer[offset:offset+str_len].decode('utf-8', errors='replace')
+                    args.append(value)
+                    offset += str_len
+                else:
+                    # Fixed-size types
+                    fmt_char, size = handler
+                    if offset + size > len(buffer): break
+                    value = struct.unpack_from(fmt_char, buffer, offset)[0]
+                    args.append(value)
+                    offset += size
+            else:
+                # Unknown argument type
+                args.append(f"{{UNKNOWN_ARG_TYPE:0x{arg_type_val:02X}}}")
+                break # Stop parsing this record's args
+        except Exception:
+            args.append("{PARSING_ERROR}")
+            break
+    return args
 
 def parse_record(data_block):
     """Parses a single log record data block."""
@@ -54,92 +98,160 @@ def parse_record(data_block):
 
     effective_message = raw_message_str
 
-    # Check for argument buffer size field
     if offset + 4 > len(data_block):
-        print(f"Warning: Truncated record before arg_buffer_size. RawMsg: '{raw_message_str}'", file=sys.stderr)
-        formatted_timestamp = format_timestamp_ns(timestamp_ns)
-        return f"{formatted_timestamp} [0x{thread_id:X}] {level_str:<5} {logger_name} - {effective_message} (TruncatedArgs)"
+        return f"Warning: Truncated record. RawMsg: '{raw_message_str}'"
 
     arg_data_actual_len = struct.unpack_from('<I', data_block, offset)[0]
     offset += 4
 
-    # If the raw message is "{}" and there's argument data, try to parse the first argument as a string
-    if raw_message_str == "{}" and arg_data_actual_len > 0:
+    if arg_data_actual_len > 0:
         if offset + arg_data_actual_len > len(data_block):
-            print(f"Warning: Arg data length {arg_data_actual_len} exceeds remaining data_block {len(data_block) - offset}. RawMsg: '{raw_message_str}'", file=sys.stderr)
+            effective_message += " (TruncatedArgs)"
         else:
             arg_buffer = data_block[offset : offset + arg_data_actual_len]
-            
-            # Try to parse the first argument if it's a string
-            # Min size for string arg: 1 (type) + 4 (len_field) = 5 bytes
-            if len(arg_buffer) >= 5:
-                arg_ptr = 0 # Pointer within arg_buffer
-                
-                arg_type_val = struct.unpack_from('<B', arg_buffer, arg_ptr)[0]; arg_ptr += 1
-                
-                if arg_type_val == ARG_STRING_TYPE:
-                    if arg_ptr + 4 <= len(arg_buffer): # Check for string length field
-                        str_len_in_arg = struct.unpack_from('<I', arg_buffer, arg_ptr)[0]; arg_ptr += 4
-                        
-                        if arg_ptr + str_len_in_arg <= len(arg_buffer): # Check for string data
-                            actual_str_data = arg_buffer[arg_ptr : arg_ptr + str_len_in_arg]
-                            try:
-                                decoded_arg_str = actual_str_data.decode('utf-8', errors='replace')
-                                effective_message = decoded_arg_str # Replace "{}"
-                            except Exception as e:
-                                print(f"Warning: Failed to decode string arg: {e}", file=sys.stderr)
-                                # effective_message remains "{}"
-                        # else: String data length exceeds arg_buffer, effective_message remains "{}"
-                    # else: String length field exceeds arg_buffer, effective_message remains "{}"
-                # else: First argument is not a string, effective_message remains "{}"
-            # else: Argument buffer too small for a typed string, effective_message remains "{}"
-    
-    offset += arg_data_actual_len # Advance offset past the argument data
-
-    if offset != len(data_block):
-        print(f"Warning: Offset mismatch after parsing. Offset={offset}, DataBlockLen={len(data_block)}. EffectiveMsg: '{effective_message}'", file=sys.stderr)
+            try:
+                parsed_args = _parse_argument_buffer(arg_buffer)
+                # Use python's format() to substitute arguments
+                effective_message = raw_message_str.format(*parsed_args)
+            except (IndexError, ValueError) as e:
+                # Formatting failed (e.g., mismatched {} count vs args)
+                args_repr = ", ".join(map(str, parsed_args))
+                effective_message = f"{raw_message_str} [FORMAT_ERROR: {e} | ARGS: {args_repr}]"
 
     formatted_timestamp = format_timestamp_ns(timestamp_ns)
-    return f"{formatted_timestamp} [0x{thread_id:X}] {level_str:<5} {logger_name} - {effective_message}"
+    # Use only the lower 32 bits of the thread ID for cleaner output, matching the C++ tool
+    return f"{formatted_timestamp} [0x{thread_id & 0xFFFFFFFF:X}] {level_str:<5} {logger_name} - {effective_message}"
 
-def decode_log_file(filepath):
-    """Decodes and prints records from a CppLogging binary log file."""
+def decode_log_file(binary_filepath, output_filepath):
+    """Decodes records from a CppLogging binary log file and writes to text file."""
+    
+    # Check if binary log file exists
+    if not os.path.exists(binary_filepath):
+        print(f"Error: Binary log file not found at '{binary_filepath}'")
+        print(f"Make sure your application has run and generated the log file.")
+        return False
+    
+    # Get file size for progress indication
+    file_size = os.path.getsize(binary_filepath)
+    if file_size == 0:
+        print(f"Warning: Binary log file '{binary_filepath}' is empty.")
+        return False
+    
+    records_processed = 0
+    warnings_count = 0
+    errors_count = 0
+    
     try:
-        with open(filepath, 'rb') as f:
+        with open(binary_filepath, 'rb') as infile, open(output_filepath, 'w', encoding='utf-8') as outfile:
+            # Write header information
+            outfile.write(f"# CppLogging Binary Log Decoder Output\n")
+            outfile.write(f"# Source: {binary_filepath}\n")
+            outfile.write(f"# Decoded at: {datetime.datetime.now().isoformat()}\n")
+            outfile.write(f"# File size: {file_size} bytes\n")
+            outfile.write("# Format: TIMESTAMP [THREAD_ID] LEVEL LOGGER - MESSAGE\n")
+            outfile.write("#" + "="*80 + "\n\n")
+            
             while True:
-                size_bytes = f.read(4)
-                if not size_bytes: break
+                size_bytes = infile.read(4)
+                if not size_bytes: 
+                    break
                 if len(size_bytes) < 4:
-                    print(f"Error: Incomplete record size field at end of file.", file=sys.stderr); break
+                    outfile.write(f"ERROR: Incomplete record size field at end of file.\n")
+                    errors_count += 1
+                    break
                 
                 data_block_size = struct.unpack('<I', size_bytes)[0]
                 
                 if data_block_size == 0: 
-                    print(f"Warning: Encountered zero-size data block. Skipping.", file=sys.stderr); continue
+                    outfile.write(f"WARNING: Encountered zero-size data block. Skipping.\n")
+                    warnings_count += 1
+                    continue
 
-                data_block = f.read(data_block_size)
+                data_block = infile.read(data_block_size)
                 if len(data_block) < data_block_size:
-                    print(f"Error: Incomplete data block. Expected {data_block_size}, got {len(data_block)}.", file=sys.stderr); break
+                    outfile.write(f"ERROR: Incomplete data block. Expected {data_block_size}, got {len(data_block)}.\n")
+                    errors_count += 1
+                    break
                 
                 try:
                     formatted_record = parse_record(data_block)
-                    print(formatted_record)
+                    outfile.write(formatted_record + "\n")
+                    records_processed += 1
+                    
+                    # Progress indicator for large files
+                    if records_processed % 1000 == 0:
+                        print(f"Processed {records_processed} records...")
+                        
                 except struct.error as e:
-                    print(f"Error parsing record (struct error): {e}. Data block size: {data_block_size}", file=sys.stderr)
+                    outfile.write(f"ERROR: Struct parsing error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
                 except UnicodeDecodeError as e:
-                    print(f"Error parsing record (unicode error): {e}. Data block size: {data_block_size}", file=sys.stderr)
+                    outfile.write(f"ERROR: Unicode decoding error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
                 except Exception as e:
-                    print(f"An unexpected error occurred while parsing a record: {e}", file=sys.stderr)
+                    outfile.write(f"ERROR: Unexpected error: {e}. Data block size: {data_block_size}\n")
+                    errors_count += 1
 
     except FileNotFoundError:
-        print(f"Error: File not found at '{filepath}'", file=sys.stderr)
+        print(f"Error: File not found at '{binary_filepath}'")
+        return False
+    except PermissionError:
+        print(f"Error: Permission denied accessing '{binary_filepath}' or '{output_filepath}'")
+        return False
     except Exception as e:
-        print(f"An error occurred: {e}", file=sys.stderr)
+        print(f"Error: An unexpected error occurred: {e}")
+        return False
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python BinLogDecoder.py <path_to_binary_log_file>")
+    # Summary
+    print(f"Decoding completed successfully!")
+    print(f"  Records processed: {records_processed}")
+    print(f"  Warnings: {warnings_count}")
+    print(f"  Errors: {errors_count}")
+    print(f"  Output written to: {output_filepath}")
+    print(f"  Output file size: {os.path.getsize(output_filepath)} bytes")
+    
+    return True
+
+def main():
+    """Main function with improved argument handling."""
+    
+    # Determine input and output paths
+    if len(sys.argv) == 1:
+        # No arguments - use defaults
+        binary_path = DEFAULT_BINARY_LOG_PATH
+        output_path = DEFAULT_OUTPUT_TXT_PATH
+        print(f"Using default paths:")
+        print(f"  Binary log: {binary_path}")
+        print(f"  Output txt: {output_path}")
+        
+    elif len(sys.argv) == 2:
+        # One argument - binary file path provided, use default output
+        binary_path = sys.argv[1]
+        output_path = DEFAULT_OUTPUT_TXT_PATH
+        print(f"Using provided binary path: {binary_path}")
+        print(f"Using default output path: {output_path}")
+        
+    elif len(sys.argv) == 3:
+        # Two arguments - both paths provided
+        binary_path = sys.argv[1]
+        output_path = sys.argv[2]
+        print(f"Using provided paths:")
+        print(f"  Binary log: {binary_path}")
+        print(f"  Output txt: {output_path}")
+        
+    else:
+        print("Usage:")
+        print(f"  {sys.argv[0]}                              # Use default paths")
+        print(f"  {sys.argv[0]} <binary_log_file>            # Specify binary file, use default output")
+        print(f"  {sys.argv[0]} <binary_log_file> <output.txt> # Specify both files")
+        print()
+        print(f"Default binary log path: {DEFAULT_BINARY_LOG_PATH}")
+        print(f"Default output txt path: {DEFAULT_OUTPUT_TXT_PATH}")
         sys.exit(1)
     
-    log_file_path = sys.argv[1]
-    decode_log_file(log_file_path)
+    # Validate and decode
+    if not decode_log_file(binary_path, output_path):
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

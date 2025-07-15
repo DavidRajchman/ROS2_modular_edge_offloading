@@ -1,6 +1,24 @@
 #include "modular_gateway_sender/gateway_controller.hpp"
 #include "modular_gateway_sender/logging_setup.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include <signal.h>
+#include <csignal>
+#include "logging/config.h"
+
+// Signal handler to flush logs before termination
+void signal_handler(int signum) {
+  // Force flush and shutdown logging system
+  CppLogging::Config::Shutdown();
+  std::exit(signum);
+}
+
+// Install abort handler to flush logs
+void install_abort_handler() {
+  std::signal(SIGABRT, signal_handler);
+  std::signal(SIGSEGV, signal_handler);
+  std::signal(SIGTERM, signal_handler);
+  std::signal(SIGINT, signal_handler);
+}
 
 int main(int argc, char * argv[])
 {
@@ -22,17 +40,27 @@ int main(int argc, char * argv[])
   //    other part of the gateway is constructed.
   gateway::setup_logging(component_type);
 
-  // 4. Create the main GatewayController node and initialize it properly
-  auto controller_node = std::make_shared<gateway::GatewayController>(rclcpp::NodeOptions());
-  
-  // 5. Initialize components that require shared_from_this()
-  controller_node->initialize();
-  
-  // 6. Spin the node
-  rclcpp::spin(controller_node);
+  // 4. Install signal handlers to flush logs on crash
+  install_abort_handler();
 
-  // 7. Shut down ROS 2
+  try {
+    // 5. Create the main GatewayController node and initialize it properly
+    auto controller_node = std::make_shared<gateway::GatewayController>(rclcpp::NodeOptions());
+    
+    // 6. Initialize components that require shared_from_this()
+    controller_node->initialize();
+    
+    // 7. Spin the node
+    rclcpp::spin(controller_node);
+  } catch (const std::exception& e) {
+    // Force log flush before re-throwing
+    CppLogging::Config::Shutdown();
+    throw;
+  }
+
+  // 8. Shut down ROS 2 and logging
   rclcpp::shutdown();
+  CppLogging::Config::Shutdown();
   
   return 0;
 }
