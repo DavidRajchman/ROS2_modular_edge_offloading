@@ -59,6 +59,15 @@ public:
   GatewayController(const rclcpp::NodeOptions& options);
   ~GatewayController();
 
+  /**
+   * @brief Initialize components that require shared_from_this().
+   * 
+   * This method must be called after the constructor completes and the object
+   * is managed by a shared_ptr. It creates the RosGateway and HandlerFactory
+   * instances that need access to shared_from_this().
+   */
+  void initialize();
+
 private:
   // Main logic thread and state machine
   void control_thread_func();

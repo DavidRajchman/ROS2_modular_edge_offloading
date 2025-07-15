@@ -22,13 +22,16 @@ int main(int argc, char * argv[])
   //    other part of the gateway is constructed.
   gateway::setup_logging(component_type);
 
-  // 4. Create and spin the main GatewayController node.
-  //    The controller will handle all discovery, connection, and session logic.
+  // 4. Create the main GatewayController node and initialize it properly
   auto controller_node = std::make_shared<gateway::GatewayController>(rclcpp::NodeOptions());
   
+  // 5. Initialize components that require shared_from_this()
+  controller_node->initialize();
+  
+  // 6. Spin the node
   rclcpp::spin(controller_node);
 
-  // 5. Shut down ROS 2
+  // 7. Shut down ROS 2
   rclcpp::shutdown();
   
   return 0;

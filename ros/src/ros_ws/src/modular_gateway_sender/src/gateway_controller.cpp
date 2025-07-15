@@ -4,8 +4,6 @@
 #include "modular_gateway_sender/handler_factory.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
 
-
-
 namespace gateway {
 
 GatewayController::GatewayController(const rclcpp::NodeOptions& options)
@@ -40,14 +38,6 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   logger_.Info("gateway_controller.cpp: Initialized mock task database with {} tasks.", task_database_.size());
   // -----------------------------------------
 
-  // Create the data plane transport and the RosGateway instance
-  auto data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
-  gateway_ = std::make_unique<RosGateway>(this->shared_from_this(), std::move(data_plane_transport));
-  gateway_->set_identity(static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_));
-
-  // Create the handler factory
-  handler_factory_ = std::make_unique<HandlerFactory>(gateway_.get(), this->shared_from_this());
-
   // Create the ROS 2 services
   offloading_service_ = this->create_service<modular_gateway_sender::srv::RequestOffloading>(
     "request_offloading",
@@ -59,11 +49,27 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
     std::bind(&GatewayController::terminate_offloading_service_handler, this, std::placeholders::_1, std::placeholders::_2)
   );
 
+  logger_.Info("gateway_controller.cpp: GatewayController basic construction completed. Call initialize() to complete setup.");
+}
+
+void GatewayController::initialize() 
+{
+  logger_.Info("gateway_controller.cpp: Initializing GatewayController components that require shared_from_this()...");
+
+  // Now we can safely call shared_from_this() since the object is fully constructed
+  // Create the data plane transport and the RosGateway instance
+  auto data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
+  gateway_ = std::make_unique<RosGateway>(this->shared_from_this(), std::move(data_plane_transport));
+  gateway_->set_identity(static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_));
+
+  // Create the handler factory
+  handler_factory_ = std::make_unique<HandlerFactory>(gateway_.get(), this->shared_from_this());
+
   // Start the main control logic thread
   running_ = true;
   control_thread_ = std::thread(&GatewayController::control_thread_func, this);
   
-  logger_.Info("gateway_controller.cpp: GatewayController constructed successfully. Control thread started.");
+  logger_.Info("gateway_controller.cpp: GatewayController initialization completed. Control thread started.");
 }
 
 GatewayController::~GatewayController()
@@ -168,137 +174,134 @@ void GatewayController::control_thread_func() {
                 // Start the data plane server listening for connections
                 auto transport = dynamic_cast<TcpServerTransport*>(gateway_->get_transport());
                 if (transport && transport->connect()) {
+                    logger_.Info("gateway_controller.cpp: Data plane transport started listening on port {}", data_plane_listen_port_);
+                    
+                    // Start the data plane connection monitoring thread
                     data_plane_connection_thread_ = std::thread(&GatewayController::data_plane_connection_thread_func, this);
+                    
+                    state_ = State::DISCOVERING;
                 } else {
-                    logger_.Error("gateway_controller.cpp: CRITICAL: Failed to start Data Plane server. Entering FAILED state.");
-                    state_ = State::FAILED;
-                    break;
+                    logger_.Error("gateway_controller.cpp: Failed to start data plane transport. Retrying in 5s.");
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
-                
-                // Transition to the discovery state
-                state_ = State::DISCOVERING;
                 break;
             }
             case State::DISCOVERING:
             {
-                logger_.Info("gateway_controller.cpp: Starting discovery process...");
-                discovery_client_ = std::make_unique<DiscoveryClient>();
+                logger_.Info("gateway_controller.cpp: Starting discovery client for component type: {}", component_type_);
                 
-                auto component_type_enum = discovery_protocol::string_to_component_type(component_type_);
-
-                discovery_client_->start(
-                    discovery_host_,
-                    discovery_port_,
-                    component_type_enum,
-                    component_name_,
+                discovery_protocol::ComponentType comp_type;
+                try {
+                    comp_type = discovery_protocol::string_to_component_type(component_type_);
+                } catch (const std::exception& e) {
+                    logger_.Error("gateway_controller.cpp: Invalid component type '{}': {}", component_type_, e.what());
+                    state_ = State::FAILED;
+                    break;
+                }
+                
+                discovery_client_ = std::make_unique<DiscoveryClient>();
+                if (discovery_client_->start(
+                    discovery_host_, discovery_port_, comp_type, component_name_,
                     std::bind(&GatewayController::on_discovery_success, this, std::placeholders::_1, std::placeholders::_2),
-                    std::bind(&GatewayController::on_discovery_failure, this, std::placeholders::_1)
-                );
-
-                // Wait for discovery to complete (or fail)
-                std::unique_lock<std::mutex> lock(state_mutex_);
-                state_cv_.wait(lock, [this]{ return state_ != State::DISCOVERING || !running_; });
+                    std::bind(&GatewayController::on_discovery_failure, this, std::placeholders::_1))) {
+                    
+                    logger_.Info("gateway_controller.cpp: Discovery client started. Waiting for response...");
+                    std::unique_lock<std::mutex> lock(state_mutex_);
+                    state_cv_.wait(lock, [this] { return state_ != State::DISCOVERING || !running_; });
+                } else {
+                    logger_.Error("gateway_controller.cpp: Failed to start discovery client. Retrying in 10s.");
+                    std::this_thread::sleep_for(std::chrono::seconds(10));
+                }
                 break;
             }
             case State::CONNECTING_TO_BRIDGE:
             {
+                logger_.Info("gateway_controller.cpp: Connecting to Bridge Control Plane at {}:{}", bridge_cp_host_, bridge_cp_port_);
+                
                 bridge_cp_client_ = std::make_unique<BridgeCpClient>();
-                
-                // Define callbacks for the bridge client
-                auto dp_confirmed_cb = std::bind(&GatewayController::on_dp_confirmed, this);
-                auto session_approved_cb = std::bind(&GatewayController::on_session_approved, this, std::placeholders::_1);
-                auto session_denied_cb = std::bind(&GatewayController::on_session_denied, this, std::placeholders::_1, std::placeholders::_2);
-
-                if (!bridge_cp_client_->start(bridge_cp_host_, bridge_cp_port_, dp_confirmed_cb, session_approved_cb, session_denied_cb)) {
-                    logger_.Error("gateway_controller.cpp: CRITICAL: Could not connect to Bridge Control Plane. Retrying in 5s...");
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
-                    // Stay in this state to retry on the next loop iteration
-                    break; 
+                if (bridge_cp_client_->start(
+                    bridge_cp_host_, bridge_cp_port_,
+                    std::bind(&GatewayController::on_dp_confirmed, this),
+                    std::bind(&GatewayController::on_session_approved, this, std::placeholders::_1),
+                    std::bind(&GatewayController::on_session_denied, this, std::placeholders::_1, std::placeholders::_2))) {
+                    
+                    // Send the DP_INFO message immediately
+                    bridge_cp_client_->send_dp_info(component_id_, "0.0.0.0", data_plane_listen_port_);
+                    state_ = State::WAITING_FOR_DP_CONNECTION;
+                } else {
+                    logger_.Error("gateway_controller.cpp: Failed to start Bridge CP client. Retrying in 10s.");
+                    std::this_thread::sleep_for(std::chrono::seconds(10));
                 }
-                
-                logger_.Info("gateway_controller.cpp: Bridge Control Plane client connected. Sending DP Info...");
-                std::string my_ip = "127.0.0.1"; // TODO: Get this dynamically
-                bridge_cp_client_->send_dp_info(component_id_, my_ip, data_plane_listen_port_);
-                
-                logger_.Info("gateway_controller.cpp: DP Info sent. Waiting for DP confirmation from Bridge.");
-                state_ = State::WAITING_FOR_DP_CONNECTION;
                 break;
             }
             case State::WAITING_FOR_DP_CONNECTION:
             {
-                // The on_dp_confirmed() callback will change the state.
-                // We wait here until that happens.
-                logger_.Info("gateway_controller.cpp: Waiting for Data Plane connection to be confirmed by Bridge...");
+                logger_.Info("gateway_controller.cpp: Waiting for data plane connection confirmation from Bridge...");
                 std::unique_lock<std::mutex> lock(state_mutex_);
-                state_cv_.wait(lock, [this]{ return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; });
+                state_cv_.wait(lock, [this] { return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; });
                 break;
             }
             case State::OPERATIONAL:
             {
-                // In operational state, we process queues and send keepalives.
-                // Wait for a new request or for the keepalive timeout.
+                // Process any queued offloading or termination requests
                 std::unique_lock<std::mutex> lock(queue_mutex_);
-                queue_cv_.wait_for(lock, std::chrono::seconds(5), [this]{ 
+                if (queue_cv_.wait_for(lock, keepalive_interval, [this] { 
                     return !offloading_request_queue_.empty() || !termination_request_queue_.empty() || !running_; 
-                });
-
-                if (!running_) break;
-
-                // 1. Process termination requests
-                while (!termination_request_queue_.empty()) {
-                    std::string request_id_to_terminate = termination_request_queue_.front();
-                    termination_request_queue_.pop();
-                    lock.unlock(); // Unlock while handling
+                })) {
                     
-                    logger_.Info("gateway_controller.cpp: Dequeued termination request for session '{}'", request_id_to_terminate);
-                    bridge_cp_client_->send_session_terminate_request(component_id_, request_id_to_terminate);
-                    handle_session_teardown(request_id_to_terminate);
-
-                    lock.lock(); // Re-lock to check queue condition
-                }
-
-                // 2. Process new offloading requests
-                while (!offloading_request_queue_.empty()) {
-                    OffloadingRequestData request = offloading_request_queue_.front();
-                    offloading_request_queue_.pop();
-                    lock.unlock(); // Unlock while handling
-
-                    logger_.Info("gateway_controller.cpp: Dequeued and processing offloading request for task '{}'", request.task_id);
-                    
-                    auto db_it = task_database_.find(request.task_id);
-                    if (db_it == task_database_.end()) {
-                        logger_.Error("gateway_controller.cpp: Dequeued task '{}' but it's not in the database. This should not happen.", request.task_id);
-                    } else {
-                        std::string task_name = db_it->second.task_name;
-                        std::string request_id = component_id_ + ":" + std::to_string(request_id_counter_++);
-
+                    // Process offloading requests
+                    while (!offloading_request_queue_.empty() && running_) {
+                        auto req = offloading_request_queue_.front();
+                        offloading_request_queue_.pop();
+                        lock.unlock();
+                        
+                        std::string request_id = std::to_string(request_id_counter_++);
                         {
                             std::lock_guard<std::mutex> session_lock(session_mutex_);
-                            active_sessions_[request_id] = {request_id, request.task_id, std::chrono::steady_clock::now()};
+                            active_sessions_[request_id] = {request_id, req.task_id, std::chrono::steady_clock::now()};
                         }
-
-                        bridge_cp_client_->send_offload_request(component_id_, request_id, request.task_id, task_name);
+                        
+                        auto task_it = task_database_.find(req.task_id);
+                        if (task_it != task_database_.end()) {
+                            bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name);
+                            logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}'", req.task_id, request_id);
+                        }
+                        
+                        lock.lock();
                     }
-                    lock.lock(); // Re-lock to check queue condition
-                }
-                lock.unlock();
-
-                // 3. Send keepalives for active sessions
-                std::lock_guard<std::mutex> session_lock(session_mutex_);
-                auto now = std::chrono::steady_clock::now();
-                for (auto& pair : active_sessions_) {
-                    if (now - pair.second.last_keepalive_sent > keepalive_interval) {
-                        logger_.Info("gateway_controller.cpp: Sending keepalive for session '{}'", pair.first);
-                        bridge_cp_client_->send_session_keepalive(component_id_, pair.first);
-                        pair.second.last_keepalive_sent = now;
+                    
+                    // Process termination requests
+                    while (!termination_request_queue_.empty() && running_) {
+                        auto req_id = termination_request_queue_.front();
+                        termination_request_queue_.pop();
+                        lock.unlock();
+                        
+                        bridge_cp_client_->send_session_terminate_request(component_id_, req_id);
+                        handle_session_teardown(req_id);
+                        logger_.Info("gateway_controller.cpp: Sent termination request for session '{}'", req_id);
+                        
+                        lock.lock();
+                    }
+                } else {
+                    // Timeout occurred, send keepalives for active sessions
+                    lock.unlock();
+                    
+                    std::lock_guard<std::mutex> session_lock(session_mutex_);
+                    auto now = std::chrono::steady_clock::now();
+                    for (auto& [req_id, session] : active_sessions_) {
+                        if (now - session.last_keepalive_sent >= keepalive_interval) {
+                            bridge_cp_client_->send_session_keepalive(component_id_, req_id);
+                            session.last_keepalive_sent = now;
+                            logger_.Debug("gateway_controller.cpp: Sent keepalive for session '{}'", req_id);
+                        }
                     }
                 }
                 break;
             }
             case State::FAILED:
             {
-                logger_.Error("gateway_controller.cpp: Controller has entered FAILED state. Halting operations.");
-                running_ = false; // Stop the loop
+                logger_.Error("gateway_controller.cpp: Controller in FAILED state. Exiting control loop.");
+                running_ = false;
                 break;
             }
         }
@@ -310,21 +313,19 @@ void GatewayController::data_plane_connection_thread_func()
 {
   TransportBase* transport = gateway_->get_transport();
   if (!transport) {
-    logger_.Error("gateway_controller.cpp: No transport available for data plane connection monitoring.");
+    logger_.Error("gateway_controller.cpp: No transport available for data plane monitoring.");
     return;
   }
 
   while (running_) {
-    auto tcp_server_transport = dynamic_cast<TcpServerTransport*>(transport);
-    if (tcp_server_transport && !tcp_server_transport->is_connected()) {
-      logger_.Info("gateway_controller.cpp: Waiting for data plane connection...");
-      if (tcp_server_transport->accept_connection()) {
-        logger_.Info("gateway_controller.cpp: Data plane connection established.");
-        // Remove the is_receiver_running check since it's not accessible
-        // The receiver will be started when the controller transitions to OPERATIONAL
-      }
+    auto tcp_server = dynamic_cast<TcpServerTransport*>(transport);
+    if (tcp_server && tcp_server->accept_connection()) {
+      logger_.Info("gateway_controller.cpp: Data plane connection accepted from Bridge.");
+      // The connection is now established. The bridge should send DP_CONNECTION_CONFIRMED.
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    } else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 }
 
@@ -332,7 +333,7 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
     std::lock_guard<std::mutex> lock(session_mutex_);
     auto session_it = active_sessions_.find(request_id);
     if (session_it == active_sessions_.end()) {
-        logger_.Warn("gateway_controller.cpp: Teardown requested for unknown or already terminated session '{}'.", request_id);
+        logger_.Warn("gateway_controller.cpp: Attempted to teardown unknown session '{}'", request_id);
         return;
     }
 
@@ -340,13 +341,17 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
     auto task_it = task_database_.find(task_id);
     if (task_it != task_database_.end()) {
         const auto& required_handlers = task_it->second.required_handlers;
-        logger_.Info("gateway_controller.cpp: Tearing down session '{}'. Unregistering {} handlers for task '{}'.", request_id, required_handlers.size(), task_id);
+        logger_.Info("gateway_controller.cpp: Deactivating {} handlers for session '{}'", required_handlers.size(), request_id);
+        
         for (const auto& handler_type : required_handlers) {
-            // The handler name is the same as its type string in our current factory implementation
-            gateway_->unregister_handler(handler_type);
+            auto handler = handler_factory_->create_handler(handler_type);
+            if (handler) {
+                gateway_->unregister_handler(handler->get_name());
+                logger_.Info("gateway_controller.cpp: Deactivated handler '{}'", handler_type);
+            }
         }
     } else {
-        logger_.Error("gateway_controller.cpp: Could not find task details for task_id '{}' during teardown of session '{}'.", task_id, request_id);
+        logger_.Error("gateway_controller.cpp: Session '{}' references unknown task_id '{}'", request_id, task_id);
     }
 
     active_sessions_.erase(session_it);
@@ -358,10 +363,10 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
 void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (state_ == State::DISCOVERING) {
-        logger_.Info("gateway_controller.cpp: Discovery successful. Bridge CP at {}:{}", bridge_host, bridge_port);
         bridge_cp_host_ = bridge_host;
         bridge_cp_port_ = bridge_port;
         state_ = State::CONNECTING_TO_BRIDGE;
+        logger_.Info("gateway_controller.cpp: Discovery successful. Bridge found at {}:{}", bridge_host, bridge_port);
     }
     state_cv_.notify_one();
 }
@@ -372,7 +377,7 @@ void GatewayController::on_discovery_failure(const std::string& error_message) {
     // Instead of failing, we will retry discovery after a delay
     std::this_thread::sleep_for(std::chrono::seconds(10));
     if (state_ == State::DISCOVERING) {
-        // The loop in control_thread_func will re-initiate discovery
+        // Stay in DISCOVERING state to retry
     }
     state_cv_.notify_one(); // Wake up the control thread to retry
 }
@@ -380,9 +385,9 @@ void GatewayController::on_discovery_failure(const std::string& error_message) {
 void GatewayController::on_dp_confirmed() {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (state_ == State::WAITING_FOR_DP_CONNECTION) {
-        logger_.Info("gateway_controller.cpp: DP connection confirmed by Bridge. Starting receiver and transitioning to OPERATIONAL.");
         gateway_->start_receiver();
         state_ = State::OPERATIONAL;
+        logger_.Info("gateway_controller.cpp: Data plane confirmed. Gateway is now OPERATIONAL.");
     } else {
         logger_.Warn("gateway_controller.cpp: Received DP confirmation in unexpected state: {}", static_cast<int>(state_.load()));
     }
@@ -395,7 +400,7 @@ void GatewayController::on_session_approved(const std::string& request_id) {
     std::lock_guard<std::mutex> lock(session_mutex_);
     auto session_it = active_sessions_.find(request_id);
     if (session_it == active_sessions_.end()) {
-        logger_.Error("gateway_controller.cpp: Received approval for unknown or already handled request_id '{}'.", request_id);
+        logger_.Error("gateway_controller.cpp: Approved session '{}' not found in active sessions.", request_id);
         return;
     }
 
@@ -405,7 +410,7 @@ void GatewayController::on_session_approved(const std::string& request_id) {
     const std::string& task_id = session_it->second.task_id;
     auto task_it = task_database_.find(task_id);
     if (task_it == task_database_.end()) {
-        logger_.Error("gateway_controller.cpp: Could not find task details for task_id '{}' from approved session '{}'.", task_id, request_id);
+        logger_.Error("gateway_controller.cpp: Session '{}' references unknown task_id '{}'", request_id, task_id);
         return;
     }
 
@@ -415,12 +420,19 @@ void GatewayController::on_session_approved(const std::string& request_id) {
     for (const auto& handler_type : required_handlers) {
         auto handler = handler_factory_->create_handler(handler_type);
         if (handler) {
+            // Configure handler based on component type
+            if (component_type_ == "VHC") {
+                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::SUBSCRIBER_ONLY);
+            } else if (component_type_ == "MEC") {
+                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::PUBLISHER_ONLY);
+            } else {
+                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::BOTH);
+            }
+            
             gateway_->register_handler(handler);
-            // TODO: Configure handler mode (Subscriber/Publisher) based on task details.
-            // For now, default to subscriber only.
-            MessageHandlerBase::configure_handler_mode(handler, HandlerMode::SUBSCRIBER_ONLY);
+            logger_.Info("gateway_controller.cpp: Activated handler '{}'", handler_type);
         } else {
-            logger_.Error("gateway_controller.cpp: HandlerFactory failed to create handler of type '{}' for task '{}'.", handler_type, task_id);
+            logger_.Error("gateway_controller.cpp: Failed to create handler for type '{}'", handler_type);
         }
     }
 }
@@ -430,4 +442,4 @@ void GatewayController::on_session_denied(const std::string& request_id, const s
     handle_session_teardown(request_id);
 }
 
-} // namespace
+} // namespace gateway
