@@ -21,12 +21,24 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(fmt REQUIRED)
 find_package(Threads REQUIRED)
 # Add /usr/local to the search path for packages installed outside the workspace
 list(APPEND CMAKE_PREFIX_PATH "/usr/local")
 find_package(ControlPlaneProtocol REQUIRED)
 find_package(DiscoveryProtocol REQUIRED)
+
+# --- Fetch fmt via FetchContent to avoid system library issues ---
+include(FetchContent)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG 11.0.2  # Use a version of fmt that CppLogging is compatible with (e.g., 11.x)
+  CMAKE_ARGS -DBUILD_SHARED_LIBS=OFF -DFMT_HEADER_ONLY=OFF # Ensure fmt is built as a static, compiled library
+)
+
+# Set options to avoid building tests or installing fmt from this build
+set(FMT_TEST OFF CACHE BOOL "Disable building of fmt tests" FORCE)
+FetchContent_MakeAvailable(fmt) # This makes the fmt::fmt target available from the fetched source
 
 # --- Generate ROS 2 Service Definitions ---
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -41,7 +53,6 @@ set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue")
 
 # --- Fetch nlohmann_json via FetchContent ---
-include(FetchContent)
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -84,7 +95,7 @@ target_include_directories(gateway_transport_lib PUBLIC
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
     $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
 )
-ament_target_dependencies(gateway_transport_lib rclcpp)
+target_link_libraries(gateway_transport_lib Threads::Threads)
 
 # Message Handler Base library
 add_library(message_handler_base_lib src/message_handler_base.cpp)
@@ -103,23 +114,20 @@ add_library(handlers_lib
   src/handlers/string_test_input_handler.cpp
   src/handlers/string_test_result_handler.cpp
 )
-target_link_libraries(handlers_lib PRIVATE message_handler_base_lib)
 target_include_directories(handlers_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_link_libraries(handlers_lib message_handler_base_lib)
 ament_target_dependencies(handlers_lib rclcpp std_msgs sensor_msgs)
 
 # RosGateway library (Data Plane core)
 add_library(ros_gateway_lib src/ros_gateway.cpp)
-target_link_libraries(ros_gateway_lib PRIVATE
-  gateway_transport_lib
-  message_handler_base_lib
-)
 target_include_directories(ros_gateway_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_link_libraries(ros_gateway_lib gateway_transport_lib message_handler_base_lib)
 ament_target_dependencies(ros_gateway_lib rclcpp)
 
 # GatewayController library (Control Plane core)
@@ -130,29 +138,30 @@ add_library(gateway_controller_lib
     src/bridge_cp_client.cpp
     src/handler_factory.cpp
 )
-target_link_libraries(gateway_controller_lib PRIVATE
-    ros_gateway_lib
-    handlers_lib
-    ${ControlPlaneProtocol_LIBRARIES}
-    ${DiscoveryProtocol_LIBRARIES}
-    nlohmann_json::nlohmann_json
-)
 target_include_directories(gateway_controller_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
+)
+# Use the proper CMake targets instead of manually found library paths
+target_link_libraries(gateway_controller_lib 
+    ros_gateway_lib
+    handlers_lib
+    ControlPlaneProtocol::control_plane_protocol
+    DiscoveryProtocol::discovery_protocol
+    nlohmann_json::nlohmann_json
 )
 ament_target_dependencies(gateway_controller_lib rclcpp)
 
 # --- Executable Definition ---
 # The single, unified executable for the new architecture.
 add_executable(gateway_controller src/main.cpp)
-target_link_libraries(gateway_controller PRIVATE
+target_link_libraries(gateway_controller
     gateway_controller_lib
     Threads::Threads
     ${CPPLOGGING_LIBRARY}
     ${CPPCOMMON_LIBRARY}
-    fmt::fmt
+    fmt::fmt              # Link fmt library
     bfd
     uuid
     dl
@@ -163,7 +172,7 @@ ament_target_dependencies(gateway_controller rclcpp)
 
 # --- Make sure the service headers are available to the gateway_controller_lib ---
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-target_link_libraries(gateway_controller_lib PRIVATE "${cpp_typesupport_target}")
+target_link_libraries(gateway_controller_lib "${cpp_typesupport_target}")
 
 # --- Installation ---
 install(TARGETS

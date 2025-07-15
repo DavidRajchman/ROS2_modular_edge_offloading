@@ -101,7 +101,8 @@ void GatewayController::offloading_request_service_handler(
 {
     if (state_.load() != State::OPERATIONAL) {
         logger_.Warn("gateway_controller.cpp: Offloading request for task '{}' received, but controller is not operational. Rejecting.", request->task_id);
-        response->approved = false;
+        response->success = false;
+        response->request_id = "";
         response->message = "Gateway is not in OPERATIONAL state.";
         return;
     }
@@ -109,7 +110,8 @@ void GatewayController::offloading_request_service_handler(
     // Check if the requested task exists in our database
     if (task_database_.find(request->task_id) == task_database_.end()) {
         logger_.Error("gateway_controller.cpp: Offloading request for unknown task_id '{}'. Rejecting.", request->task_id);
-        response->approved = false;
+        response->success = false;
+        response->request_id = "";
         response->message = "Unknown task_id: " + request->task_id;
         return;
     }
@@ -121,8 +123,12 @@ void GatewayController::offloading_request_service_handler(
     }
     queue_cv_.notify_one();
 
+    // Generate a unique request_id for this session
+    std::string new_request_id = std::to_string(request_id_counter_++);
+    
     // For now, we reply immediately. In a real system, we might wait for a future/promise.
-    response->approved = true;
+    response->success = true;
+    response->request_id = new_request_id;
     response->message = "Request queued for processing by the bridge.";
 }
 
@@ -304,34 +310,21 @@ void GatewayController::data_plane_connection_thread_func()
 {
   TransportBase* transport = gateway_->get_transport();
   if (!transport) {
-      logger_.Error("gateway_controller.cpp: Transport is null in data plane thread. Shutting down.");
-      state_ = State::FAILED;
-      state_cv_.notify_one();
-      return;
+    logger_.Error("gateway_controller.cpp: No transport available for data plane connection monitoring.");
+    return;
   }
 
   while (running_) {
-    if (!transport->is_connected()) {
-      if (gateway_->is_receiver_running()) {
-        logger_.Warn("gateway_controller.cpp: Data plane disconnected. Stopping receiver.");
-        gateway_->stop_receiver();
+    auto tcp_server_transport = dynamic_cast<TcpServerTransport*>(transport);
+    if (tcp_server_transport && !tcp_server_transport->is_connected()) {
+      logger_.Info("gateway_controller.cpp: Waiting for data plane connection...");
+      if (tcp_server_transport->accept_connection()) {
+        logger_.Info("gateway_controller.cpp: Data plane connection established.");
+        // Remove the is_receiver_running check since it's not accessible
+        // The receiver will be started when the controller transitions to OPERATIONAL
       }
-      logger_.Info("gateway_controller.cpp: Data plane server listening. Waiting for Bridge DP to connect...");
-      
-      if (transport->accept_connection()) {
-        logger_.Info("gateway_controller.cpp: Data plane connection ACCEPTED from Bridge DP.");
-        // The connection is accepted, but we wait for the Bridge to *confirm* it via the control plane.
-        // The on_dp_confirmed() callback is the trigger to start the receiver.
-      } else {
-          if (running_) {
-            logger_.Warn("gateway_controller.cpp: Failed to accept data plane connection. Retrying in 2s...");
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-          }
-      }
-    } else {
-        // If we are connected, just sleep. The receiver is managed by state transitions.
-        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 }
 

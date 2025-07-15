@@ -1,4 +1,3 @@
-#include "modular_gateway_sender/logging_utils.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
