@@ -236,10 +236,10 @@ def main():
         simulator.add_component("B", "Bridge-Simulator", 5, 1, 7000)
     
     if args.VHC:
-        simulator.add_component("V", "Vehicle-Simulator", 2, 10, 6000)
+        simulator.add_component("V", "Vehicle-Simulator", 50, 10, 6000)
     
     if args.MEC:
-        simulator.add_component("M", "MEC-Simulator", 12, 1, 8080)
+        simulator.add_component("M", "MEC-Simulator", 60, 10, 8080)
     
     simulator.run()
 

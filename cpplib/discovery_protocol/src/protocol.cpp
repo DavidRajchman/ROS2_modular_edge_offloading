@@ -152,6 +152,7 @@ ProtocolStatus encode_registration_response(const RegistrationResponse& response
        << response.connectionTargetPort << ";"
        << response.connectionTargetId << ";"
        << response.configJson << ";"
+       << response.detectedClientAddress << ";"  // NEW FIELD
        << response.humanReadableMessage;
     output = ss.str();
     return ProtocolStatus::OK;
@@ -159,7 +160,7 @@ ProtocolStatus encode_registration_response(const RegistrationResponse& response
 
 ProtocolStatus decode_registration_response(const std::string& input, RegistrationResponse& output) {
     auto parts = split_string(input, ';');
-    if (parts.size() != 10) return ProtocolStatus::MALFORMED_MESSAGE;
+    if (parts.size() != 11) return ProtocolStatus::MALFORMED_MESSAGE;
     try {
         output.responseCode = static_cast<ResponseCode>(std::stoi(parts[1]));
         output.assignedGroupId = static_cast<uint8_t>(std::stoi(parts[2]));
@@ -169,7 +170,8 @@ ProtocolStatus decode_registration_response(const std::string& input, Registrati
         output.connectionTargetPort = parts[6];
         output.connectionTargetId = static_cast<uint16_t>(std::stoi(parts[7]));
         output.configJson = parts[8];
-        output.humanReadableMessage = parts[9];
+        output.detectedClientAddress = parts[9];  // NEW FIELD
+        output.humanReadableMessage = parts[10];   // Shifted index
     } catch (const std::exception&) {
         return ProtocolStatus::INVALID_FORMAT;
     }

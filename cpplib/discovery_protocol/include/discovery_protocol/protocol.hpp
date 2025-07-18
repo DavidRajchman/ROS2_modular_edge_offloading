@@ -77,6 +77,7 @@ struct RegistrationResponse {
     std::string connectionTargetPort;
     uint16_t connectionTargetId;
     std::string configJson;
+    std::string detectedClientAddress;  // NEW FIELD: The IP address detected by the server
     std::string humanReadableMessage;
 };
 

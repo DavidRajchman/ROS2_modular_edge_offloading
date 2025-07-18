@@ -34,6 +34,9 @@ public:
      * @param port The port of the DiscoveryService.
      * @param component_type The type of this component (e.g., "VHC" or "MEC").
      * @param component_name A human-readable name for this component.
+     * @param group_id The group ID for this component.
+     * @param id_in_group The ID within the group for this component.
+     * @param data_plane_port The port where this component's data plane is listening.
      * @param success_cb Callback invoked on successful discovery.
      * @param failure_cb Callback invoked on any failure.
      * @return true if the client thread was started successfully, false otherwise.
@@ -43,29 +46,36 @@ public:
         int port,
         discovery_protocol::ComponentType component_type,
         const std::string& component_name,
+        uint8_t group_id,
+        uint8_t id_in_group,
+        int data_plane_port,
         DiscoverySuccessCallback success_cb,
         DiscoveryFailureCallback failure_cb
     );
 
     /**
-     * @brief Stops the discovery client and its communication thread.
+     * @brief Stops the discovery process.
+     * 
+     * This method blocks until the client thread finishes.
      */
     void stop();
 
 private:
     void client_thread_func();
 
-    std::unique_ptr<TransportBase> transport_;
     CppLogging::Logger logger_;
-
-    std::thread client_thread_;
+    std::unique_ptr<TransportBase> transport_;
     std::atomic<bool> running_{false};
+    std::thread client_thread_;
 
-    // Connection and registration details
+    // Connection parameters
     std::string host_;
     int port_;
     discovery_protocol::ComponentType component_type_;
     std::string component_name_;
+    uint8_t group_id_;
+    uint8_t id_in_group_;
+    int data_plane_port_;
 
     // Callbacks
     DiscoverySuccessCallback success_cb_;

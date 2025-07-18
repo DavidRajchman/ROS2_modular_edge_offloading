@@ -21,6 +21,9 @@ bool DiscoveryClient::start(
     int port,
     discovery_protocol::ComponentType component_type,
     const std::string& component_name,
+    uint8_t group_id,
+    uint8_t id_in_group,
+    int data_plane_port,
     DiscoverySuccessCallback success_cb,
     DiscoveryFailureCallback failure_cb)
 {
@@ -33,6 +36,9 @@ bool DiscoveryClient::start(
     port_ = port;
     component_type_ = component_type;
     component_name_ = component_name;
+    group_id_ = group_id;
+    id_in_group_ = id_in_group;
+    data_plane_port_ = data_plane_port;
     success_cb_ = success_cb;
     failure_cb_ = failure_cb;
 
@@ -65,7 +71,13 @@ void DiscoveryClient::client_thread_func() {
     
     discovery_protocol::RegistrationRequest request_payload;
     request_payload.componentType = component_type_;
+    request_payload.idRequestType = discovery_protocol::IdRequestType::STATIC;
+    request_payload.groupId = group_id_;
+    request_payload.idInGroup = id_in_group_;
     request_payload.componentName = component_name_;
+    request_payload.listenAddress = "0.0.0.0";
+    request_payload.listenPort = std::to_string(data_plane_port_);
+    request_payload.humanReadableMessage = "registration request from MGW";
 
     discovery_protocol::Message reg_msg(request_payload);
 
@@ -76,6 +88,15 @@ void DiscoveryClient::client_thread_func() {
         return;
     }
 
+    // Add validation to ensure we're not sending empty data
+    if (encoded_msg.empty()) {
+        logger_.Error("discovery_client.cpp: Encoded message is empty!");
+        if (failure_cb_) failure_cb_("Encoded message is empty.");
+        return;
+    }
+
+    logger_.Info("discovery_client.cpp: Sending encoded message ({} bytes): '{}'", encoded_msg.size(), encoded_msg);
+    
     std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
     transport_->async_send_data(std::move(reg_data));
 
@@ -87,8 +108,12 @@ void DiscoveryClient::client_thread_func() {
             buffer[bytes_received] = '\0'; // Null-terminate
             std::string response_str(reinterpret_cast<char*>(buffer.data()));
             
+            logger_.Info("discovery_client.cpp: Received raw response from DiscoveryService: '{}'", response_str);
+            
             discovery_protocol::Message response_msg;
             if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
+                logger_.Info("discovery_client.cpp: Successfully decoded message with type: {}", static_cast<int>(response_msg.type));
+                
                 if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
                     auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
                     if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
@@ -107,19 +132,23 @@ void DiscoveryClient::client_thread_func() {
                         if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);
                     }
                 } else {
-                    logger_.Error("discovery_client.cpp: Received unexpected message type from DiscoveryService.");
+                    logger_.Error("discovery_client.cpp: Received unexpected message type from DiscoveryService. Expected: {}, Got: {}", 
+                                static_cast<int>(discovery_protocol::MessageType::REGISTRATION_RESPONSE), 
+                                static_cast<int>(response_msg.type));
                     if (failure_cb_) failure_cb_("Unexpected message type from DiscoveryService.");
                 }
             } else {
-                logger_.Error("discovery_client.cpp: Failed to decode response from DiscoveryService: {}", response_str);
+                logger_.Error("discovery_client.cpp: Failed to decode response from DiscoveryService. Raw message: '{}'", response_str);
                 if (failure_cb_) failure_cb_("Failed to decode response.");
             }
+        } else {
+            logger_.Error("discovery_client.cpp: No data received from DiscoveryService or connection lost.");
+            if (failure_cb_) failure_cb_("No response from DiscoveryService.");
         }
     } else {
         logger_.Warn("discovery_client.cpp: Timed out waiting for response from DiscoveryService.");
         if (failure_cb_) failure_cb_("Timeout waiting for DiscoveryService response.");
     }
-    stop(); // Stop the client thread after the attempt
 }
 
 } // namespace gateway

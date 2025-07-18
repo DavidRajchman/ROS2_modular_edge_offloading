@@ -225,8 +225,25 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
         LOG_INFO("Successfully registered component '%s' with ID %u.%u", info.name.c_str(), info.group_id, info.id_in_group);
         resp.responseCode = discovery_protocol::ResponseCode::SUCCESS;
         resp.configJson = global_configuration_.value_or("");
+        
+        // NEW: Set the detected client IP address
+        auto it = client_ip_addresses_.find(client_id);
+        if (it != client_ip_addresses_.end()) {
+            resp.detectedClientAddress = it->second;
+        } else {
+            resp.detectedClientAddress = "unknown";
+        }
+        
         resp.humanReadableMessage = "Registration successful.";
     } else {
+        // Also set it for error cases
+        auto it = client_ip_addresses_.find(client_id);
+        if (it != client_ip_addresses_.end()) {
+            resp.detectedClientAddress = it->second;
+        } else {
+            resp.detectedClientAddress = "unknown";
+        }
+        
         // This case should be rare due to the earlier is_id_taken check, but is a safeguard.
         LOG_ERROR("Failed to register component '%s' due to an internal registry error.", info.name.c_str());
         resp.responseCode = discovery_protocol::ResponseCode::GENERAL_ERROR;

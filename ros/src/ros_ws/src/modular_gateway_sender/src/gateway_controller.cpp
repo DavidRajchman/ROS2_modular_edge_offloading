@@ -15,10 +15,10 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   // Declare and load all required parameters
   this->declare_parameter<std::string>("discovery_service.host", "192.168.65.10");
   this->declare_parameter<int>("discovery_service.port", 9090);
-  this->declare_parameter<std::string>("identity.component_type", "VHC");
+  this->declare_parameter<std::string>("identity.component_type", "V");
   this->declare_parameter<std::string>("identity.component_name", "default_vhc");
-  this->declare_parameter<int>("identity.group_id", 1);
-  this->declare_parameter<int>("identity.id_in_group", 1);
+  this->declare_parameter<int>("identity.group_id", 60);
+  this->declare_parameter<int>("identity.id_in_group", 5);
   this->declare_parameter<int>("data_plane.listen_port", 7401);
 
   discovery_host_ = this->get_parameter("discovery_service.host").as_string();
@@ -193,7 +193,9 @@ void GatewayController::control_thread_func() {
                 
                 discovery_protocol::ComponentType comp_type;
                 try {
+                    logger_.Info("gateway_controller.cpp: Converting component_type '{}' to enum", component_type_);
                     comp_type = discovery_protocol::string_to_component_type(component_type_);
+                    logger_.Info("gateway_controller.cpp: Converted to enum value: {}", static_cast<int>(comp_type));
                 } catch (const std::exception& e) {
                     logger_.Error("gateway_controller.cpp: Invalid component type '{}': {}", component_type_, e.what());
                     state_ = State::FAILED;
@@ -209,6 +211,7 @@ void GatewayController::control_thread_func() {
                 discovery_client_ = std::make_unique<DiscoveryClient>();
                 if (discovery_client_->start(
                     discovery_host_, discovery_port_, comp_type, component_name_,
+                    static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_), data_plane_listen_port_,
                     std::bind(&GatewayController::on_discovery_success, this, std::placeholders::_1, std::placeholders::_2),
                     std::bind(&GatewayController::on_discovery_failure, this, std::placeholders::_1))) {
                     
