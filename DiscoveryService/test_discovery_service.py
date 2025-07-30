@@ -4,7 +4,7 @@ import sys
 import threading
 
 # --- Configuration ---
-DISCOVERY_HOST = "localhost"
+DISCOVERY_HOST = "192.168.65.5"
 DISCOVERY_PORT = 9090
 KEEPALIVE_INTERVAL_S = 5  # Should be < server timeout (15s)
 WAIT_FOR_TIMEOUT_S = 20 # Should be > server timeout (15s)
@@ -175,7 +175,7 @@ def run_full_test_suite():
         
         # Since we connect to DISCOVERY_HOST ("localhost"), the detected IP will be 127.0.0.1.
         # This is the IP the server will store for the Bridge and send to other components.
-        detected_bridge_ip = "127.0.0.1"
+        detected_bridge_ip = "192.168.65.10"
 
         config_string = '{"system_mode":"test","log_level":"debug"}'
         test_cases = [

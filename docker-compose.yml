@@ -65,7 +65,6 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./bridge:/home/ubuntu/bridge
       - ./DiscoveryService:/home/ubuntu/DiscoveryService
-      
       - ./cpplib:/home/ubuntu/cpplib_src
 
     working_dir: /home/ubuntu/bridge
@@ -76,6 +75,30 @@ services:
     networks:
       public_net:
           ipv4_address: 192.168.65.10
+
+  discovery_service:
+    build:
+      context: .
+      dockerfile: ./bridge/Dockerfile
+    container_name: discovery_service # Custom name
+    #network_mode: "host"
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./bridge:/home/ubuntu/bridge
+      - ./DiscoveryService:/home/ubuntu/DiscoveryService
+      - ./cpplib:/home/ubuntu/cpplib_src
+
+    working_dir: /home/ubuntu/bridge
+    privileged: true
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash", "-c", "/home/ubuntu/autostart.sh && exec bash"]
+    networks:
+      public_net:
+          ipv4_address: 192.168.65.5
 
 networks:
     public_net:

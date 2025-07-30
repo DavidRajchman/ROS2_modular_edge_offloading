@@ -77,8 +77,20 @@ RUN rm -rf build && \
     cmake .. && \
     make -j$(nproc) && \
     make install
+
+WORKDIR /home/ubuntu/cpplib_src_build_time/discovery_protocol
+RUN rm -rf build && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
 # Optional: RUN rm -rf /home/ubuntu/cpplib_src_build_time
 # --- End TransportLib Installation ---
+
+# Copy and setup autostart script for DiscoveryService
+COPY ./DiscoveryService/autostart.sh /home/ubuntu/autostart.sh
+RUN chmod +x /home/ubuntu/autostart.sh
 
 RUN mkdir -p /etc/sudoers.d && \
     useradd -m ubuntu && \

@@ -28,7 +28,7 @@ RUN apt install -y tmux \
 ros-jazzy-robot-localization \
 ros-jazzy-navigation2 \
 ros-jazzy-nav2-bringup \
-ros-jazzy-rmw-cyclonedx-cpp \
+#ros-jazzy-rmw-cyclonedx-cpp \ # MUST BE FIXED - THROWS DOCKER BUILD ERROR
 ros-jazzy-pcl-conversions \
 ros-jazzy-pcl-msgs \
 python3-scipy \
