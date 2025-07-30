@@ -6,6 +6,7 @@
 #include <csignal>
 #include <atomic>
 #include <memory>
+#include <thread>
 
 // Global atomic flag for graceful shutdown
 std::atomic<bool> shutdown_requested(false);

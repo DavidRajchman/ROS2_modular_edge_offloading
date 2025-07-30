@@ -76,7 +76,7 @@ private:
     void remove_routing_rules_for_session(const std::string& request_id);
     
     // Data plane coordination
-    bool create_transport_handler_for_mgwcp(const std::string& mgwcp_component_id, 
+    bool create_transport_handler_for_mgwdp(const std::string& mgwcp_component_id, 
                                            const std::string& host, int port);
     bool create_transport_handler_for_mec(const std::string& mec_component_id, 
                                          const std::string& host, int port);
@@ -112,7 +112,7 @@ private:
     std::thread mgwcp_server_thread_;
     
     // MGWCP connections management
-    std::mutex mgwcp_connections_mutex_;
+    mutable std::mutex mgwcp_connections_mutex_;
     std::unordered_map<uint32_t, std::unique_ptr<MGWCPConnection>> mgwcp_connections_;
     std::unordered_map<std::string, uint32_t> component_id_to_transport_id_;
     uint32_t next_mgwcp_connection_id_;

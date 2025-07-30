@@ -507,7 +507,7 @@ bool BridgeControlPlane::establish_mgwcp_data_plane_connection(const std::string
     logger.Info("BridgeControlPlane.cpp: Establishing data plane connection to MGWCP '{}' at {}:{}", 
                mgwcp_component_id, dp_host, dp_port);
     
-    return create_transport_handler_for_mgwcp(mgwcp_component_id, dp_host, dp_port);
+    return create_transport_handler_for_mgwdp(mgwcp_component_id, dp_host, dp_port);
 }
 
 void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_response) {
@@ -688,7 +688,7 @@ void BridgeControlPlane::remove_routing_rules_for_session(const std::string& req
     }
 }
 
-bool BridgeControlPlane::create_transport_handler_for_mgwcp(const std::string& mgwcp_component_id, 
+bool BridgeControlPlane::create_transport_handler_for_mgwdp(const std::string& mgwcp_component_id, 
                                                            const std::string& host, int port) {
     CppLogging::Logger logger("bridge");
     

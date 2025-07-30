@@ -37,14 +37,30 @@ set(moodycamel_concurrent_queue_SOURCE_DIR /home/ubuntu/external_libs/moodycamel
 set(CPPLOGGER_DIR "/home/ubuntu/external_libs/CppLogging")
 set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 
-# Find required packages
+# Find required packages with debugging
+message(STATUS "Finding Threads...")
 find_package(Threads REQUIRED)
+message(STATUS "Threads found successfully")
+
+message(STATUS "Finding fmt...")
+find_package(fmt REQUIRED)
+message(STATUS "fmt found successfully")
+
+message(STATUS "Finding DiscoveryProtocol...")
+find_package(DiscoveryProtocol REQUIRED)
+message(STATUS "DiscoveryProtocol found successfully")
+
+message(STATUS "Finding TransportLib...")
 find_package(TransportLib REQUIRED)
-find_package(fmt REQUIRED) # Ensures fmt is found (e.g., system-installed or via FetchContent)
+message(STATUS "TransportLib found successfully")
 
 # Add the executable for your bridge application
 add_executable(bridge
     src/main.cpp
+    src/BridgeControlPlane.cpp
+    src/MGWCPConnection.cpp
+    src/SessionManager.cpp
+    src/GlobalConfig.cpp
     src/RoutingTable.cpp
     src/TransportHandler.cpp
 )
@@ -97,6 +113,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 target_link_libraries(bridge
     PRIVATE
     Threads::Threads
+    DiscoveryProtocol::discovery_protocol  # Link the discovery protocol library
     TransportLib::transport
     nlohmann_json::nlohmann_json
 
