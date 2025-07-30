@@ -85,11 +85,21 @@ if(NOT CPPLOGGING_LIBRARY)
     message(FATAL_ERROR "CppLogging library not found. Searched in ${CPPLOGGER_DIR}/build and ${CPPLOGGER_DIR}/bin. Ensure it's built.")
 endif()
 
+# --- Fetch nlohmann_json via FetchContent ---
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Link libraries
 target_link_libraries(bridge
     PRIVATE
     Threads::Threads
     TransportLib::transport
+    nlohmann_json::nlohmann_json
+
     fmt::fmt                # Link against the fmt library found by find_package
     ${CPPLOGGING_LIBRARY}   # Link against the found CppLogging library
     ${CPPCOMMON_LIBRARY}    # Link against the found CppCommon library
