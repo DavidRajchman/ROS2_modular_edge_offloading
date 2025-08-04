@@ -15,6 +15,7 @@ struct ComponentInfo {
     discovery_protocol::ComponentType component_type;
     uint8_t group_id;
     uint8_t id_in_group;
+    uint8_t component_subtype = 0;  // NEW: Default subtype 0 for backward compatibility
     std::string name;
     std::string listen_address;
     uint16_t listen_port;
@@ -35,6 +36,9 @@ public:
 
     // Finds an available Bridge for a VHC to connect to (e.g., round-robin).
     std::optional<ComponentInfo> find_available_bridge();
+
+    // Finds an available OM for a Bridge to connect to.
+    std::optional<ComponentInfo> find_available_om();
 
     // Finds a component by its transport client_id.
     std::optional<ComponentInfo> find_by_client_id(uint32_t client_id) const;
@@ -59,4 +63,8 @@ private:
     // Helper list to quickly find all registered bridges for round-robin assignment.
     std::vector<uint32_t> bridge_client_ids_;
     size_t next_bridge_idx_ = 0;
+
+    // Helper list to quickly find all registered OMs.
+    std::vector<uint32_t> om_client_ids_;
+    size_t next_om_idx_ = 0;
 };

@@ -47,7 +47,9 @@ enum class MessageType {
     REGISTRATION_RESPONSE,
     ERROR,
     KEEPALIVE_PING,
-    KEEPALIVE_RESPONSE
+    KEEPALIVE_RESPONSE,
+    COMPONENT_QUERY,       // NEW
+    COMPONENT_LIST         // NEW
 };
 
 enum class ErrorCode {
@@ -98,12 +100,28 @@ struct ErrorMessage {
     std::string humanReadableMessage;
 };
 
+// NEW: Component query request
+struct ComponentQuery {
+    std::string componentTypeFilter;  // "M", "V", "B", "O", "T"
+    std::string humanReadableMessage;
+};
+
+// NEW: Component list response
+struct ComponentListResponse {
+    uint32_t componentCount;
+    std::vector<std::string> componentDataList;  // Format: component_type:group_id:id_in_group:subtype
+    std::string humanReadableMessage;
+};
+
+// Update the MessageVariant to include new types:
 using MessageVariant = std::variant<
     RegistrationRequest,
     RegistrationResponse,
     ErrorMessage,
     KeepalivePing,
-    KeepaliveResponse
+    KeepaliveResponse,
+    ComponentQuery,        // NEW
+    ComponentListResponse  // NEW
 >;
 
 struct Message {
@@ -116,6 +134,9 @@ struct Message {
     explicit Message(const KeepalivePing& ping) : type(MessageType::KEEPALIVE_PING), data(ping) {}
     explicit Message(const KeepaliveResponse& pong) : type(MessageType::KEEPALIVE_RESPONSE), data(pong) {}
     explicit Message(const ErrorMessage& err) : type(MessageType::ERROR), data(err) {}
+    explicit Message(const ComponentQuery& query) : type(MessageType::COMPONENT_QUERY), data(query) {}
+    explicit Message(const ComponentListResponse& list) : type(MessageType::COMPONENT_LIST), data(list) {}
+
 };
 
 ProtocolStatus encode_message(const Message& message, std::string& output);
@@ -135,6 +156,22 @@ ProtocolStatus decode_keepalive_response(const std::string& input, KeepaliveResp
 
 ProtocolStatus encode_error_message(const ErrorMessage& error, std::string& output);
 ProtocolStatus decode_error_message(const std::string& input, ErrorMessage& output);
+
+ProtocolStatus encode_component_query(const ComponentQuery& query, std::string& output);
+ProtocolStatus decode_component_query(const std::string& input, ComponentQuery& output);
+ProtocolStatus encode_component_list_response(const ComponentListResponse& response, std::string& output);
+ProtocolStatus decode_component_list_response(const std::string& input, ComponentListResponse& output);
+
+// NEW: Component data parsing utility
+struct ComponentData {
+    std::string component_type;
+    uint8_t group_id;
+    uint8_t id_in_group;
+    uint8_t subtype = 0;  // Default 0 for backward compatibility
+};
+
+ComponentData parse_component_data(const std::string& data_str);
+std::string format_component_data(const ComponentData& data);
 
 const char* protocol_status_to_string(ProtocolStatus status);
 std::string component_type_to_string(ComponentType type);

@@ -56,12 +56,12 @@ class OffloadingManagerServer:
     def start(self):
         """Start the TCP server"""
         try:
-            self.logger.info("Starting OM TCP server on localhost:8100")
+            self.logger.info("Starting OM TCP server on 0.0.0.0:8100")
             
             # Create server socket
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind(('localhost', 8100))
+            self.server_socket.bind(('0.0.0.0', 8100))
             self.server_socket.listen(5)
             self.server_socket.settimeout(1.0)  # Non-blocking accept
             

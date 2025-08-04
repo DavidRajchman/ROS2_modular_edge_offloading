@@ -16,6 +16,8 @@ bool ComponentRegistry::register_component(const ComponentInfo& info) {
 
     if (info.component_type == discovery_protocol::ComponentType::BRIDGE) {
         bridge_client_ids_.push_back(info.client_id);
+    } else if (info.component_type == discovery_protocol::ComponentType::OFFLOAD_MANAGER) {
+        om_client_ids_.push_back(info.client_id);
     }
 
     return true;
@@ -38,6 +40,12 @@ void ComponentRegistry::unregister_component(uint32_t client_id) {
         bridge_client_ids_.erase(
             std::remove(bridge_client_ids_.begin(), bridge_client_ids_.end(), client_id),
             bridge_client_ids_.end()
+        );
+    } else if (info.component_type == discovery_protocol::ComponentType::OFFLOAD_MANAGER) {
+        // Erase-remove idiom to remove the client_id from the vector
+        om_client_ids_.erase(
+            std::remove(om_client_ids_.begin(), om_client_ids_.end(), client_id),
+            om_client_ids_.end()
         );
     }
 
@@ -66,6 +74,22 @@ std::optional<ComponentInfo> ComponentRegistry::find_available_bridge() {
     return find_by_client_id(bridge_client_id);
 }
 
+std::optional<ComponentInfo> ComponentRegistry::find_available_om() {
+    if (om_client_ids_.empty()) {
+        return std::nullopt;
+    }
+
+    // Simple round-robin (though typically only one OM)
+    if (next_om_idx_ >= om_client_ids_.size()) {
+        next_om_idx_ = 0;
+    }
+
+    uint32_t om_client_id = om_client_ids_[next_om_idx_];
+    next_om_idx_++;
+
+    return find_by_client_id(om_client_id);
+}
+
 std::vector<uint32_t> ComponentRegistry::get_all_client_ids() const {
     std::vector<uint32_t> ids;
     ids.reserve(registry_by_client_id_.size());
@@ -91,8 +115,6 @@ std::vector<ComponentInfo> ComponentRegistry::get_all_components() const {
     }
     return components;
 }
-
-
 
 bool ComponentRegistry::update_keepalive(uint8_t group_id, uint8_t id_in_group) {
     auto component_id_pair = std::make_pair(group_id, id_in_group);

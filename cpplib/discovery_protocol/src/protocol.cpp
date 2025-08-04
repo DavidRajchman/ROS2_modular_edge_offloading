@@ -55,7 +55,7 @@ ComponentType string_to_component_type(const std::string& str) {
 
 // --- Message-level encode/decode ---
 
-ProtocolStatus encode_message(const Message& message, std::string& output) {
+PProtocolStatus encode_message(const Message& message, std::string& output) {
     switch (message.type) {
         case MessageType::REGISTRATION_REQUEST:
             return encode_registration_request(std::get<RegistrationRequest>(message.data), output);
@@ -67,10 +67,15 @@ ProtocolStatus encode_message(const Message& message, std::string& output) {
             return encode_keepalive_response(std::get<KeepaliveResponse>(message.data), output);
         case MessageType::ERROR:
             return encode_error_message(std::get<ErrorMessage>(message.data), output);
+        case MessageType::COMPONENT_QUERY:  // NEW
+            return encode_component_query(std::get<ComponentQuery>(message.data), output);
+        case MessageType::COMPONENT_LIST:   // NEW
+            return encode_component_list_response(std::get<ComponentListResponse>(message.data), output);
         default:
             return ProtocolStatus::INVALID_MESSAGE_TYPE;
     }
 }
+
 
 ProtocolStatus decode_message(const std::string& input, Message& output) {
     if (input.size() < 8 || input.substr(0, 5) != "DISC:") {
@@ -101,6 +106,16 @@ ProtocolStatus decode_message(const std::string& input, Message& output) {
         ErrorMessage err;
         ProtocolStatus status = decode_error_message(input, err);
         if (status == ProtocolStatus::OK) output = Message(err);
+        return status;
+    } else if (msg_type == "QRY") {  // NEW: Component query
+        ComponentQuery query;
+        ProtocolStatus status = decode_component_query(input, query);
+        if (status == ProtocolStatus::OK) output = Message(query);
+        return status;
+    } else if (msg_type == "LST") {  // NEW: Component list
+        ComponentListResponse list;
+        ProtocolStatus status = decode_component_list_response(input, list);
+        if (status == ProtocolStatus::OK) output = Message(list);
         return status;
     }
     return ProtocolStatus::INVALID_MESSAGE_TYPE;
@@ -231,6 +246,111 @@ ProtocolStatus decode_error_message(const std::string& input, ErrorMessage& outp
         return ProtocolStatus::INVALID_FORMAT;
     }
     return ProtocolStatus::OK;
+}
+
+// NEW: Component Query Implementation
+ProtocolStatus encode_component_query(const ComponentQuery& query, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:QRY;" << query.componentTypeFilter << ";" << query.humanReadableMessage;
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_component_query(const std::string& input, ComponentQuery& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() != 3) return ProtocolStatus::MALFORMED_MESSAGE;
+    output.componentTypeFilter = parts[1];
+    output.humanReadableMessage = parts[2];
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus encode_component_list_response(const ComponentListResponse& response, std::string& output) {
+    std::ostringstream ss;
+    ss << "DISC:LST;" << response.componentCount;
+    
+    // Add each component data entry
+    for (const auto& componentData : response.componentDataList) {
+        ss << ";" << componentData;
+    }
+    
+    // Add human readable message at the end
+    ss << ";" << response.humanReadableMessage;
+    
+    output = ss.str();
+    return ProtocolStatus::OK;
+}
+
+ProtocolStatus decode_component_list_response(const std::string& input, ComponentListResponse& output) {
+    auto parts = split_string(input, ';');
+    if (parts.size() < 3) return ProtocolStatus::MALFORMED_MESSAGE;
+    
+    try {
+        output.componentCount = static_cast<uint32_t>(std::stoi(parts[1]));
+        
+        // Clear the component list
+        output.componentDataList.clear();
+        
+        // Extract component data (between count and human readable message)
+        // Format: DISC:LST;count;comp1;comp2;...;compN;humanReadableMessage
+        // So component data goes from parts[2] to parts[2 + componentCount - 1]
+        if (parts.size() < 2 + output.componentCount + 1) {
+            return ProtocolStatus::MALFORMED_MESSAGE;
+        }
+        
+        for (uint32_t i = 0; i < output.componentCount; ++i) {
+            if (2 + i < parts.size()) {
+                output.componentDataList.push_back(parts[2 + i]);
+            }
+        }
+        
+        // Human readable message is the last field
+        if (parts.size() > 2 + output.componentCount) {
+            output.humanReadableMessage = parts[2 + output.componentCount];
+        } else {
+            output.humanReadableMessage = "";
+        }
+        
+    } catch (const std::exception&) {
+        return ProtocolStatus::INVALID_FORMAT;
+    }
+    return ProtocolStatus::OK;
+}
+
+// NEW: Component data parsing utilities
+ComponentData parse_component_data(const std::string& data_str) {
+    ComponentData data;
+    auto parts = split_string(data_str, ':');
+    
+    if (parts.size() >= 3) {
+        data.component_type = parts[0];
+        try {
+            data.group_id = static_cast<uint8_t>(std::stoi(parts[1]));
+            data.id_in_group = static_cast<uint8_t>(std::stoi(parts[2]));
+            
+            // Subtype is optional, default to 0 for backward compatibility
+            if (parts.size() >= 4) {
+                data.subtype = static_cast<uint8_t>(std::stoi(parts[3]));
+            } else {
+                data.subtype = 0;
+            }
+        } catch (const std::exception&) {
+            // If parsing fails, use default values
+            data.group_id = 0;
+            data.id_in_group = 0;
+            data.subtype = 0;
+        }
+    }
+    
+    return data;
+}
+
+std::string format_component_data(const ComponentData& data) {
+    std::ostringstream ss;
+    ss << data.component_type << ":" 
+       << static_cast<int>(data.group_id) << ":" 
+       << static_cast<int>(data.id_in_group) << ":" 
+       << static_cast<int>(data.subtype);
+    return ss.str();
 }
 
 } // namespace discovery_protocol

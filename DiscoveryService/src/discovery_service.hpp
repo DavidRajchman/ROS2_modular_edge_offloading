@@ -32,6 +32,7 @@ private:
     // Handlers for specific message types from the protocol library
     void handleRegistration(uint32_t client_id, const discovery_protocol::RegistrationRequest& req);
     void handleKeepalive(uint32_t client_id, const discovery_protocol::KeepalivePing& ping);
+    void handleComponentQuery(uint32_t client_id, const discovery_protocol::ComponentQuery& query);  // NEW
 
     // Helper to send responses
     void sendResponse(uint32_t client_id, const std::string& message);

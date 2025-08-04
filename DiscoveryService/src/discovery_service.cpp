@@ -128,6 +128,9 @@ void DiscoveryService::onDataReceived(uint32_t client_id, const std::vector<uint
         case discovery_protocol::MessageType::KEEPALIVE_PING:
             handleKeepalive(client_id, std::get<discovery_protocol::KeepalivePing>(message.data));
             break;
+        case discovery_protocol::MessageType::COMPONENT_QUERY:  // NEW
+            handleComponentQuery(client_id, std::get<discovery_protocol::ComponentQuery>(message.data));
+            break;
         default:
             LOG_WARN("Received unhandled message type from client %u", client_id);
             break;
@@ -187,6 +190,28 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
             resp.connectionTargetAddress = bridge_info.listen_address;
             resp.connectionTargetPort = std::to_string(bridge_info.listen_port);
             resp.connectionTargetId = (bridge_info.group_id << 8) | bridge_info.id_in_group;
+        }
+    }
+    
+    // For Bridges, check if OM is available and provide OM connection info
+    if (req.componentType == discovery_protocol::ComponentType::BRIDGE) {
+        auto om_info_opt = registry_.find_available_om();
+        if (!om_info_opt) {
+            LOG_WARN("Bridge '%s' trying to register, but no OM is available. Sending WAIT.", req.componentName.c_str());
+            resp.responseCode = discovery_protocol::ResponseCode::WAIT;
+            resp.humanReadableMessage = "No Offloading Manager is currently available.";
+            std::string response_str;
+            discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+            sendResponse(client_id, response_str);
+            return;
+        } else {
+            auto& om_info = *om_info_opt;
+            // Populate OM connection info in the response
+            resp.connectionTargetType = discovery_protocol::component_type_to_string(om_info.component_type);
+            resp.connectionTargetAddress = om_info.listen_address;
+            resp.connectionTargetPort = std::to_string(om_info.listen_port);
+            resp.connectionTargetId = (om_info.group_id << 8) | om_info.id_in_group;
+            LOG_INFO("Providing OM connection details to Bridge: %s:%u", om_info.listen_address.c_str(), om_info.listen_port);
         }
     }
 
@@ -281,6 +306,62 @@ void DiscoveryService::handleKeepalive(uint32_t client_id, const discovery_proto
     } else {
         LOG_WARN("Received keepalive for unknown or unregistered component ID %u.%u from client %u", group_id, id_in_group, client_id);
     }
+}
+
+void DiscoveryService::handleComponentQuery(uint32_t client_id, const discovery_protocol::ComponentQuery& query) {
+    LOG_INFO("Processing component query from client %u for component type '%s'", 
+             client_id, query.componentTypeFilter.c_str());
+
+    discovery_protocol::ComponentListResponse response;
+    
+    // Validate component type filter - only single types allowed, no "ALL"
+    if (query.componentTypeFilter == "ALL" || query.componentTypeFilter.empty()) {
+        LOG_WARN("Invalid component query filter '%s' from client %u. Only single component types allowed.", 
+                 query.componentTypeFilter.c_str(), client_id);
+        response.componentCount = 0;
+        response.humanReadableMessage = "Invalid filter: only single component types allowed (V, M, B, O, T)";
+        std::string response_str;
+        discovery_protocol::encode_message(discovery_protocol::Message(response), response_str);
+        sendResponse(client_id, response_str);
+        return;
+    }
+
+    // Convert filter string to ComponentType
+    discovery_protocol::ComponentType target_type = discovery_protocol::string_to_component_type(query.componentTypeFilter);
+    
+    // Get all components and filter by type
+    auto all_components = registry_.get_all_components();
+    std::vector<ComponentInfo> filtered_components;
+    
+    for (const auto& component : all_components) {
+        if (component.component_type == target_type) {
+            filtered_components.push_back(component);
+        }
+    }
+    
+    // Build response
+    response.componentCount = static_cast<uint32_t>(filtered_components.size());
+    response.componentDataList.clear();
+    
+    for (const auto& component : filtered_components) {
+        // Format: component_type:group_id:id_in_group:subtype
+        std::ostringstream ss;
+        ss << discovery_protocol::component_type_to_string(component.component_type) << ":"
+           << static_cast<int>(component.group_id) << ":"
+           << static_cast<int>(component.id_in_group) << ":"
+           << static_cast<int>(component.component_subtype);  // Use subtype field (default 0)
+        
+        response.componentDataList.push_back(ss.str());
+    }
+    
+    response.humanReadableMessage = "Component query successful";
+    
+    LOG_INFO("Returning %u components of type '%s' to client %u", 
+             response.componentCount, query.componentTypeFilter.c_str(), client_id);
+    
+    std::string response_str;
+    discovery_protocol::encode_message(discovery_protocol::Message(response), response_str);
+    sendResponse(client_id, response_str);
 }
 
 void DiscoveryService::sendResponse(uint32_t client_id, const std::string& message) {
