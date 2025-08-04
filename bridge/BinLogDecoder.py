@@ -5,8 +5,8 @@ import datetime
 import os
 
 # --- Configuration ---
-DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/ros_ws/mec_binary.log"
-DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/ros_ws/decoded_log.txt"
+DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/bridge/build/bridge_binary.log"
+DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/bridge/bridge_decoded.txt"
 
 # Define CppLogging Level enum mapping
 # From: /home/ubuntu/external_libs/CppLogging/include/logging/level.h

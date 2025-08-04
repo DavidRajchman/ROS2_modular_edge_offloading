@@ -18,7 +18,7 @@ import argparse
 import signal
 
 # --- Configuration ---
-DISCOVERY_HOST = "localhost"
+DISCOVERY_HOST = "192.168.65.5"
 DISCOVERY_PORT = 9090
 KEEPALIVE_INTERVAL_S = 5  # Should be < server timeout (15s)
 

@@ -1,0 +1,30 @@
+# CppLogging Binary Log Decoder Output
+# Source: /home/ubuntu/bridge/build/bridge_binary.log
+# Decoded at: 2025-08-04T16:16:52.320518
+# File size: 2234 bytes
+# Format: TIMESTAMP [THREAD_ID] LEVEL LOGGER - MESSAGE
+#================================================================================
+
+2025-08-04T16:16:22.233908797Z [0xCD6AD280] INFO  bridge - main.cpp: Bridge Control Plane starting...
+2025-08-04T16:16:22.233916722Z [0xCD6AD280] INFO  bridge - main.cpp: Component ID: 15:10
+2025-08-04T16:16:22.233920720Z [0xCD6AD280] INFO  bridge - main.cpp: OM Port: 8100
+2025-08-04T16:16:22.233921772Z [0xCD6AD280] INFO  bridge - main.cpp: Discovery Service: 192.168.65.5:9090
+2025-08-04T16:16:22.233922664Z [0xCD6AD280] INFO  bridge - main.cpp: MGWCP Server Port: 7000
+2025-08-04T16:16:22.233925319Z [0xCD6AD280] INFO  bridge - main.cpp: Registered signal handlers for graceful shutdown and crash handling
+2025-08-04T16:16:22.233925950Z [0xCD6AD280] INFO  bridge - main.cpp: Creating Bridge Control Plane instance...
+2025-08-04T16:16:22.233958531Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane constructed
+2025-08-04T16:16:22.235167987Z [0xCD6AD280] INFO  bridge - main.cpp: Starting Bridge Control Plane...
+2025-08-04T16:16:22.235176964Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Starting Bridge Control Plane...
+2025-08-04T16:16:22.235179549Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Registering with Discovery Service at 192.168.65.5:9090
+2025-08-04T16:16:22.235728462Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Sent Discovery Service registration request
+2025-08-04T16:16:22.236088620Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Successfully parsed global configuration with 0 tasks
+2025-08-04T16:16:22.236095072Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Discovery Service registration successful. Assigned ID: 5:1
+2025-08-04T16:16:22.236984887Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Successfully registered with Discovery Service
+2025-08-04T16:16:22.237060670Z [0xCD6A8640] INFO  bridge - BridgeControlPlane.cpp: Discovery Service keepalive thread started
+2025-08-04T16:16:22.237767841Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Connecting to OM at localhost:8100
+2025-08-04T16:16:22.238110105Z [0xCD6AD280] ERROR bridge - BridgeControlPlane.cpp: Failed to connect to OM
+2025-08-04T16:16:22.238906694Z [0xCD6AD280] ERROR bridge - BridgeControlPlane.cpp: Failed to connect to OM
+2025-08-04T16:16:22.239683116Z [0xCD6AD280] ERROR bridge - main.cpp: Failed to start Bridge Control Plane
+2025-08-04T16:16:22.239692544Z [0xCD6AD280] INFO  bridge - main.cpp: Final status - Discovery connected: True, OM connected: False, MGWCP connections: 0
+2025-08-04T16:16:22.239694437Z [0xCD6AD280] INFO  bridge - main.cpp: Destroying Bridge Control Plane instance...
+2025-08-04T16:16:22.239697743Z [0xCD6AD280] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane destructor called

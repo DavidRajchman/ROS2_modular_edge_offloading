@@ -14,20 +14,6 @@ std::atomic<bool> shutdown_requested(false);
 // Global Bridge Control Plane instance for signal handler access
 std::unique_ptr<BridgeControlPlane> bridge_cp;
 
-void signal_handler(int signum) {
-    CppLogging::Logger logger("bridge");
-    logger.Info("main.cpp: Received signal {} ({}). Initiating graceful shutdown...", 
-               signum, signum == SIGINT ? "SIGINT" : signum == SIGTERM ? "SIGTERM" : "UNKNOWN");
-    
-    shutdown_requested.store(true);
-    
-    // Stop the Bridge Control Plane if it's running
-    if (bridge_cp && bridge_cp->is_running()) {
-        logger.Info("main.cpp: Stopping Bridge Control Plane...");
-        bridge_cp->stop();
-    }
-}
-
 void configure_logger() {
     // Create a binary layout processor for high-performance logging
     auto sink = std::make_shared<CppLogging::Processor>(std::make_shared<CppLogging::BinaryLayout>());
@@ -41,6 +27,41 @@ void configure_logger() {
     // Startup the logging system
     CppLogging::Config::Startup();
 }
+
+
+// Signal handler for graceful shutdown (SIGINT, SIGTERM)
+void graceful_signal_handler(int signum) {
+    CppLogging::Logger logger("bridge");
+    logger.Info("main.cpp: Received signal {} ({}). Initiating graceful shutdown...", 
+               signum, signum == SIGINT ? "SIGINT" : signum == SIGTERM ? "SIGTERM" : "UNKNOWN");
+    
+    shutdown_requested.store(true);
+    
+    // Stop the Bridge Control Plane if it's running
+    if (bridge_cp && bridge_cp->is_running()) {
+        logger.Info("main.cpp: Stopping Bridge Control Plane...");
+        bridge_cp->stop();
+    }
+}
+
+// Signal handler for crash signals - flush logs before termination
+void crash_signal_handler(int signum) {
+    // Force flush and shutdown logging system immediately
+    CppLogging::Config::Shutdown();
+    std::exit(signum);
+}
+
+// Install signal handlers for both graceful shutdown and crash handling
+void install_signal_handlers() {
+    // Graceful shutdown signals
+    signal(SIGINT, graceful_signal_handler);
+    signal(SIGTERM, graceful_signal_handler);
+    
+    // Crash signals - force log flush before exit
+    signal(SIGABRT, crash_signal_handler);
+    signal(SIGSEGV, crash_signal_handler);
+}
+
 
 int main(int argc, char* argv[]) {
     // Configure and start logging system
@@ -60,10 +81,9 @@ int main(int argc, char* argv[]) {
     logger.Info("main.cpp: Discovery Service: {}:{}", DISCOVERY_SERVICE_HOST, DISCOVERY_SERVICE_PORT);
     logger.Info("main.cpp: MGWCP Server Port: {}", MGWCP_SERVER_PORT);
     
-    // Register signal handlers for graceful shutdown
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    logger.Info("main.cpp: Registered signal handlers for graceful shutdown");
+    // Register signal handlers for both graceful shutdown and crash handling
+    install_signal_handlers();
+    logger.Info("main.cpp: Registered signal handlers for graceful shutdown and crash handling");
     
     int exit_code = 0;
     
