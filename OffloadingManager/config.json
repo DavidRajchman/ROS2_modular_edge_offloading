@@ -1,0 +1,24 @@
+{
+  "available_tasks": [
+    {
+      "task_id": 31,
+      "task_name": "MAP_ROUTING",
+      "input_message_types": [201, 203],
+      "output_message_types": [202, 204]
+    },
+    {
+      "task_id": 42,
+      "task_name": "OBJECT_DETECTION",
+      "input_message_types": [205],
+      "output_message_types": [206, 207]
+    },
+    {
+      "task_id": 55,
+      "task_name": "PATH_PLANNING",
+      "input_message_types": [210, 211],
+      "output_message_types": [212]
+    }
+  ],
+  "default_session_timeout": 300,
+  "max_concurrent_sessions": 100
+}

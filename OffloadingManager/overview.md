@@ -10,8 +10,9 @@
 4. [Session Management and Decision Making](#4-session-management-and-decision-making)
 5. [Resource Management](#5-resource-management)
 6. [Global Configuration Distribution](#6-global-configuration-distribution)
-7. [Error Handling and Recovery](#7-error-handling-and-recovery)
-8. [Implementation Requirements](#8-implementation-requirements)
+7. [Discovery Service Integration](#7-discovery-service-integration)
+8. [Error Handling and Recovery](#8-error-handling-and-recovery)
+9. [Implementation Requirements](#9-implementation-requirements)
 
 ---
 
@@ -85,6 +86,7 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 **Resource Tracker**: Maintain real-time state of all VHCs and MECs in the system via Discovery Service API
 **Session Manager**: Track active offloading sessions and their state
 **Configuration Manager**: Load and provide static global configuration JSON file
+**Discovery Service Client**: Handle registration and component discovery
 
 ### 2.2 Component Registration and Discovery
 
@@ -95,9 +97,9 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - **OM**: The offloading manager itself (component_id: `1:1`)
 
 **Discovery Service Integration**:
-- OM must register with Discovery Service using simple text-based protocol (details to be provided)
+- OM must register with Discovery Service using text-based protocol
 - OM provides static global configuration JSON to Discovery Service for distribution
-- Discovery Service has API that returns all connected components (VHCs, MECs, Bridges)
+- Discovery Service has API/mechanism that returns all connected components (VHCs, MECs, Bridges)
 - Discovery Service distributes configuration "throughout the system" at component connection
 
 ### 2.3 Global Configuration Structure
@@ -282,12 +284,12 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 ### 5.1 Component Tracking
 
 **VHC Management**:
-- Track active VHCs via Discovery Service API
+- Track active VHCs via Discovery Service component queries
 - Monitor VHC connection status via Bridge CP
 - Maintain VHC-to-MEC assignment mappings
 
 **MEC Management**:
-- Track available MECs via Discovery Service API
+- Track available MECs via Discovery Service component queries
 - Monitor MEC computational load and availability
 - Enforce one-vehicle-per-MEC constraint
 
@@ -306,6 +308,11 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - Distribute load across available MECs
 - Consider geographic or network proximity
 - Optimize for system-wide performance
+
+**Algorithm Abstraction**:
+- Simple auto-approve placeholder algorithm for initial implementation
+- Decision engine behind abstraction layer for easy algorithm swapping
+- All algorithm decisions must be logged for research purposes
 
 ### 5.3 Failure Handling
 
@@ -329,6 +336,7 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - Load configuration from static JSON file at startup
 - No runtime modifications to configuration
 - Configuration remains constant during OM lifetime
+- Configuration file path should be configurable via command line argument
 
 **Distribution Mechanism** (source: `/home/ubuntu/bridge/docs/bridgeCP.md:32`):
 > *"At the start of the offloading experiment a Global configuration JSON is sent by OM to DiscoveryService which distributes it throughout the system."*
@@ -345,35 +353,163 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 
 ---
 
-## 7. Error Handling and Recovery
+## 7. Discovery Service Integration
 
-### 7.1 Connection Management
+### 7.1 Discovery Protocol Overview
 
-**Bridge CP Connection** (source: `/home/ubuntu/bridge/src/BridgeControlPlane.cpp:277-295`):
-- OM listens on localhost:8100 for Bridge CP connections
-- Handle multiple concurrent Bridge CP connections (for VHC network switching)
-- Maintain session state during brief connection interruptions
+**Protocol Format** (source: analysis of protocol.hpp and protocol.cpp):
+- **Transport**: TCP connection with text-based protocol
+- **Message Format**: Semicolon-delimited fields: `DISC:<TYPE>;<field1>;<field2>;...;<last_field>`
+- **Component Types**: V (Vehicle), M (MEC), B (Bridge), O (Offload Manager), T (Test)
 
-### 7.2 Error Response Codes
+### 7.2 OM Registration Process
 
-**SESSION_DENIED Reasons** (examples from code analysis):
-- `4001`: "No available MEC resources for the requested task"
-- Resource exhaustion
-- Invalid task type requests
-- System overload conditions
+**Registration Request Format**:
+```
+DISC:REG;O;S;1;1;OffloadManager;0.0.0.0;8100;{global_config_json}
+```
 
-### 7.3 System Recovery
+**Field Breakdown**:
+- `DISC:REG`: Protocol header for registration
+- `O`: Component type (Offload Manager)
+- `S`: Static ID request type
+- `1`: Group ID (always 1 for OM)
+- `1`: ID in group (always 1 for OM)
+- `OffloadManager`: Component name
+- `0.0.0.0`: Listen address (Discovery Service will detect actual IP)
+- `8100`: Listen port
+- `{global_config_json}`: Global configuration in humanReadableMessage field
 
-**Partial Failures**:
-- Continue operation with reduced capacity during MEC failures
-- Reallocate resources when components reconnect
-- Maintain decision-making capability during network partitions
+**Registration Response Format**:
+```
+DISC:ACK;0;1;1;;;;;{detected_ip};Registration successful
+```
+
+**Field Breakdown**:
+- `DISC:ACK`: Acknowledgment header
+- `0`: Response code (0 = Success)
+- `1;1`: Assigned group ID and ID in group
+- `;;;;`: Empty connection target fields (not needed for OM)
+- `{detected_ip}`: IP address detected by Discovery Service
+- `Registration successful`: Human readable message
+
+### 7.3 Component Discovery Mechanism
+
+**Current Challenge**: The existing discovery protocol does not have a message type to query all connected components.
+
+**Required New Message Type** (to be implemented):
+- **Query Request**: `DISC:QRY;component_type_filter;status_filter`
+- **Query Response**: `DISC:LST;component_count;component1_data;component2_data;...`
+
+**Component Data Format** (proposed):
+- `component_type:group_id:id_in_group:listen_address:listen_port:status`
+- Example: `M:2:5:192.168.1.100:8080:ACTIVE`
+
+### 7.4 Keepalive Protocol
+
+**Keepalive Ping**:
+```
+DISC:PNG;1.1;OK;Keepalive from OM
+```
+
+**Keepalive Response**:
+```
+DISC:PON;OK;5000;Continue operation
+```
+
+**Keepalive Requirements**:
+- OM must send keepalive every 5 seconds
+- Discovery Service timeout is 15 seconds
+- Failed keepalives result in component deregistration
+
+### 7.5 Python Implementation Requirements
+
+Since Python cannot use the C++ discovery protocol library, the OM must implement:
+
+**Protocol Encoder/Decoder**:
+- Parse semicolon-delimited messages
+- Validate message structure and field counts
+- Handle component type and response code enumerations
+
+**TCP Client for Discovery Service**:
+- Connect to Discovery Service (default: 192.168.65.5:9090)
+- Handle connection failures and retries
+- Maintain persistent connection for keepalives
+
+**Component State Tracking**:
+- Cache component information from queries
+- Update component status based on Discovery Service responses
+- Trigger resource allocation updates when components change
 
 ---
 
-## 8. Implementation Requirements
+## 8. Error Handling and Recovery
 
-### 8.1 Core Server Components
+### 8.1 Error Handling Philosophy
+
+**Shutdown on Critical Errors**: All critical errors should result in graceful OM shutdown with detailed logging of shutdown reasons. The system prioritizes diagnostics over automatic recovery for research purposes.
+
+**Error Categories**:
+- **Configuration Errors**: Invalid config file, missing required fields
+- **Network Errors**: Connection failures, protocol errors
+- **Discovery Service Errors**: Registration failures, component query failures
+- **Bridge Communication Errors**: Message parsing failures, sequence errors
+- **Resource Management Errors**: Algorithm failures, constraint violations
+
+### 8.2 Critical Error Scenarios
+
+**Discovery Service Connection Failure**:
+- Retry connection attempts with exponential backoff
+- If all retries fail, log detailed error and shutdown OM
+- Cannot operate without Discovery Service registration
+
+**Bridge CP Communication Failure**:
+- Log connection attempts and failures
+- If Bridge disconnects, continue operation but log degraded state
+- If message parsing fails, log message content and shutdown
+
+**Configuration Loading Failure**:
+- Log detailed file path and parsing errors
+- Cannot start without valid configuration
+- Shutdown immediately with clear error message
+
+### 8.3 Logging Requirements
+
+**Structured Logging Format**:
+```
+[TIMESTAMP] [LEVEL] [COMPONENT] [FUNCTION] - MESSAGE
+```
+
+**Required Log Information**:
+- Startup sequence with configuration details
+- All Discovery Service interactions (registration, queries, keepalives)
+- All Bridge CP message exchanges with full message content
+- Decision algorithm choices and reasoning
+- Resource allocation changes
+- Error details with full context and stack traces
+- Shutdown reasons with detailed error analysis
+
+### 8.4 Graceful Shutdown Sequence
+
+**Shutdown Triggers**:
+- Critical error conditions
+- SIGINT/SIGTERM signals
+- Discovery Service connection loss
+- Unrecoverable Bridge communication errors
+
+**Shutdown Process**:
+1. Log shutdown initiation with reason
+2. Stop accepting new offload requests
+3. Complete or deny pending requests
+4. Save session state for post-mortem analysis
+5. Log final shutdown completion
+6. (all connections will timeout automatically)
+
+---
+
+## 9. Implementation Requirements
+
+### 9.1 Core Server Components
 
 **TCP Server**: 
 - Listen on `localhost:8100`
@@ -386,11 +522,12 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - Generate appropriate error responses
 
 **Decision Engine**:
-- Implement resource allocation algorithms
+- Implement resource allocation algorithms behind abstraction layer
 - Process OFFLOAD_REQUEST messages
 - Generate SESSION_APPROVED/DENIED responses
+- Simple auto-approve placeholder for initial implementation
 
-### 8.2 State Management
+### 9.2 State Management
 
 **Session Tracking**:
 - Maintain active session registry by request_id
@@ -398,25 +535,57 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - Implement session timeout detection
 
 **Resource Database**:
-- Query Discovery Service API for real-time component availability
+- Query Discovery Service for real-time component availability
 - Task type compatibility matrix from static configuration
 - System capacity monitoring
 
-### 8.3 Integration Points
+### 9.3 Integration Points
 
-**Discovery Service**:
-- Register OM component with Discovery Service using text-based protocol
+**Discovery Service Client**:
+- Register OM component with Discovery Service
 - Provide static global configuration JSON to Discovery Service
-- Query Discovery Service API for connected components list
+- Implement component discovery mechanism (new protocol messages needed)
+- Maintain keepalive heartbeat
+
+**Configuration Management**:
+- Load static JSON configuration from file (path configurable via CLI)
+- Validate configuration structure and required fields
+- No runtime configuration changes
 
 **Logging and Monitoring**:
 - Structured logging for decision audit trails
 - Performance metrics collection
 - System health monitoring
+- Detailed error logging for research analysis
+
+### 9.4 Python-Specific Implementation Details
+
+**Discovery Protocol Implementation**:
+- Custom Python protocol encoder/decoder
+- TCP socket management for Discovery Service connection
+- Component type and response code enumerations
+- Message validation and error handling
+
+**Async/Threading Architecture**:
+- Separate threads for Bridge CP server and Discovery Service client
+- Thread-safe resource state management
+- Graceful shutdown coordination across threads
+
+**Error Handling Framework**:
+- Centralized error logging with context
+- Graceful shutdown on critical errors
+- Exception handling with detailed stack traces
 
 ---
 
 **Implementation Priority Order**:
-There will not be any work in progress testing, except for using a placeholder algorithm that approves all requests. Every other part of the OM is the same priority.
+1. Basic TCP server and JSON message handling (auto-approve algorithm)
+2. Static configuration loading and validation
+3. Discovery Service registration and Python protocol implementation
+4. Session state management and timeouts
+5. Component discovery mechanism (requires protocol extension)
+6. Advanced resource optimization algorithms
+7. Multiple bridge connection handling
+8. Comprehensive error handling and graceful shutdown
 
-This specification provides the foundation for implementing an OM that is fully compatible with the Bridge Control Plane and the broader modular gateway offloading system.
+This specification provides the foundation for implementing an OM that is fully compatible with the Bridge Control Plane and the broader modular gateway offloading system, with emphasis on research-oriented logging and diagnostics.
