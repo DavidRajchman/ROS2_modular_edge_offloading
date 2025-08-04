@@ -2859,3 +2859,222 @@ OSError: [Errno 113] No route to host
 [2025-08-04 22:26:03.564] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread stopped
 [2025-08-04 22:26:03.564] [INFO ] [discovery   ] [_query_loop    ] - Component query thread stopped
 [2025-08-04 22:26:03.568] [INFO ] [main        ] [start          ] - Shutdown event received, initiating graceful shutdown
+[2025-08-04 22:36:52.907] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:36:52.908] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:36:52.908] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:36:52.908] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:36:52.908] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:36:52.909] [ERROR] [discovery   ] [connect_and_register] - Failed to connect and register with Discovery Service: [Errno 111] Connection refused
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 119, in connect_and_register
+    self.socket.connect((self.host, self.port))
+ConnectionRefusedError: [Errno 111] Connection refused
+[2025-08-04 22:36:52.909] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Discovery Service registration failed
+[2025-08-04 22:36:52.909] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Discovery Service registration failed
+[2025-08-04 22:36:52.909] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 22:36:52.909] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 22:36:52.909] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 22:45:29.335] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:45:29.335] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:45:29.335] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:45:29.336] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:45:29.336] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Startup error: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:45:29.336] [ERROR] [main        ] [_shutdown_with_error] - Exception details: 'DiscoveryClient' object has no attribute 'connect_and_register'
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/main.py", line 66, in start
+    if not self.discovery_client.connect_and_register():
+AttributeError: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:45:29.336] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Startup error: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:46:31.430] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:46:31.430] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:46:31.430] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:46:31.431] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:46:31.431] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:46:31.431] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:46:31.431] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:46:31.431] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:46:31.431] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:46:31.431] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:46:31.431] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Startup error: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:46:31.431] [ERROR] [main        ] [_shutdown_with_error] - Exception details: 'DiscoveryClient' object has no attribute 'connect_and_register'
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/main.py", line 66, in start
+    if not self.discovery_client.connect_and_register():
+AttributeError: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:46:31.432] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Startup error: 'DiscoveryClient' object has no attribute 'connect_and_register'
+[2025-08-04 22:47:30.292] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:47:30.292] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:47:30.292] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:47:30.293] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:47:30.293] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:47:30.293] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Startup error: name 'DISCOVERY_REGISTRATION_TIMEOUT_MINUTES' is not defined
+[2025-08-04 22:47:30.293] [ERROR] [main        ] [_shutdown_with_error] - Exception details: name 'DISCOVERY_REGISTRATION_TIMEOUT_MINUTES' is not defined
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/main.py", line 66, in start
+    if not self.discovery_client.connect_and_register():
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 117, in connect_and_register
+    timeout_seconds = DISCOVERY_REGISTRATION_TIMEOUT_MINUTES * 60.0
+NameError: name 'DISCOVERY_REGISTRATION_TIMEOUT_MINUTES' is not defined
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Startup error: name 'DISCOVERY_REGISTRATION_TIMEOUT_MINUTES' is not defined
+[2025-08-04 22:47:30.293] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 22:47:30.293] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 22:47:30.293] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 22:48:19.437] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:48:19.437] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:48:19.437] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:48:19.438] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:48:19.438] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:48:19.438] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:48:19.438] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:48:19.438] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:48:19.438] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:48:19.438] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:48:19.438] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:48:19.438] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:48:19.438] [INFO ] [discovery   ] [connect_and_register] - Starting Discovery Service connection and registration process (timeout: 5.0 minutes)
+[2025-08-04 22:48:19.438] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 1 (time remaining: 300.0s)
+[2025-08-04 22:48:19.438] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:19.438] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 1 failed: Connection refused to 192.168.65.5:9090
+[2025-08-04 22:48:19.438] [INFO ] [discovery   ] [connect_and_register] - Waiting 2.0 seconds before retry 2
+[2025-08-04 22:48:21.441] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 2 (time remaining: 298.0s)
+[2025-08-04 22:48:21.441] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:21.442] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:48:21.442] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 2 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:48:21.442] [INFO ] [discovery   ] [connect_and_register] - Waiting 3.0 seconds before retry 3
+[2025-08-04 22:48:24.445] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 3 (time remaining: 295.0s)
+[2025-08-04 22:48:24.446] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:24.446] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:48:24.446] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 3 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:48:24.447] [INFO ] [discovery   ] [connect_and_register] - Waiting 4.5 seconds before retry 4
+[2025-08-04 22:48:28.950] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 4 (time remaining: 290.5s)
+[2025-08-04 22:48:28.951] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:28.951] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:48:28.951] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 4 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:48:28.952] [INFO ] [discovery   ] [connect_and_register] - Waiting 6.8 seconds before retry 5
+[2025-08-04 22:48:35.708] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 5 (time remaining: 283.7s)
+[2025-08-04 22:48:35.709] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:35.709] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:48:35.709] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 5 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:48:35.709] [INFO ] [discovery   ] [connect_and_register] - Waiting 10.1 seconds before retry 6
+[2025-08-04 22:48:45.845] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 6 (time remaining: 273.6s)
+[2025-08-04 22:48:45.845] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:48:45.846] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:48:45.846] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 6 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:48:45.846] [INFO ] [discovery   ] [connect_and_register] - Waiting 15.2 seconds before retry 7
+[2025-08-04 22:49:01.049] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 7 (time remaining: 258.4s)
+[2025-08-04 22:49:01.049] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:49:01.049] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:49:01.049] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 7 failed: 'DiscoveryClient' object has no attribute '_send_registration'
+[2025-08-04 22:49:01.049] [INFO ] [discovery   ] [connect_and_register] - Waiting 22.8 seconds before retry 8
+[2025-08-04 22:49:39.105] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:49:39.106] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:49:39.106] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:49:39.106] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:49:39.106] [INFO ] [discovery   ] [connect_and_register] - Starting Discovery Service connection and registration process (timeout: 5.0 minutes)
+[2025-08-04 22:49:39.106] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 1 (time remaining: 300.0s)
+[2025-08-04 22:49:39.106] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:49:39.107] [WARNING] [discovery   ] [connect_and_register] - Registration attempt 1 failed: Connection refused to 192.168.65.5:9090
+[2025-08-04 22:49:39.107] [INFO ] [discovery   ] [connect_and_register] - Waiting 2.0 seconds before retry 2
+[2025-08-04 22:49:41.108] [INFO ] [discovery   ] [connect_and_register] - Registration attempt 2 (time remaining: 298.0s)
+[2025-08-04 22:49:41.109] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:49:41.109] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:49:41.109] [INFO ] [discovery   ] [_send_registration] - Sending registration request to Discovery Service
+[2025-08-04 22:49:41.110] [INFO ] [discovery   ] [_parse_registration_response] - Discovery Service detected OM IP as: {"available_tasks":[{"task_id":1,"task_name":"STRING_PROCESSING","input_message_types":[1],"output_message_types":[1]},{"task_id":2,"task_name":"LASER_SCAN_PROCESSING","input_message_types":[11],"output_message_types":[11]},{"task_id":3,"task_name":"STRING_TEST_PIPELINE","input_message_types":[201],"output_message_types":[202]},{"task_id":4,"task_name":"BASIC_DATA_PROCESSING","input_message_types":[1,2,3,4],"output_message_types":[1,2,3,4]},{"task_id":5,"task_name":"SENSOR_FUSION","input_message_types":[11,1],"output_message_types":[11,1]},{"task_id":6,"task_name":"COMPLETE_TEST_SUITE","input_message_types":[1,11,201],"output_message_types":[1,11,202]}],"default_session_timeout":300,"max_concurrent_sessions":100}
+[2025-08-04 22:49:41.110] [INFO ] [discovery   ] [_parse_registration_response] - Successfully registered with Discovery Service
+[2025-08-04 22:49:41.110] [INFO ] [discovery   ] [connect_and_register] - Registration completed successfully
+[2025-08-04 22:49:41.111] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread started - sending pings every 5 seconds
+[2025-08-04 22:49:41.111] [INFO ] [discovery   ] [_query_loop    ] - Component query thread started - initial delay 2s
+[2025-08-04 22:49:41.111] [INFO ] [discovery   ] [_start_background_threads] - Discovery Service background threads started
+[2025-08-04 22:49:41.111] [INFO ] [discovery   ] [connect_and_register] - Discovery Service registration successful after 2 attempts in 2.00 seconds
+[2025-08-04 22:49:41.111] [INFO ] [main        ] [start          ] - Successfully registered with Discovery Service
+[2025-08-04 22:49:41.111] [INFO ] [main        ] [start          ] - Starting OM TCP server...
+[2025-08-04 22:49:41.111] [INFO ] [algorithm   ] [__init__       ] - Algorithm initialized: AUTO_APPROVE_V1 v1.0.0
+[2025-08-04 22:49:41.111] [INFO ] [algorithm   ] [__init__       ] - Auto-approve mode: True
+[2025-08-04 22:49:41.111] [INFO ] [algorithm   ] [__init__       ] - MEC selection: RANDOM
+[2025-08-04 22:49:41.112] [INFO ] [algorithm   ] [__init__       ] - Discovery query interval: 10s
+[2025-08-04 22:49:41.112] [INFO ] [decision    ] [__init__       ] - Decision engine initialized
+[2025-08-04 22:49:41.112] [INFO ] [server      ] [start          ] - Starting OM TCP server on 0.0.0.0:8100
+[2025-08-04 22:49:41.112] [INFO ] [main        ] [start          ] - OM Server started on localhost:8100
+[2025-08-04 22:49:41.112] [INFO ] [main        ] [start          ] - === OM Ready for Bridge CP connections ===
+[2025-08-04 22:49:41.112] [INFO ] [server      ] [start          ] - OM Server listening for Bridge CP connections

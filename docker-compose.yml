@@ -101,6 +101,30 @@ services:
       public_net:
           ipv4_address: 192.168.65.5
 
+  offloading_manager:
+    build:
+      context: .
+      dockerfile: ./bridge/Dockerfile
+    container_name: offloading_manager # Custom name
+    #network_mode: "host"
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./bridge:/home/ubuntu/bridge
+      - ./OffloadingManager:/home/ubuntu/OffloadingManager
+      - ./cpplib:/home/ubuntu/cpplib_src
+
+    working_dir: /home/ubuntu/OffloadingManager
+    privileged: true
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash", "-c", "/home/ubuntu/autostart_om.sh && exec bash"]
+    networks:
+      public_net:
+          ipv4_address: 192.168.65.4
+
 networks:
     public_net:
         driver: bridge

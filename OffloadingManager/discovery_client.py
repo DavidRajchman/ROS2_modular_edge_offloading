@@ -13,8 +13,9 @@ from dataclasses import dataclass
 
 from config_manager import ConfigManager
 from algorithm import (DISCOVERY_QUERY_INTERVAL_SECONDS, DISCOVERY_INITIAL_QUERY_DELAY,
-                      DISCOVERY_KEEPALIVE_MAX_FAILURES, DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS)
-
+                      DISCOVERY_KEEPALIVE_MAX_FAILURES, DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS,
+                      DISCOVERY_REGISTRATION_TIMEOUT_MINUTES, DISCOVERY_REGISTRATION_RETRY_DELAY_SECONDS,
+                      DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER, DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS)
 
 class ComponentType(Enum):
     """Discovery Service component types"""
@@ -109,36 +110,90 @@ class DiscoveryClient:
         self.resource_update_callback = callback
         
     def connect_and_register(self) -> bool:
-        """Connect to Discovery Service and register OM"""
-        try:
-            self.logger.info("Connecting to Discovery Service...")
+        """Connect to Discovery Service and register OM with retry logic"""
+        import time
+        import math
+        
+        start_time = time.time()
+        timeout_seconds = DISCOVERY_REGISTRATION_TIMEOUT_MINUTES * 60.0
+        attempt = 0
+        delay = DISCOVERY_REGISTRATION_RETRY_DELAY_SECONDS
+        
+        self.logger.info(f"Starting Discovery Service connection and registration process (timeout: {DISCOVERY_REGISTRATION_TIMEOUT_MINUTES} minutes)")
+        
+        while time.time() - start_time < timeout_seconds:
+            attempt += 1
+            time_remaining = timeout_seconds - (time.time() - start_time)
             
-            # Create socket connection
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(10.0)  # 10 second timeout
-            self.socket.connect((self.host, self.port))
-            self.connected = True
+            self.logger.info(f"Registration attempt {attempt} (time remaining: {time_remaining:.1f}s)")
             
-            self.logger.info(f"Connected to Discovery Service at {self.host}:{self.port}")
-            
-            # Send registration request
-            if not self._send_registration():
-                self.logger.error("Failed to send registration request")
+            try:
+                # Clean up any previous connection
                 self._cleanup_connection()
-                return False
                 
-            self.logger.info("Registration completed successfully")
+                self.logger.info("Connecting to Discovery Service...")
+                
+                # Create socket connection
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.settimeout(10.0)  # 10 second timeout for individual operations
+                self.socket.connect((self.host, self.port))
+                self.connected = True
+                
+                self.logger.info(f"Connected to Discovery Service at {self.host}:{self.port}")
+                
+                # Send registration request
+                if not self._send_registration():
+                    self.logger.error("Failed to send registration request")
+                    self._cleanup_connection()
+                    # Don't return immediately, continue to retry logic
+                else:
+                    self.logger.info("Registration completed successfully")
+                    
+                    # Start background threads
+                    self._start_background_threads()
+                    
+                    total_time = time.time() - start_time
+                    self.logger.info(f"Discovery Service registration successful after {attempt} attempts in {total_time:.2f} seconds")
+                    return True
+                    
+            except socket.timeout:
+                self.logger.warning(f"Registration attempt {attempt} timed out after 10 seconds")
+            except ConnectionRefusedError:
+                self.logger.warning(f"Registration attempt {attempt} failed: Connection refused to {self.host}:{self.port}")
+            except socket.gaierror as e:
+                self.logger.warning(f"Registration attempt {attempt} failed: DNS resolution error for {self.host}: {e}")
+            except Exception as e:
+                self.logger.warning(f"Registration attempt {attempt} failed: {e}")
             
-            # Start background threads
-            self._start_background_threads()
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to connect and register with Discovery Service: {e}", exc_info=True)
+            # Clean up failed connection
             self._cleanup_connection()
-            return False
             
+            # Check if we have time for another attempt
+            if time.time() - start_time >= timeout_seconds:
+                break
+                
+            # Calculate delay for next attempt with exponential backoff
+            actual_delay = min(delay, DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS)
+            remaining_time = timeout_seconds - (time.time() - start_time)
+            
+            if remaining_time <= actual_delay:
+                self.logger.warning(f"Insufficient time remaining ({remaining_time:.1f}s) for retry delay ({actual_delay:.1f}s)")
+                break
+                
+            self.logger.info(f"Waiting {actual_delay:.1f} seconds before retry {attempt + 1}")
+            time.sleep(actual_delay)
+            
+            # Increase delay for next attempt (exponential backoff)
+            delay *= DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER
+        
+        # All attempts failed
+        total_time = time.time() - start_time
+        self.logger.error(f"Failed to register with Discovery Service after {attempt} attempts over {total_time:.2f} seconds")
+        self.logger.error(f"Discovery Service: {self.host}:{self.port}")
+        self.logger.error("Check that Discovery Service is running and accessible")
+        
+        return False
+                
     def _send_registration(self) -> bool:
         """Send registration request to Discovery Service"""
         try:
@@ -179,7 +234,7 @@ class DiscoveryClient:
         except Exception as e:
             self.logger.error(f"Error during registration: {e}", exc_info=True)
             return False
-            
+                
     def _parse_registration_response(self, response: str) -> bool:
         """Parse registration response from Discovery Service"""
         try:

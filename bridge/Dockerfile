@@ -92,6 +92,10 @@ RUN rm -rf build && \
 COPY ./DiscoveryService/autostart.sh /home/ubuntu/autostart.sh
 RUN chmod +x /home/ubuntu/autostart.sh
 
+# Copy and setup autostart script for OffloadingManager
+COPY ./OffloadingManager/autostart_om.sh /home/ubuntu/autostart_om.sh
+RUN chmod +x /home/ubuntu/autostart_om.sh
+
 RUN mkdir -p /etc/sudoers.d && \
     useradd -m ubuntu && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \

@@ -42,6 +42,12 @@ DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS = 10.0  # Timeout for keepalive responses
 DISCOVERY_CONNECTION_RETRY_ATTEMPTS = 3  # Number of reconnection attempts
 DISCOVERY_RECONNECT_DELAY_SECONDS = 5.0  # Delay between reconnection attempts
 
+# NEW: Registration retry configuration
+DISCOVERY_REGISTRATION_TIMEOUT_MINUTES = 5.0  # Total timeout for registration attempts
+DISCOVERY_REGISTRATION_RETRY_DELAY_SECONDS = 2.0  # Delay between registration retry attempts
+DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER = 1.5  # Exponential backoff multiplier for delays
+DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS = 30.0  # Maximum delay between retry attempts
+
 # ===================================================================
 
 
