@@ -55,7 +55,7 @@ ComponentType string_to_component_type(const std::string& str) {
 
 // --- Message-level encode/decode ---
 
-PProtocolStatus encode_message(const Message& message, std::string& output) {
+ProtocolStatus encode_message(const Message& message, std::string& output) {
     switch (message.type) {
         case MessageType::REGISTRATION_REQUEST:
             return encode_registration_request(std::get<RegistrationRequest>(message.data), output);

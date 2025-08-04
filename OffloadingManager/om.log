@@ -2258,3 +2258,363 @@ Traceback (most recent call last):
   File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
     raise DiscoveryProtocolError(f"Send failed: {e}")
 discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:27.622] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:27.622] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:27.622] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:27.623] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:37.623] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:37.623] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:37.623] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:37.623] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:47.624] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:47.624] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:47.625] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:47.625] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:57.625] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:57.625] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:15:57.626] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:15:57.626] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:07.626] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:07.627] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:07.627] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:07.627] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:17.628] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:17.628] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:17.628] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:17.628] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:27.629] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:27.629] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:27.630] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:27.630] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:37.630] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:37.631] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:37.631] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:37.631] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:47.631] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:47.632] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:47.632] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:47.633] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:57.633] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:57.633] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:16:57.633] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:16:57.633] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:07.634] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:07.634] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:07.634] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:07.634] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:17.635] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:17.635] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:17.635] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:17.635] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
