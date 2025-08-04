@@ -1,0 +1,238 @@
+[2025-08-04 21:26:02.951] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 21:26:02.951] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 21:26:02.951] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 21:26:02.952] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 21:26:02.952] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 21:26:02.952] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 21:26:02.952] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 21:26:02.952] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 21:26:02.952] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 21:26:02.952] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 21:26:02.952] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 21:26:02.952] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 21:26:02.953] [INFO ] [discovery   ] [_send_registration] - Sending registration request to Discovery Service
+[2025-08-04 21:26:02.953] [ERROR] [discovery   ] [_parse_registration_response] - Registration failed: Component ID conflict
+[2025-08-04 21:26:02.953] [ERROR] [discovery   ] [connect_and_register] - Failed to send registration request
+[2025-08-04 21:26:02.953] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Discovery Service registration failed
+[2025-08-04 21:26:02.953] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Discovery Service registration failed
+[2025-08-04 21:26:02.953] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 21:26:02.953] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 21:26:02.953] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 21:27:52.126] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 21:27:52.126] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 21:27:52.126] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 21:27:52.127] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 21:27:52.127] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 21:27:52.127] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 21:27:52.127] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 21:27:52.127] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 21:27:52.127] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 21:27:52.127] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 21:27:52.127] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 21:27:52.127] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 21:27:52.127] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 21:27:52.127] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 21:27:52.127] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 21:27:52.127] [INFO ] [discovery   ] [_send_registration] - Sending registration request to Discovery Service
+[2025-08-04 21:27:52.127] [INFO ] [discovery   ] [_parse_registration_response] - Discovery Service detected OM IP as: {"available_tasks":[{"task_id":1,"task_name":"STRING_PROCESSING","input_message_types":[1],"output_message_types":[1]},{"task_id":2,"task_name":"LASER_SCAN_PROCESSING","input_message_types":[11],"output_message_types":[11]},{"task_id":3,"task_name":"STRING_TEST_PIPELINE","input_message_types":[201],"output_message_types":[202]},{"task_id":4,"task_name":"BASIC_DATA_PROCESSING","input_message_types":[1,2,3,4],"output_message_types":[1,2,3,4]},{"task_id":5,"task_name":"SENSOR_FUSION","input_message_types":[11,1],"output_message_types":[11,1]},{"task_id":6,"task_name":"COMPLETE_TEST_SUITE","input_message_types":[1,11,201],"output_message_types":[1,11,202]}],"default_session_timeout":300,"max_concurrent_sessions":100}
+[2025-08-04 21:27:52.128] [INFO ] [discovery   ] [_parse_registration_response] - Successfully registered with Discovery Service
+[2025-08-04 21:27:52.128] [INFO ] [discovery   ] [connect_and_register] - Registration completed successfully
+[2025-08-04 21:27:52.128] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread started - sending pings every 5 seconds
+[2025-08-04 21:27:52.128] [INFO ] [discovery   ] [_query_loop    ] - Component query thread started - initial delay 2s
+[2025-08-04 21:27:52.128] [INFO ] [discovery   ] [_start_background_threads] - Discovery Service background threads started
+[2025-08-04 21:27:52.128] [INFO ] [main        ] [start          ] - Successfully registered with Discovery Service
+[2025-08-04 21:27:52.128] [INFO ] [main        ] [start          ] - Starting OM TCP server...
+[2025-08-04 21:27:52.128] [INFO ] [algorithm   ] [__init__       ] - Algorithm initialized: AUTO_APPROVE_V1 v1.0.0
+[2025-08-04 21:27:52.129] [INFO ] [algorithm   ] [__init__       ] - Auto-approve mode: True
+[2025-08-04 21:27:52.129] [INFO ] [algorithm   ] [__init__       ] - MEC selection: RANDOM
+[2025-08-04 21:27:52.129] [INFO ] [algorithm   ] [__init__       ] - Discovery query interval: 10s
+[2025-08-04 21:27:52.129] [INFO ] [decision    ] [__init__       ] - Decision engine initialized
+[2025-08-04 21:27:52.129] [INFO ] [server      ] [start          ] - Starting OM TCP server on localhost:8100
+[2025-08-04 21:27:52.129] [INFO ] [main        ] [start          ] - OM Server started on localhost:8100
+[2025-08-04 21:27:52.129] [INFO ] [main        ] [start          ] - === OM Ready for Bridge CP connections ===
+[2025-08-04 21:27:52.131] [INFO ] [server      ] [start          ] - OM Server listening for Bridge CP connections
+[2025-08-04 21:27:54.131] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:27:54.131] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:04.132] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:04.136] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:14.136] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:14.137] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:24.137] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:24.138] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:34.138] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:34.138] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:44.139] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:44.139] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:54.139] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:28:54.140] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:04.141] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:04.141] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:14.143] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:14.143] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:24.144] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:24.144] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:34.145] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:34.146] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:44.147] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:44.147] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:54.148] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:29:54.148] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:04.149] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:04.149] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:14.150] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:14.150] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:24.151] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:24.151] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:34.152] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:34.153] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:44.154] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:44.154] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:54.155] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:30:54.155] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:04.155] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:04.156] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:14.157] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:14.158] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:24.159] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:24.159] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:34.160] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:34.160] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:44.161] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:44.161] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:54.162] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:31:54.162] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:04.163] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:04.163] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:14.164] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:14.165] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:24.165] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:24.166] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:34.167] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:34.168] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:44.169] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:44.169] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:54.171] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:32:54.171] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:04.172] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:04.172] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:14.173] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:14.174] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:24.175] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:24.175] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:34.177] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:34.179] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:44.181] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:44.181] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:54.182] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:33:54.182] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:04.182] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:04.183] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:14.183] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:14.184] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:24.184] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:24.185] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:34.185] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:34.185] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:44.186] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:44.187] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:54.188] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:34:54.189] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:04.189] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:04.190] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:14.190] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:14.190] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:24.191] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:24.191] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:34.192] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:34.192] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:44.193] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:44.193] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:54.193] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:35:54.194] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:04.194] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:04.194] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:14.195] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:14.196] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:24.198] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:24.200] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:34.201] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:34.201] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:44.202] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:44.203] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:54.203] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:36:54.204] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:04.204] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:04.205] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:14.205] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:14.206] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:24.206] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:24.207] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:34.207] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:34.208] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:44.208] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:44.209] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:54.210] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:37:54.210] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:04.211] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:04.211] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:14.213] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:14.213] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:24.214] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:24.215] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:34.215] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:34.215] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:44.217] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:44.218] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:54.219] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:38:54.219] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:04.220] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:04.220] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:14.221] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:14.222] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:24.222] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:24.222] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:34.223] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:34.223] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:44.224] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:44.224] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:54.225] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:39:54.225] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:04.226] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:04.226] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:14.227] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:14.227] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:24.228] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:24.228] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:34.229] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:34.230] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:44.230] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:44.231] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:54.232] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:40:54.232] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:04.233] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:04.233] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:14.233] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:14.234] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:24.235] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:24.235] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:34.237] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:34.237] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:44.238] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.
+[2025-08-04 21:41:44.238] [WARNING] [discovery   ] [_parse_query_response] - Unexpected query response format: DISC:ERR;3;Malformed or invalid message received.

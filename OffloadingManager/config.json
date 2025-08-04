@@ -1,22 +1,40 @@
 {
   "available_tasks": [
     {
-      "task_id": 31,
-      "task_name": "MAP_ROUTING",
-      "input_message_types": [201, 203],
-      "output_message_types": [202, 204]
+      "task_id": 1,
+      "task_name": "STRING_PROCESSING",
+      "input_message_types": [1],
+      "output_message_types": [1]
     },
     {
-      "task_id": 42,
-      "task_name": "OBJECT_DETECTION",
-      "input_message_types": [205],
-      "output_message_types": [206, 207]
+      "task_id": 2,
+      "task_name": "LASER_SCAN_PROCESSING",
+      "input_message_types": [11],
+      "output_message_types": [11]
     },
     {
-      "task_id": 55,
-      "task_name": "PATH_PLANNING",
-      "input_message_types": [210, 211],
-      "output_message_types": [212]
+      "task_id": 3,
+      "task_name": "STRING_TEST_PIPELINE",
+      "input_message_types": [201],
+      "output_message_types": [202]
+    },
+    {
+      "task_id": 4,
+      "task_name": "BASIC_DATA_PROCESSING",
+      "input_message_types": [1, 2, 3, 4],
+      "output_message_types": [1, 2, 3, 4]
+    },
+    {
+      "task_id": 5,
+      "task_name": "SENSOR_FUSION",
+      "input_message_types": [11, 1],
+      "output_message_types": [11, 1]
+    },
+    {
+      "task_id": 6,
+      "task_name": "COMPLETE_TEST_SUITE",
+      "input_message_types": [1, 11, 201],
+      "output_message_types": [1, 11, 202]
     }
   ],
   "default_session_timeout": 300,

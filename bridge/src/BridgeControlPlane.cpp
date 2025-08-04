@@ -11,7 +11,9 @@ BridgeControlPlane::BridgeControlPlane()
       shutdown_requested_(false),
       discovery_connected_(false),
       om_connected_(false),
-      next_mgwcp_connection_id_(1)
+      next_mgwcp_connection_id_(1),
+      om_host_(""),  // Will be set from Discovery Service response
+      om_port_(0)    // Will be set from Discovery Service response
 {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: Bridge Control Plane constructed");
@@ -39,7 +41,7 @@ bool BridgeControlPlane::start() {
         return false;
     }
     
-    // Phase 2: Connect to OM
+    // Phase 2: Connect to OM (using address from Discovery Service)
     if (!connect_to_om()) {
         logger.Error("BridgeControlPlane.cpp: Failed to connect to OM");
         return false;
@@ -215,6 +217,22 @@ bool BridgeControlPlane::perform_discovery_registration() {
         return false;
     }
     
+    // Extract OM connection details from Discovery Service response
+    if (!response.connectionTargetAddress.empty() && !response.connectionTargetPort.empty()) {
+        om_host_ = response.connectionTargetAddress;
+        try {
+            om_port_ = static_cast<uint16_t>(std::stoi(response.connectionTargetPort));
+            logger.Info("BridgeControlPlane.cpp: OM connection target received: {}:{}", om_host_, om_port_);
+        } catch (const std::exception& e) {
+            logger.Error("BridgeControlPlane.cpp: Invalid OM port in Discovery Service response: {}", 
+                        response.connectionTargetPort);
+            return false;
+        }
+    } else {
+        logger.Error("BridgeControlPlane.cpp: No OM connection target provided by Discovery Service");
+        return false;
+    }
+    
     // Parse global configuration
     if (!response.configJson.empty()) {
         try {
@@ -223,8 +241,7 @@ bool BridgeControlPlane::perform_discovery_registration() {
                 logger.Error("BridgeControlPlane.cpp: Failed to parse global configuration from Discovery Service");
                 return false;
             }
-            logger.Info("BridgeControlPlane.cpp: Successfully parsed global configuration with {} tasks", 
-                       global_config_->get_all_tasks().size());
+            logger.Info("BridgeControlPlane.cpp: Global configuration loaded successfully");
         } catch (const std::exception& e) {
             logger.Error("BridgeControlPlane.cpp: Failed to parse global configuration JSON: {}", e.what());
             return false;
@@ -277,13 +294,19 @@ void BridgeControlPlane::discovery_keepalive_thread_func() {
 bool BridgeControlPlane::connect_to_om() {
     CppLogging::Logger logger("bridge");
     
-    logger.Info("BridgeControlPlane.cpp: Connecting to OM at localhost:{}", OM_PORT);
+    // Verify OM connection details were received from Discovery Service
+    if (om_host_.empty() || om_port_ == 0) {
+        logger.Error("BridgeControlPlane.cpp: No OM connection details available from Discovery Service");
+        return false;
+    }
     
-    // Create OM connection
-    om_transport_ = std::make_unique<gateway::TcpClientTransport>("localhost", OM_PORT);
+    logger.Info("BridgeControlPlane.cpp: Connecting to OM at {}:{}", om_host_, om_port_);
+    
+    // Create OM connection using details from Discovery Service
+    om_transport_ = std::make_unique<gateway::TcpClientTransport>(om_host_, om_port_);
     
     if (!om_transport_->connect()) {
-        logger.Error("BridgeControlPlane.cpp: Failed to connect to OM");
+        logger.Error("BridgeControlPlane.cpp: Failed to connect to OM at {}:{}", om_host_, om_port_);
         return false;
     }
     
@@ -292,7 +315,7 @@ bool BridgeControlPlane::connect_to_om() {
     // Start OM connection thread
     om_connection_thread_ = std::thread(&BridgeControlPlane::om_connection_thread_func, this);
     
-    logger.Info("BridgeControlPlane.cpp: Successfully connected to OM");
+    logger.Info("BridgeControlPlane.cpp: Successfully connected to OM at {}:{}", om_host_, om_port_);
     return true;
 }
 

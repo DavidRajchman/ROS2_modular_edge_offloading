@@ -17,6 +17,7 @@ from pathlib import Path
 from om_server import OffloadingManagerServer
 from config_manager import ConfigManager
 from logger_config import setup_logging
+from discovery_client import DiscoveryClient
 
 
 class OffloadingManager:
@@ -24,6 +25,7 @@ class OffloadingManager:
         self.logger = logging.getLogger('OM.main')
         self.config_file = config_file
         self.server = None
+        self.discovery_client = None
         self.shutdown_event = threading.Event()
         self.shutdown_reason = "Unknown"
         
@@ -55,8 +57,27 @@ class OffloadingManager:
             self.logger.info(f"Available tasks: {len(config_manager.config.get('available_tasks', []))}")
             self.logger.info(f"Max concurrent sessions: {config_manager.config.get('max_concurrent_sessions', 'Not set')}")
             
-            # Create and start the OM server
+            # Initialize Discovery Service client
+            self.logger.info("Initializing Discovery Service client...")
+            self.discovery_client = DiscoveryClient(config_manager, self.shutdown_event)
+            
+            # Connect and register with Discovery Service
+            self.logger.info("Registering with Discovery Service...")
+            if not self.discovery_client.connect_and_register():
+                self.shutdown_reason = "Discovery Service registration failed"
+                self._shutdown_with_error(self.shutdown_reason)
+                return False
+                
+            self.logger.info("Successfully registered with Discovery Service")
+            
+            # Create and start the OM server (only after successful registration)
+            self.logger.info("Starting OM TCP server...")
             self.server = OffloadingManagerServer(config_manager, self.shutdown_event)
+            
+            # Set up resource update callback from Discovery Service to Decision Engine
+            self.discovery_client.set_resource_update_callback(
+                self.server.decision_engine.update_available_resources
+            )
             
             # Start server in separate thread
             server_thread = threading.Thread(target=self.server.start, name="OMServer")
@@ -83,8 +104,13 @@ class OffloadingManager:
         self.logger.info(f"Shutdown initiated: {self.shutdown_reason}")
         self.shutdown_event.set()
         
+        # Stop OM server
         if self.server:
             self.server.stop()
+            
+        # Disconnect from Discovery Service
+        if self.discovery_client:
+            self.discovery_client.disconnect()
             
         self.logger.info("=== OM Shutdown Complete ===")
         

@@ -12,7 +12,8 @@
 6. [Global Configuration Distribution](#6-global-configuration-distribution)
 7. [Discovery Service Integration](#7-discovery-service-integration)
 8. [Error Handling and Recovery](#8-error-handling-and-recovery)
-9. [Implementation Requirements](#9-implementation-requirements)
+9. [Implementation Details](#9-implementation-details)
+10. [File Structure and Responsibilities](#10-file-structure-and-responsibilities)
 
 ---
 
@@ -47,6 +48,7 @@ It will also gather information from other sources other than bridgeCP (TBD) to 
 - Physical MEC server usage statistics
 - other sources
 
+**IMPORTANT**: Everything that is configurable about the OM must be done in the algorithm.py file. The OM must not have any hardcoded values that are not configurable in the algorithm.py file. This is to allow easy modification of the decision-making algorithms and resource management strategies. And the algorithm.py file must be the only file that needs to be modified to change the behavior of the OM. The rest of the code must remain unchanged.
 
 ### 1.2 System Position and Communication Model
 
@@ -94,12 +96,12 @@ Based on analysis of Bridge CP interactions, the OM must implement:
 - **VHC (Vehicle)**: Physical or simulated vehicle requesting task offloading
 - **MEC**: Virtual copy of VHC that processes offloaded tasks  
 - **Bridge**: Routes data between VHC, MEC, and OM
-- **OM**: The offloading manager itself (component_id: `1:1`)
+- **OM**: The offloading manager itself (component_id: `1:1`, subtype: `0`)
 
 **Discovery Service Integration**:
 - OM must register with Discovery Service using text-based protocol
 - OM provides static global configuration JSON to Discovery Service for distribution
-- Discovery Service has API/mechanism that returns all connected components (VHCs, MECs, Bridges)
+- Discovery Service has API/mechanism that returns all connected components (VHCs, MECs)
 - Discovery Service distributes configuration "throughout the system" at component connection
 
 ### 2.3 Global Configuration Structure
@@ -395,15 +397,21 @@ DISC:ACK;0;1;1;;;;;{detected_ip};Registration successful
 
 ### 7.3 Component Discovery Mechanism
 
-**Current Challenge**: The existing discovery protocol does not have a message type to query all connected components.
-
-**Required New Message Type** (to be implemented):
-- **Query Request**: `DISC:QRY;component_type_filter;status_filter`
+**Required New Message Type** (to be implemented in OM first, then Discovery Service):
+- **Query Request**: `DISC:QRY;component_type_filter;HumanReadableMessage`
 - **Query Response**: `DISC:LST;component_count;component1_data;component2_data;...`
 
-**Component Data Format** (proposed):
-- `component_type:group_id:id_in_group:listen_address:listen_port:status`
-- Example: `M:2:5:192.168.1.100:8080:ACTIVE`
+**Component Data Format**:
+- Format: `component_type:group_id:id_in_group:component_subtype`
+- Example: `V:10:12:1` (Vehicle with group ID 10, ID in group 12, subtype 1)
+- Example: `M:20:5:0` (MEC with group ID 20, ID in group 5, no subtype)
+- **Subtypes**: Used to differentiate between component capabilities within the same type (e.g., GPU-equipped MEC vs CPU-only MEC)
+- **OM Subtype**: Always 0 for backward compatibility
+
+**Query Implementation Details**:
+- **Single Component Type**: Only one type per query (e.g., "M" for MECs, "V" for VHCs)
+- **OM Queries**: Primarily for MECs, VHCs for research data (current single-bridge version only)
+- **Query Timing**: Periodic queries every few seconds (configurable in algorithm.py) plus on-demand capability
 
 ### 7.4 Keepalive Protocol
 
@@ -422,7 +430,17 @@ DISC:PON;OK;5000;Continue operation
 - Discovery Service timeout is 15 seconds
 - Failed keepalives result in component deregistration
 
-### 7.5 Python Implementation Requirements
+### 7.5 Connection and Startup Sequence
+
+**Startup Order**:
+1. Logging system initialization
+2. Configuration loading and validation
+3. **Discovery Service registration** (must succeed)
+4. TCP server startup (only after successful registration)
+
+**Registration Dependency**: TCP server exposes OM only after successful Discovery Service registration to ensure Bridge CP can discover OM location.
+
+### 7.6 Python Implementation Requirements
 
 Since Python cannot use the C++ discovery protocol library, the OM must implement:
 
@@ -440,6 +458,8 @@ Since Python cannot use the C++ discovery protocol library, the OM must implemen
 - Cache component information from queries
 - Update component status based on Discovery Service responses
 - Trigger resource allocation updates when components change
+- Periodic refresh mechanism with configurable intervals
+- On-demand query capability for future MEC creation events
 
 ---
 
@@ -447,7 +467,9 @@ Since Python cannot use the C++ discovery protocol library, the OM must implemen
 
 ### 8.1 Error Handling Philosophy
 
-**Shutdown on Critical Errors**: All critical errors should result in graceful OM shutdown with detailed logging of shutdown reasons. The system prioritizes diagnostics over automatic recovery for research purposes.
+The OM is research-oriented and prioritizes simplicity, thus logs are required for all error conditions, and the system should not attempt to recover from critical errors automatically. Instead, it should log detailed diagnostics and shut down gracefully (if possible) to allow researchers to analyze the failure.
+
+**Shutdown on Critical Errors**: All critical errors should result in OM shutdown with detailed logging of shutdown reasons. The system prioritizes diagnostics over automatic recovery for research purposes.
 
 **Error Categories**:
 - **Configuration Errors**: Invalid config file, missing required fields
@@ -501,91 +523,134 @@ Since Python cannot use the C++ discovery protocol library, the OM must implemen
 1. Log shutdown initiation with reason
 2. Stop accepting new offload requests
 3. Complete or deny pending requests
-4. Save session state for post-mortem analysis
-5. Log final shutdown completion
-6. (all connections will timeout automatically)
+4. Log final shutdown completion
+5. (all connections timeout)
 
 ---
 
-## 9. Implementation Requirements
+## 9. Implementation Details
 
-### 9.1 Core Server Components
+### 9.1 Architecture Overview
 
-**TCP Server**: 
-- Listen on `localhost:8100`
-- Accept connections from Bridge CP
-- Handle multiple concurrent Bridge connections (for VHC network switching scenarios)
+The OM is implemented as a multi-threaded Python application designed for research flexibility and comprehensive logging. The architecture separates concerns to allow easy modification of decision algorithms without affecting core infrastructure.
 
-**JSON Message Parser**:
-- Parse incoming JSON messages
-- Validate message structure and required fields
-- Generate appropriate error responses
+### 9.2 Threading Model
 
-**Decision Engine**:
-- Implement resource allocation algorithms behind abstraction layer
-- Process OFFLOAD_REQUEST messages
-- Generate SESSION_APPROVED/DENIED responses
-- Simple auto-approve placeholder for initial implementation
+**Main Thread**: Application lifecycle management, signal handling, and shutdown coordination
+**TCP Server Thread**: Handles Bridge CP connections and message processing
+**Discovery Service Thread**: Manages Discovery Service communication and keepalives
+**Decision Engine Thread**: Processes offload requests and makes allocation decisions (optional async processing)
 
-### 9.2 State Management
+### 9.3 Algorithm Research Framework
 
-**Session Tracking**:
-- Maintain active session registry by request_id
-- Track VHC-MEC assignments
-- Implement session timeout detection
+**Pluggable Design**: The decision algorithm is completely separated from the core OM infrastructure. Researchers can modify algorithm behavior by editing a single file containing configuration variables and decision logic.
 
-**Resource Database**:
-- Query Discovery Service for real-time component availability
-- Task type compatibility matrix from static configuration
-- System capacity monitoring
+**Algorithm Configuration Variables**: All algorithm parameters are defined as module-level constants that can be easily modified:
+- Auto-approval mode toggle
+- MEC selection strategies (random, first-available, least-loaded)
+- Load balancing parameters
+- Discovery Service query intervals
+- Future research extensions (latency optimization, task affinity)
 
-### 9.3 Integration Points
+**Algorithm Statistics**: The algorithm tracks comprehensive statistics for research analysis including decision counts, approval rates, assignment patterns, and timing metrics.
 
-**Discovery Service Client**:
-- Register OM component with Discovery Service
-- Provide static global configuration JSON to Discovery Service
-- Implement component discovery mechanism (new protocol messages needed)
-- Maintain keepalive heartbeat
+### 9.4 Resource State Management
 
-**Configuration Management**:
-- Load static JSON configuration from file (path configurable via CLI)
-- Validate configuration structure and required fields
-- No runtime configuration changes
+**Thread-Safe Operations**: All resource state (available MECs, active sessions, MEC assignments) is protected by threading locks to ensure consistency across concurrent operations.
 
-**Logging and Monitoring**:
-- Structured logging for decision audit trails
-- Performance metrics collection
-- System health monitoring
-- Detailed error logging for research analysis
+**Component Discovery Integration**: The OM maintains real-time awareness of system components through Discovery Service queries and keepalive monitoring. Component state changes trigger resource allocation updates.
 
-### 9.4 Python-Specific Implementation Details
+**Session Lifecycle Tracking**: Each offloading session is tracked from initial request through completion or failure, with full audit trails for research analysis.
 
-**Discovery Protocol Implementation**:
-- Custom Python protocol encoder/decoder
-- TCP socket management for Discovery Service connection
-- Component type and response code enumerations
-- Message validation and error handling
+### 9.5 Reliability Mechanisms
 
-**Async/Threading Architecture**:
-- Separate threads for Bridge CP server and Discovery Service client
-- Thread-safe resource state management
-- Graceful shutdown coordination across threads
+**Message Acknowledgments**: All control plane messages implement hop-by-hop reliability with immediate ACK responses and sequence number tracking.
 
-**Error Handling Framework**:
-- Centralized error logging with context
-- Graceful shutdown on critical errors
-- Exception handling with detailed stack traces
+**Connection Recovery**: The OM handles Bridge CP connection failures gracefully, maintaining session state during brief disconnections and logging degraded operations.
+
+**Discovery Service Resilience**: Connection to the Discovery Service is maintained through automatic reconnection attempts and exponential backoff on failures.
 
 ---
 
-**Implementation Priority Order**:
-1. Basic TCP server and JSON message handling (auto-approve algorithm)
-2. Static configuration loading and validation
-3. Discovery Service registration and Python protocol implementation
-4. Session state management and timeouts
-5. Component discovery mechanism (requires protocol extension)
-6. Advanced resource optimization algorithms
-7. Multiple bridge connection handling
-8. Comprehensive error handling and graceful shutdown
+## 10. File Structure and Responsibilities
+
+### 10.1 Core Application Files
+
+**main.py**: Application entry point and lifecycle management
+- Command-line argument parsing (config file path, log level)
+- Signal handler registration for graceful shutdown
+- Main application coordination and shutdown sequencing
+- Logging system initialization and configuration
+
+**om_server.py**: TCP server for Bridge CP connections
+- Multi-threaded TCP server listening on port 8100
+- JSON message parsing and validation
+- Bridge CP connection state management
+- Message routing between Bridge CP and decision engine
+- ACK mechanism implementation for hop-by-hop reliability
+
+**decision_engine.py**: Core resource allocation logic
+- Session state management and tracking
+- Resource constraint validation (task compatibility, session limits)
+- Integration with pluggable algorithm framework
+- MEC assignment and session lifecycle management
+- Thread-safe operations for concurrent access
+
+**algorithm.py**: Pluggable decision algorithm (research modification point)
+- Algorithm configuration constants (auto-approval, MEC selection strategy)
+- Discovery Service query interval configuration
+- Decision-making logic implementation
+- Statistics collection for research analysis
+- Easy modification interface for algorithm research
+
+### 10.2 Configuration and Management
+
+**config_manager.py**: Configuration loading and validation
+- JSON configuration file parsing and validation
+- Task configuration structure validation
+- Configuration parameter access methods
+- Global configuration JSON string generation for Discovery Service
+
+**logger_config.py**: Logging system configuration
+- Structured logging format for research diagnostics
+- Multi-level logging (console and file output)
+- Component-based logger naming (OM.server, OM.decision, etc.)
+- Timestamp formatting and log level management
+
+### 10.3 Discovery Service Integration
+
+**discovery_client.py**: Discovery Service communication
+- Text-based protocol encoder/decoder for Discovery Service messages
+- Component registration and keepalive management
+- Component discovery and state tracking (MECs, VHCs)
+- Connection failure handling and retry logic
+- Periodic and on-demand component queries
+- Thread-safe resource state updates
+
+### 10.4 Configuration Files
+
+**config.json**: Global system configuration
+- Available task definitions with input/output message types
+- System limits (max concurrent sessions, default timeouts)
+- Task compatibility information for routing decisions
+- Static configuration that doesn't change during runtime
+
+**om.log**: Runtime log file
+- Comprehensive operational logging for debugging and research
+- All Discovery Service interactions and Bridge CP communications
+- Decision algorithm choices and resource allocation changes
+- Error conditions and shutdown sequences
+
+### 10.5 Implementation Characteristics
+
+**Research-Oriented Design**: The entire implementation prioritizes ease of modification for algorithm research over complex optimization. The algorithm file is designed to be the only file researchers need to modify.
+
+**Comprehensive Logging**: Every significant operation is logged with structured format for post-experiment analysis. All message exchanges are logged with full content for debugging.
+
+**Error Transparency**: Rather than attempting automatic recovery, the system provides detailed diagnostic information and graceful shutdown on errors to aid in debugging and system understanding.
+
+**Thread Safety**: All shared state is properly protected for multi-threaded operation while maintaining simple, readable code structure.
+
+**Configuration Driven**: All operational parameters are externalized to configuration files or algorithm constants, avoiding hard-coded values in the core infrastructure.
 
 This specification provides the foundation for implementing an OM that is fully compatible with the Bridge Control Plane and the broader modular gateway offloading system, with emphasis on research-oriented logging and diagnostics.

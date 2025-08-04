@@ -176,3 +176,8 @@ class DecisionEngine:
             if old_mecs != mec_list:
                 self.logger.info(f"MEC availability updated: {len(mec_list)} available MECs")
                 self.logger.debug(f"Available MECs: {sorted(mec_list)}")
+    
+    def update_available_resources(self, mec_list: Set[str]):
+        """Update available resources - callback method for Discovery Service integration"""
+        self.logger.debug(f"Received resource update callback with {len(mec_list)} MECs")
+        self.update_available_mecs(mec_list)

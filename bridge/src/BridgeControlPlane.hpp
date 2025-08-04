@@ -101,7 +101,9 @@ private:
     std::thread discovery_keepalive_thread_;
     std::chrono::steady_clock::time_point last_discovery_keepalive_;
     
-    // OM connection
+    // OM connection (now dynamic from Discovery Service)
+    std::string om_host_;  // Set from Discovery Service response
+    uint16_t om_port_;     // Set from Discovery Service response
     std::unique_ptr<gateway::TcpClientTransport> om_transport_;
     std::atomic<bool> om_connected_;
     std::thread om_connection_thread_;

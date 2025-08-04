@@ -27,6 +27,10 @@ MEC_SELECTION_STRATEGY = "FIRST_AVAILABLE"  # Options: "FIRST_AVAILABLE", "LEAST
 # Logging level for algorithm decisions
 ALGORITHM_LOG_LEVEL = "INFO"  # Options: "DEBUG", "INFO", "WARNING"
 
+# Discovery Service query configuration
+DISCOVERY_QUERY_INTERVAL_SECONDS = 10  # How often to query for component updates
+DISCOVERY_INITIAL_QUERY_DELAY = 2      # Delay before first query after registration
+
 # Future research parameters (currently unused but available for algorithm extensions)
 ENABLE_LOAD_BALANCING = False
 ENABLE_LATENCY_OPTIMIZATION = False
@@ -57,6 +61,7 @@ class OffloadingAlgorithm:
         self.logger.info(f"Algorithm initialized: {ALGORITHM_NAME} v{ALGORITHM_VERSION}")
         self.logger.info(f"Auto-approve mode: {AUTO_APPROVE_ALL_REQUESTS}")
         self.logger.info(f"MEC selection: {'RANDOM' if USE_RANDOM_MEC_SELECTION else MEC_SELECTION_STRATEGY}")
+        self.logger.info(f"Discovery query interval: {DISCOVERY_QUERY_INTERVAL_SECONDS}s")
         
         # Algorithm statistics for research
         self.decisions_made = 0
@@ -184,6 +189,7 @@ class OffloadingAlgorithm:
             "configuration": {
                 "auto_approve_all": AUTO_APPROVE_ALL_REQUESTS,
                 "random_mec_selection": USE_RANDOM_MEC_SELECTION,
-                "mec_selection_strategy": MEC_SELECTION_STRATEGY
+                "mec_selection_strategy": MEC_SELECTION_STRATEGY,
+                "discovery_query_interval": DISCOVERY_QUERY_INTERVAL_SECONDS
             }
         }
