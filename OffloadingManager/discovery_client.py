@@ -12,7 +12,8 @@ from enum import Enum
 from dataclasses import dataclass
 
 from config_manager import ConfigManager
-from algorithm import DISCOVERY_QUERY_INTERVAL_SECONDS, DISCOVERY_INITIAL_QUERY_DELAY
+from algorithm import (DISCOVERY_QUERY_INTERVAL_SECONDS, DISCOVERY_INITIAL_QUERY_DELAY,
+                      DISCOVERY_KEEPALIVE_MAX_FAILURES, DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS)
 
 
 class ComponentType(Enum):
@@ -244,6 +245,7 @@ class DiscoveryClient:
     def _keepalive_loop(self):
         """Background thread for sending keepalives"""
         keepalive_interval = 5.0  # 5 seconds as per protocol
+        consecutive_failures = 0
         
         self.logger.info("Keepalive thread started - sending pings every 5 seconds")
         
@@ -254,18 +256,35 @@ class DiscoveryClient:
                 self._send_message(ping_msg)
                 
                 # Receive response
-                response = self._receive_message(timeout=10.0)
+                response = self._receive_message(timeout=DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS)
                 if response and response.startswith("DISC:PON;OK;"):
                     self.logger.debug("Keepalive successful")
+                    consecutive_failures = 0  # Reset failure counter on success
                 else:
-                    self.logger.warning(f"Unexpected keepalive response: {response}")
+                    consecutive_failures += 1
+                    self.logger.warning(f"Unexpected keepalive response: {response} (failure {consecutive_failures}/{DISCOVERY_KEEPALIVE_MAX_FAILURES})")
+                    
+                    if consecutive_failures >= DISCOVERY_KEEPALIVE_MAX_FAILURES:
+                        self.logger.error(f"Discovery Service keepalive failed {DISCOVERY_KEEPALIVE_MAX_FAILURES} times - triggering OM shutdown")
+                        self.shutdown_event.set()  # Trigger main application shutdown
+                        break
                     
             except Exception as e:
-                self.logger.error(f"Keepalive error: {e}", exc_info=True)
-                break
+                consecutive_failures += 1
+                self.logger.error(f"Keepalive error: {e} (failure {consecutive_failures}/{DISCOVERY_KEEPALIVE_MAX_FAILURES})", exc_info=True)
                 
-            # Wait for next keepalive interval
-            self.shutdown_event.wait(keepalive_interval)
+                if consecutive_failures >= DISCOVERY_KEEPALIVE_MAX_FAILURES:
+                    self.logger.error(f"Discovery Service connection failed {DISCOVERY_KEEPALIVE_MAX_FAILURES} times - triggering OM shutdown")
+                    self.shutdown_event.set()  # Trigger main application shutdown
+                    break
+                    
+            # Wait for next keepalive interval (but break immediately if shutdown requested)
+            if self.shutdown_event.wait(keepalive_interval):
+                break
+        
+        # Mark as disconnected when keepalive loop exits
+        self.connected = False
+        self.registered = False
         
         self.logger.info("Keepalive thread stopped")
         

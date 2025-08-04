@@ -36,6 +36,12 @@ ENABLE_LOAD_BALANCING = False
 ENABLE_LATENCY_OPTIMIZATION = False
 ENABLE_TASK_AFFINITY = False
 
+# Discovery Service connection reliability
+DISCOVERY_KEEPALIVE_MAX_FAILURES = 3  # Number of consecutive failures before shutdown
+DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS = 10.0  # Timeout for keepalive responses
+DISCOVERY_CONNECTION_RETRY_ATTEMPTS = 3  # Number of reconnection attempts
+DISCOVERY_RECONNECT_DELAY_SECONDS = 5.0  # Delay between reconnection attempts
+
 # ===================================================================
 
 

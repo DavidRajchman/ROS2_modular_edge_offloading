@@ -2618,3 +2618,244 @@ Traceback (most recent call last):
   File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
     raise DiscoveryProtocolError(f"Send failed: {e}")
 discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:27.636] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:27.636] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:27.636] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:27.636] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:37.637] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:37.637] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:37.637] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:37.637] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:47.638] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:47.639] [ERROR] [discovery   ] [_query_components] - Error querying M components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:47.639] [ERROR] [discovery   ] [_send_message  ] - Failed to send message to Discovery Service: [Errno 32] Broken pipe
+[2025-08-04 22:17:47.639] [ERROR] [discovery   ] [_query_components] - Error querying V components: Send failed: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 396, in _send_message
+    self.socket.send(message_bytes)
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 302, in _query_components
+    self._send_message(query_msg)
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 400, in _send_message
+    raise DiscoveryProtocolError(f"Send failed: {e}")
+discovery_client.DiscoveryProtocolError: Send failed: [Errno 32] Broken pipe
+[2025-08-04 22:17:49.112] [INFO ] [main        ] [_signal_handler] - Signal handler triggered: Received signal SIGINT
+[2025-08-04 22:17:49.112] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Received signal SIGINT
+[2025-08-04 22:17:49.114] [INFO ] [server      ] [stop           ] - Stopping OM server
+[2025-08-04 22:17:49.114] [INFO ] [discovery   ] [_query_loop    ] - Component query thread stopped
+[2025-08-04 22:17:49.114] [INFO ] [server      ] [stop           ] - Server socket closed
+[2025-08-04 22:17:49.114] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 22:17:49.114] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 22:17:49.114] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 22:17:49.177] [INFO ] [main        ] [start          ] - Shutdown event received, initiating graceful shutdown
+[2025-08-04 22:17:52.402] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:17:52.402] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:17:52.402] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:17:52.402] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:17:52.402] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:17:52.402] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:17:52.402] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:17:52.403] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:17:52.403] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:17:52.403] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:17:52.403] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:17:52.403] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:17:52.403] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:17:52.403] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:17:52.403] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:17:52.403] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:17:52.403] [INFO ] [discovery   ] [_send_registration] - Sending registration request to Discovery Service
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [_parse_registration_response] - Discovery Service detected OM IP as: {"available_tasks":[{"task_id":1,"task_name":"STRING_PROCESSING","input_message_types":[1],"output_message_types":[1]},{"task_id":2,"task_name":"LASER_SCAN_PROCESSING","input_message_types":[11],"output_message_types":[11]},{"task_id":3,"task_name":"STRING_TEST_PIPELINE","input_message_types":[201],"output_message_types":[202]},{"task_id":4,"task_name":"BASIC_DATA_PROCESSING","input_message_types":[1,2,3,4],"output_message_types":[1,2,3,4]},{"task_id":5,"task_name":"SENSOR_FUSION","input_message_types":[11,1],"output_message_types":[11,1]},{"task_id":6,"task_name":"COMPLETE_TEST_SUITE","input_message_types":[1,11,201],"output_message_types":[1,11,202]}],"default_session_timeout":300,"max_concurrent_sessions":100}
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [_parse_registration_response] - Successfully registered with Discovery Service
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [connect_and_register] - Registration completed successfully
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread started - sending pings every 5 seconds
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [_query_loop    ] - Component query thread started - initial delay 2s
+[2025-08-04 22:17:52.404] [INFO ] [discovery   ] [_start_background_threads] - Discovery Service background threads started
+[2025-08-04 22:17:52.405] [INFO ] [main        ] [start          ] - Successfully registered with Discovery Service
+[2025-08-04 22:17:52.405] [INFO ] [main        ] [start          ] - Starting OM TCP server...
+[2025-08-04 22:17:52.405] [INFO ] [algorithm   ] [__init__       ] - Algorithm initialized: AUTO_APPROVE_V1 v1.0.0
+[2025-08-04 22:17:52.405] [INFO ] [algorithm   ] [__init__       ] - Auto-approve mode: True
+[2025-08-04 22:17:52.405] [INFO ] [algorithm   ] [__init__       ] - MEC selection: RANDOM
+[2025-08-04 22:17:52.405] [INFO ] [algorithm   ] [__init__       ] - Discovery query interval: 10s
+[2025-08-04 22:17:52.405] [INFO ] [decision    ] [__init__       ] - Decision engine initialized
+[2025-08-04 22:17:52.405] [INFO ] [server      ] [start          ] - Starting OM TCP server on 0.0.0.0:8100
+[2025-08-04 22:17:52.405] [INFO ] [main        ] [start          ] - OM Server started on localhost:8100
+[2025-08-04 22:17:52.405] [INFO ] [main        ] [start          ] - === OM Ready for Bridge CP connections ===
+[2025-08-04 22:17:52.405] [INFO ] [server      ] [start          ] - OM Server listening for Bridge CP connections
+[2025-08-04 22:18:01.825] [INFO ] [server      ] [start          ] - New Bridge CP connection from ('192.168.65.10', 44922)
+[2025-08-04 22:18:01.825] [INFO ] [server      ] [_handle_connection] - Handling Bridge CP connection 0 from ('192.168.65.10', 44922)
+[2025-08-04 22:18:40.786] [INFO ] [main        ] [_signal_handler] - Signal handler triggered: Received signal SIGINT
+[2025-08-04 22:18:40.786] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Received signal SIGINT
+[2025-08-04 22:18:40.786] [INFO ] [server      ] [stop           ] - Stopping OM server
+[2025-08-04 22:18:40.786] [INFO ] [server      ] [stop           ] - Closed connection 0
+[2025-08-04 22:18:40.786] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread stopped
+[2025-08-04 22:18:40.787] [INFO ] [server      ] [stop           ] - Server socket closed
+[2025-08-04 22:18:40.787] [INFO ] [discovery   ] [_query_loop    ] - Component query thread stopped
+[2025-08-04 22:18:40.787] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 22:18:40.787] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 22:18:40.787] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 22:18:40.793] [INFO ] [main        ] [start          ] - Shutdown event received, initiating graceful shutdown
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:24:49.593] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:24:49.593] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:24:49.593] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:24:49.593] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:24:50.769] [ERROR] [discovery   ] [connect_and_register] - Failed to connect and register with Discovery Service: [Errno 113] No route to host
+Traceback (most recent call last):
+  File "/home/ubuntu/OffloadingManager/discovery_client.py", line 119, in connect_and_register
+    self.socket.connect((self.host, self.port))
+OSError: [Errno 113] No route to host
+[2025-08-04 22:24:50.770] [ERROR] [main        ] [_shutdown_with_error] - CRITICAL ERROR - Discovery Service registration failed
+[2025-08-04 22:24:50.770] [INFO ] [main        ] [shutdown       ] - Shutdown initiated: Discovery Service registration failed
+[2025-08-04 22:24:50.771] [INFO ] [discovery   ] [disconnect     ] - Disconnecting from Discovery Service
+[2025-08-04 22:24:50.771] [INFO ] [discovery   ] [disconnect     ] - Discovery Service disconnection complete
+[2025-08-04 22:24:50.771] [INFO ] [main        ] [shutdown       ] - === OM Shutdown Complete ===
+[2025-08-04 22:25:03.555] [INFO ] [main        ] [start          ] - === Offloading Manager Starting ===
+[2025-08-04 22:25:03.555] [INFO ] [main        ] [start          ] - Configuration file: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [load_config    ] - Loading configuration from: /home/ubuntu/OffloadingManager/config.json
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [load_config    ] - Configuration validation successful
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] - === Configuration Summary ===
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] - Available tasks: 6
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 1: STRING_PROCESSING (in: [1], out: [1])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 2: LASER_SCAN_PROCESSING (in: [11], out: [11])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 3: STRING_TEST_PIPELINE (in: [201], out: [202])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 4: BASIC_DATA_PROCESSING (in: [1, 2, 3, 4], out: [1, 2, 3, 4])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 5: SENSOR_FUSION (in: [11, 1], out: [11, 1])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] -   Task 6: COMPLETE_TEST_SUITE (in: [1, 11, 201], out: [1, 11, 202])
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] - Default session timeout: 300 seconds
+[2025-08-04 22:25:03.555] [INFO ] [config      ] [_log_config_summary] - Max concurrent sessions: 100
+[2025-08-04 22:25:03.556] [INFO ] [main        ] [start          ] - Configuration loaded successfully
+[2025-08-04 22:25:03.556] [INFO ] [main        ] [start          ] - Available tasks: 6
+[2025-08-04 22:25:03.556] [INFO ] [main        ] [start          ] - Max concurrent sessions: 100
+[2025-08-04 22:25:03.556] [INFO ] [main        ] [start          ] - Initializing Discovery Service client...
+[2025-08-04 22:25:03.556] [INFO ] [discovery   ] [__init__       ] - Discovery client initialized for 192.168.65.5:9090
+[2025-08-04 22:25:03.556] [INFO ] [main        ] [start          ] - Registering with Discovery Service...
+[2025-08-04 22:25:03.556] [INFO ] [discovery   ] [connect_and_register] - Connecting to Discovery Service...
+[2025-08-04 22:25:03.556] [INFO ] [discovery   ] [connect_and_register] - Connected to Discovery Service at 192.168.65.5:9090
+[2025-08-04 22:25:03.556] [INFO ] [discovery   ] [_send_registration] - Sending registration request to Discovery Service
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [_parse_registration_response] - Discovery Service detected OM IP as: {"available_tasks":[{"task_id":1,"task_name":"STRING_PROCESSING","input_message_types":[1],"output_message_types":[1]},{"task_id":2,"task_name":"LASER_SCAN_PROCESSING","input_message_types":[11],"output_message_types":[11]},{"task_id":3,"task_name":"STRING_TEST_PIPELINE","input_message_types":[201],"output_message_types":[202]},{"task_id":4,"task_name":"BASIC_DATA_PROCESSING","input_message_types":[1,2,3,4],"output_message_types":[1,2,3,4]},{"task_id":5,"task_name":"SENSOR_FUSION","input_message_types":[11,1],"output_message_types":[11,1]},{"task_id":6,"task_name":"COMPLETE_TEST_SUITE","input_message_types":[1,11,201],"output_message_types":[1,11,202]}],"default_session_timeout":300,"max_concurrent_sessions":100}
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [_parse_registration_response] - Successfully registered with Discovery Service
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [connect_and_register] - Registration completed successfully
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread started - sending pings every 5 seconds
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [_query_loop    ] - Component query thread started - initial delay 2s
+[2025-08-04 22:25:03.557] [INFO ] [discovery   ] [_start_background_threads] - Discovery Service background threads started
+[2025-08-04 22:25:03.557] [INFO ] [main        ] [start          ] - Successfully registered with Discovery Service
+[2025-08-04 22:25:03.557] [INFO ] [main        ] [start          ] - Starting OM TCP server...
+[2025-08-04 22:25:03.557] [INFO ] [algorithm   ] [__init__       ] - Algorithm initialized: AUTO_APPROVE_V1 v1.0.0
+[2025-08-04 22:25:03.557] [INFO ] [algorithm   ] [__init__       ] - Auto-approve mode: True
+[2025-08-04 22:25:03.557] [INFO ] [algorithm   ] [__init__       ] - MEC selection: RANDOM
+[2025-08-04 22:25:03.558] [INFO ] [algorithm   ] [__init__       ] - Discovery query interval: 10s
+[2025-08-04 22:25:03.558] [INFO ] [decision    ] [__init__       ] - Decision engine initialized
+[2025-08-04 22:25:03.558] [INFO ] [server      ] [start          ] - Starting OM TCP server on 0.0.0.0:8100
+[2025-08-04 22:25:03.558] [INFO ] [main        ] [start          ] - OM Server started on localhost:8100
+[2025-08-04 22:25:03.558] [INFO ] [main        ] [start          ] - === OM Ready for Bridge CP connections ===
+[2025-08-04 22:25:03.558] [INFO ] [server      ] [start          ] - OM Server listening for Bridge CP connections
+[2025-08-04 22:25:16.075] [INFO ] [server      ] [start          ] - New Bridge CP connection from ('192.168.65.10', 33446)
+[2025-08-04 22:25:16.075] [INFO ] [server      ] [_handle_connection] - Handling Bridge CP connection 0 from ('192.168.65.10', 33446)
+[2025-08-04 22:25:16.083] [INFO ] [server      ] [_handle_connection] - Connection 0 closed by peer
+[2025-08-04 22:25:16.083] [INFO ] [server      ] [_handle_connection] - Connection 0 cleaned up
+[2025-08-04 22:25:53.563] [WARNING] [discovery   ] [_receive_message] - Received empty data from Discovery Service
+[2025-08-04 22:25:53.563] [WARNING] [discovery   ] [_keepalive_loop] - Unexpected keepalive response: None (failure 1/3)
+[2025-08-04 22:25:55.561] [WARNING] [discovery   ] [_receive_message] - Received empty data from Discovery Service
+[2025-08-04 22:25:55.562] [WARNING] [discovery   ] [_query_components] - No response to M query
+[2025-08-04 22:25:55.562] [WARNING] [discovery   ] [_receive_message] - Received empty data from Discovery Service
+[2025-08-04 22:25:55.562] [WARNING] [discovery   ] [_query_components] - No response to V query
+[2025-08-04 22:25:58.563] [WARNING] [discovery   ] [_receive_message] - Received empty data from Discovery Service
+[2025-08-04 22:25:58.564] [WARNING] [discovery   ] [_keepalive_loop] - Unexpected keepalive response: None (failure 2/3)
+[2025-08-04 22:26:03.564] [WARNING] [discovery   ] [_receive_message] - Received empty data from Discovery Service
+[2025-08-04 22:26:03.564] [WARNING] [discovery   ] [_keepalive_loop] - Unexpected keepalive response: None (failure 3/3)
+[2025-08-04 22:26:03.564] [ERROR] [discovery   ] [_keepalive_loop] - Discovery Service keepalive failed 3 times - triggering OM shutdown
+[2025-08-04 22:26:03.564] [INFO ] [discovery   ] [_keepalive_loop] - Keepalive thread stopped
+[2025-08-04 22:26:03.564] [INFO ] [discovery   ] [_query_loop    ] - Component query thread stopped
+[2025-08-04 22:26:03.568] [INFO ] [main        ] [start          ] - Shutdown event received, initiating graceful shutdown
