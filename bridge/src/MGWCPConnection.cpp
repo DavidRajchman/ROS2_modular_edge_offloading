@@ -88,6 +88,10 @@ void MGWCPConnection::connection_thread_func() {
                 buffer[bytes_received] = '\0';
                 std::string json_str(reinterpret_cast<char*>(buffer.data()), bytes_received);
                 
+                // LOG ALL INCOMING CP MESSAGES AT INFO LEVEL
+                logger.Info("MGWCPConnection.cpp: [INCOMING CP MESSAGE] Connection {}: {}", connection_id_, json_str);
+
+
                 try {
                     nlohmann::json message = nlohmann::json::parse(json_str);
                     handle_received_message(message);
