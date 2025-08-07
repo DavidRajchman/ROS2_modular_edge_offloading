@@ -83,13 +83,13 @@ void MGWCPConnection::connection_thread_func() {
         // Check for incoming data with timeout
         if (transport_->data_available(1000)) { // 1 second timeout
             int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
-            
+            logger.Debug("MGWCPConnection.cpp: READ SOME DATA ");
             if (bytes_received > 0) {
                 buffer[bytes_received] = '\0';
                 std::string json_str(reinterpret_cast<char*>(buffer.data()), bytes_received);
                 
                 // LOG ALL INCOMING CP MESSAGES AT INFO LEVEL
-                logger.Info("MGWCPConnection.cpp: [INCOMING CP MESSAGE] Connection {}: {}", connection_id_, json_str);
+                logger.Debug("MGWCPConnection.cpp: [INCOMING CP MESSAGE] Connection {}: {}", connection_id_, json_str);
 
 
                 try {
