@@ -123,7 +123,13 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
         return;
     }
 
-
+    int message_code = message["message_code"];
+    uint64_t seq_num = message.value("sequence_number", 0);
+    //if ack message, than do not further checking procesing, just process the ack
+    if (message_code == 900) {
+        handle_ack(message["payload"]);
+        return;
+    }
     
     // Extract component_id and set it if this is the first message
     std::string msg_component_id = message["component_id"];
@@ -142,8 +148,7 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
         return;
     }
     
-    int message_code = message["message_code"];
-    uint64_t seq_num = message.value("sequence_number", 0);
+
     
     // Send ACK for all non-ACK messages
     if (message_code != 900) {
