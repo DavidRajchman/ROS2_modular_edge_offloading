@@ -20,7 +20,8 @@ void configure_logger() {
     
     // Add file appender for bridge logs
     sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
-    
+    sink->appenders().push_back(std::make_shared<CppLogging::ConsoleAppender>());
+
     // Configure the bridge logger
     CppLogging::Config::ConfigLogger("bridge", sink);
     
