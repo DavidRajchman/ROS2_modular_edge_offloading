@@ -35,7 +35,7 @@ class VHCNode(Node):
                                f"subscribing to '{self.subscribe_topic_name}'.")
         
         # Request offloading after a short delay to ensure all services are ready
-        self.create_timer(2.0, self.request_offloading_once)
+        self.create_timer(10.0, self.request_offloading_once)
 
     def get_current_timestamp_ns(self):
         now_rclpy_time = self.get_clock().now()
