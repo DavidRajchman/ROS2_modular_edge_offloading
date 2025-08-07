@@ -397,7 +397,7 @@ void MGWCPConnection::send_ack(uint64_t ack_sequence_number) {
     }
     
     nlohmann::json ack_message = {
-        {"component_id", "15:10"}, // Bridge component ID
+        {"component_id", component_id_}, // Use the sender's component ID, not Bridge's
         {"message_code", 900},
         {"message_type", "ACK"},
         {"sequence_number", 0}, // ACKs don't need their own sequence number
