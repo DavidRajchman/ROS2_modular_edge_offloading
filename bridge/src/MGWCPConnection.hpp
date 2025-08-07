@@ -38,7 +38,8 @@ public:
     using DataPlaneConnectCallback = std::function<bool(const std::string&, const std::string&, int)>;
     
     MGWCPConnection(uint32_t connection_id,
-                   std::unique_ptr<gateway::TcpClientTransport> transport,
+                   std::shared_ptr<gateway::TcpServerTransport> server_transport,
+                   uint32_t transport_client_id,
                    const std::string& client_ip,
                    std::shared_ptr<SessionManager> session_manager,
                    MessageForwarder message_forwarder,
@@ -92,7 +93,8 @@ private:
     
     // Connection details
     uint32_t connection_id_;
-    std::unique_ptr<gateway::TcpClientTransport> transport_;
+    std::shared_ptr<gateway::TcpServerTransport> server_transport_;
+    uint32_t transport_client_id_;
     std::string client_ip_;
     std::string component_id_;  // Set from first valid message
     

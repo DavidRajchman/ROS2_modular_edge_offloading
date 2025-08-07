@@ -1,0 +1,51 @@
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Bridge Control Plane starting...
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Component ID: 15:10
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: OM Port: 8100
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Discovery Service: 192.168.65.5:9090
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: MGWCP Server Port: 7000
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Registered signal handlers for graceful shutdown and crash handling
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Creating Bridge Control Plane instance...
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - RoutingTable: Initialized and reserved space for 1000 potential key entries.
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane constructed
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - main.cpp: Starting Bridge Control Plane...
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Starting Bridge Control Plane...
+2025-08-07T17:03:25.019Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Registering with Discovery Service at 192.168.65.5:9090
+2025-08-07T17:03:25.020Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Sent Discovery Service registration request
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: OM connection target received: 192.168.65.4:8100
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 1 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 2 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 3 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 4 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 5 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Parsed task 6 () with 0 input types and 0 output types
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - GlobalConfig: Successfully parsed 6 tasks, timeout=300, max_sessions=100
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Global configuration loaded successfully
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Discovery Service registration successful. Assigned ID: 5:1
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Successfully registered with Discovery Service
+2025-08-07T17:03:25.021Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Connecting to OM at 192.168.65.4:8100
+2025-08-07T17:03:25.021Z [0x2C0F9640] INFO  bridge - BridgeControlPlane.cpp: Discovery Service keepalive thread started
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Successfully connected to OM at 192.168.65.4:8100
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Starting MGWCP server on port 7000
+2025-08-07T17:03:25.022Z [0x2B8F8640] INFO  bridge - BridgeControlPlane.cpp: OM connection thread started
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: MGWCP server started successfully
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Started periodic maintenance tasks
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane started successfully
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - main.cpp: Bridge Control Plane started successfully
+2025-08-07T17:03:25.022Z [0x2B0F7640] INFO  bridge - BridgeControlPlane.cpp: MGWCP server thread started
+2025-08-07T17:03:25.022Z [0x2CA20F00] INFO  bridge - main.cpp: Bridge Control Plane is operational. Waiting for shutdown signal...
+2025-08-07T17:03:25.022Z [0x2A8F6640] INFO  bridge - BridgeControlPlane.cpp: Maintenance thread started
+2025-08-07T17:03:30.022Z [0x2C0F9640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
+2025-08-07T17:03:34.991Z [0x2CA20F00] INFO  bridge - main.cpp: Received signal 15 (SIGTERM). Initiating graceful shutdown...
+2025-08-07T17:03:34.991Z [0x2CA20F00] INFO  bridge - main.cpp: Stopping Bridge Control Plane...
+2025-08-07T17:03:34.991Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Stopping Bridge Control Plane...
+2025-08-07T17:03:35.022Z [0x2C0F9640] INFO  bridge - BridgeControlPlane.cpp: Discovery Service keepalive thread stopped
+2025-08-07T17:03:35.022Z [0x2A8F6640] INFO  bridge - BridgeControlPlane.cpp: Maintenance thread stopped
+2025-08-07T17:03:35.031Z [0x2B0F7640] INFO  bridge - BridgeControlPlane.cpp: MGWCP server thread stopped
+2025-08-07T17:03:35.031Z [0x2B8F8640] ERROR bridge - BridgeControlPlane.cpp: OM connection error
+2025-08-07T17:03:35.031Z [0x2B8F8640] INFO  bridge - BridgeControlPlane.cpp: OM connection thread stopped
+2025-08-07T17:03:35.031Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane stopped
+2025-08-07T17:03:35.071Z [0x2CA20F00] INFO  bridge - main.cpp: Shutdown requested by signal
+2025-08-07T17:03:35.071Z [0x2CA20F00] INFO  bridge - main.cpp: Final status - Discovery connected: true, OM connected: false, MGWCP connections: 0
+2025-08-07T17:03:35.071Z [0x2CA20F00] INFO  bridge - main.cpp: Destroying Bridge Control Plane instance...
+2025-08-07T17:03:35.071Z [0x2CA20F00] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane destructor called
+2025-08-07T17:03:35.071Z [0x2CA20F00] INFO  bridge - main.cpp: Bridge Control Plane shutdown completed successfully

@@ -3125,3 +3125,7 @@ NameError: name 'DISCOVERY_REGISTRATION_TIMEOUT_MINUTES' is not defined
 [2025-08-07 14:57:08.969] [INFO ] [main        ] [start          ] - OM Server started on localhost:8100
 [2025-08-07 14:57:08.969] [INFO ] [main        ] [start          ] - === OM Ready for Bridge CP connections ===
 [2025-08-07 14:57:08.969] [INFO ] [server      ] [start          ] - OM Server listening for Bridge CP connections
+[2025-08-07 17:03:25.022] [INFO ] [server      ] [start          ] - New Bridge CP connection from ('192.168.65.10', 34290)
+[2025-08-07 17:03:25.023] [INFO ] [server      ] [_handle_connection] - Handling Bridge CP connection 0 from ('192.168.65.10', 34290)
+[2025-08-07 17:03:35.031] [INFO ] [server      ] [_handle_connection] - Connection 0 closed by peer
+[2025-08-07 17:03:35.032] [INFO ] [server      ] [_handle_connection] - Connection 0 cleaned up

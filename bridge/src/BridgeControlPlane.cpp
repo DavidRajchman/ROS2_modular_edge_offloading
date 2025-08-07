@@ -440,13 +440,11 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
     logger.Info("BridgeControlPlane.cpp: New MGWCP connection from {} (transport ID: {})", 
                client_ip, transport_client_id);
     
-    // Create transport wrapper for this client
-    auto client_transport = std::make_unique<gateway::TcpClientTransport>("", 0);  // Will be managed by server
-    
-    // Create MGWCPConnection
+    // Create MGWCPConnection using the server transport
     auto mgwcp_connection = std::make_unique<MGWCPConnection>(
         next_mgwcp_connection_id_++,
-        std::move(client_transport),
+        std::shared_ptr<gateway::TcpServerTransport>(mgwcp_server_.get(), [](gateway::TcpServerTransport*){}),  // Convert unique_ptr to shared_ptr without taking ownership
+        transport_client_id,  // Pass the client ID
         client_ip,
         session_manager_,
         [this](const std::string& mgwcp_id, const nlohmann::json& msg) {

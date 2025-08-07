@@ -3,13 +3,15 @@
 #include <algorithm>
 
 MGWCPConnection::MGWCPConnection(uint32_t connection_id,
-                               std::unique_ptr<gateway::TcpClientTransport> transport,
+                               std::shared_ptr<gateway::TcpServerTransport> server_transport,
+                               uint32_t transport_client_id,
                                const std::string& client_ip,
                                std::shared_ptr<SessionManager> session_manager,
                                MessageForwarder message_forwarder,
                                DataPlaneConnectCallback dp_connect_callback)
     : connection_id_(connection_id),
-      transport_(std::move(transport)),
+      server_transport_(server_transport),
+      transport_client_id_(transport_client_id),
       client_ip_(client_ip),
       state_(MGWCPConnectionState::CONNECTING),
       dp_port_(0),
@@ -37,8 +39,9 @@ void MGWCPConnection::start() {
         return;
     }
     
-    if (!transport_ || !transport_->is_connected()) {
-        logger.Error("MGWCPConnection.cpp: Transport not connected for connection {}", connection_id_);
+    if (!server_transport_ || !server_transport_->is_client_connected(transport_client_id_)) {
+        logger.Error("MGWCPConnection.cpp: Server transport or client {} not connected for connection {}", 
+                    transport_client_id_, connection_id_);
         return;
     }
     
@@ -57,8 +60,8 @@ void MGWCPConnection::stop() {
         connection_thread_.join();
     }
     
-    if (transport_) {
-        transport_->disconnect();
+    if (server_transport_ && server_transport_->is_client_connected(transport_client_id_)) {
+        server_transport_->disconnect_client(transport_client_id_);
     }
     
     // Clean up sessions for this MGWCP
@@ -79,10 +82,10 @@ void MGWCPConnection::connection_thread_func() {
     
     std::vector<uint8_t> buffer(MAX_MESSAGE_SIZE);
     
-    while (running_.load() && transport_ && transport_->is_connected()) {
+    while (running_.load() && server_transport_ && server_transport_->is_client_connected(transport_client_id_)) {
         // Check for incoming data with timeout
-        if (transport_->data_available(1000)) { // 1 second timeout
-            int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
+        if (server_transport_->data_available_from(transport_client_id_, 1000)) { // 1 second timeout
+            int bytes_received = server_transport_->receive_from(transport_client_id_, buffer.data(), buffer.size() - 1);
             logger.Debug("MGWCPConnection.cpp: READ SOME DATA ");
             if (bytes_received > 0) {
                 buffer[bytes_received] = '\0';
@@ -360,7 +363,7 @@ bool MGWCPConnection::send_dp_connection_confirmed() {
 void MGWCPConnection::send_reliable_message(nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
-    if (!transport_ || !transport_->is_connected()) {
+    if (!server_transport_ || !server_transport_->is_client_connected(transport_client_id_)) {
         logger.Error("MGWCPConnection.cpp: Cannot send message to '{}' - not connected", component_id_);
         return;
     }
@@ -376,7 +379,7 @@ void MGWCPConnection::send_reliable_message(nlohmann::json& message) {
         pending_acks_[seq_num] = {message, std::chrono::steady_clock::now(), 0};
     }
     
-    if (!transport_->send_data(data.data(), data.size())) {
+    if (!server_transport_->send_to(transport_client_id_, data.data(), data.size())) {
         logger.Error("MGWCPConnection.cpp: Failed to send message to '{}'", component_id_);
         std::lock_guard<std::mutex> lock(pending_acks_mutex_);
         pending_acks_.erase(seq_num);
@@ -388,7 +391,7 @@ void MGWCPConnection::send_reliable_message(nlohmann::json& message) {
 void MGWCPConnection::send_ack(uint64_t ack_sequence_number) {
     CppLogging::Logger logger("bridge");
     
-    if (!transport_ || !transport_->is_connected()) {
+    if (!server_transport_ || !server_transport_->is_client_connected(transport_client_id_)) {
         logger.Error("MGWCPConnection.cpp: Cannot send ACK to '{}' - not connected", component_id_);
         return;
     }
@@ -406,7 +409,7 @@ void MGWCPConnection::send_ack(uint64_t ack_sequence_number) {
     std::string message_str = ack_message.dump();
     std::vector<uint8_t> data(message_str.begin(), message_str.end());
     
-    if (!transport_->send_data(data.data(), data.size())) {
+    if (!server_transport_->send_to(transport_client_id_, data.data(), data.size())) {
         logger.Error("MGWCPConnection.cpp: Failed to send ACK for seq={} to '{}'", ack_sequence_number, component_id_);
     } else {
         logger.Debug("MGWCPConnection.cpp: Sent ACK for seq={} to '{}'", ack_sequence_number, component_id_);
@@ -452,7 +455,7 @@ void MGWCPConnection::check_for_timeouts() {
                 
                 std::string message_str = it->second.message.dump();
                 std::vector<uint8_t> data(message_str.begin(), message_str.end());
-                transport_->send_data(data.data(), data.size());
+                server_transport_->send_to(transport_client_id_, data.data(), data.size());
             }
         }
     }
