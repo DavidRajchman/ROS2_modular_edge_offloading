@@ -463,9 +463,12 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
     {
         std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);
         mgwcp_connections_[transport_client_id] = std::move(mgwcp_connection);
+        
+        // Start the connection thread to process messages
+        mgwcp_connections_[transport_client_id]->start();
     }
     
-    logger.Info("BridgeControlPlane.cpp: Created MGWCPConnection {} for transport client {}", 
+    logger.Info("BridgeControlPlane.cpp: Created and started MGWCPConnection {} for transport client {}", 
                connection_id, transport_client_id);
 }
 

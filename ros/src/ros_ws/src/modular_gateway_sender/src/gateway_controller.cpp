@@ -250,7 +250,7 @@ void GatewayController::control_thread_func() {
             }
             case State::CONNECTING_TO_BRIDGE:
             {
-                logger_.Info("gateway_controller.cpp: Connecting to Bridge Control Plane at {}:{}", bridge_cp_host_, bridge_cp_port_);
+                logger_.Info("gateway_controller.cpp: State transition: Connecting to Bridge Control Plane at {}:{}", bridge_cp_host_, bridge_cp_port_);
                 
                 bridge_cp_client_ = std::make_unique<BridgeCpClient>();
                 if (bridge_cp_client_->start(
@@ -260,7 +260,9 @@ void GatewayController::control_thread_func() {
                     std::bind(&GatewayController::on_session_denied, this, std::placeholders::_1, std::placeholders::_2))) {
                     
                     // Send the DP_INFO message immediately
+                    logger_.Info("gateway_controller.cpp: Bridge CP client connected successfully. Sending DP_INFO message...");
                     bridge_cp_client_->send_dp_info(component_id_, "0.0.0.0", data_plane_listen_port_);
+                    logger_.Info("gateway_controller.cpp: DP_INFO sent. State transition: CONNECTING_TO_BRIDGE -> WAITING_FOR_DP_CONNECTION");
                     state_ = State::WAITING_FOR_DP_CONNECTION;
                 } else {
                     logger_.Error("gateway_controller.cpp: Failed to start Bridge CP client. Retrying in 10s.");
@@ -270,13 +272,23 @@ void GatewayController::control_thread_func() {
             }
             case State::WAITING_FOR_DP_CONNECTION:
             {
-                logger_.Info("gateway_controller.cpp: Waiting for data plane connection confirmation from Bridge...");
+                logger_.Info("gateway_controller.cpp: Waiting for DP_CONNECTION_CONFIRMED message from Bridge CP...");
                 std::unique_lock<std::mutex> lock(state_mutex_);
-                state_cv_.wait(lock, [this] { return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; });
+                
+                // Wait with a timeout so we can periodically log our status
+                if (state_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; })) {
+                    if (state_ == State::OPERATIONAL) {
+                        logger_.Info("gateway_controller.cpp: Successfully received DP_CONNECTION_CONFIRMED and transitioned to OPERATIONAL");
+                    }
+                } else {
+                    logger_.Warn("gateway_controller.cpp: Still waiting for DP_CONNECTION_CONFIRMED from Bridge CP (30s timeout reached)");
+                }
                 break;
             }
             case State::OPERATIONAL:
             {
+                logger_.Debug("gateway_controller.cpp: In OPERATIONAL state, checking for work...");
+                
                 // Process any queued offloading or termination requests
                 std::unique_lock<std::mutex> lock(queue_mutex_);
                 if (queue_cv_.wait_for(lock, keepalive_interval, [this] { 
@@ -298,6 +310,7 @@ void GatewayController::control_thread_func() {
                             {
                                 std::lock_guard<std::mutex> session_lock(session_mutex_);
                                 active_sessions_[request_id] = {request_id, req.task_id, std::chrono::steady_clock::now()};
+                                logger_.Info("gateway_controller.cpp: Created new active session '{}' for task '{}'", request_id, req.task_id);
                             }
                             
                             auto task_it = task_database_.find(req.task_id);
@@ -328,11 +341,23 @@ void GatewayController::control_thread_func() {
                     
                     std::lock_guard<std::mutex> session_lock(session_mutex_);
                     auto now = std::chrono::steady_clock::now();
+                    
+                    if (active_sessions_.empty()) {
+                        logger_.Debug("gateway_controller.cpp: No active sessions to send keepalives for");
+                    } else {
+                        logger_.Info("gateway_controller.cpp: Checking {} active sessions for keepalive requirements", active_sessions_.size());
+                    }
+                    
                     for (auto& [req_id, session] : active_sessions_) {
                         if (now - session.last_keepalive_sent >= keepalive_interval) {
+                            logger_.Info("gateway_controller.cpp: Sending keepalive for session '{}' (last sent {}s ago)", 
+                                        req_id, std::chrono::duration_cast<std::chrono::seconds>(now - session.last_keepalive_sent).count());
                             bridge_cp_client_->send_session_keepalive(component_id_, req_id);
                             session.last_keepalive_sent = now;
-                            logger_.Debug("gateway_controller.cpp: Sent keepalive for session '{}'", req_id);
+                        } else {
+                            auto time_until_next = keepalive_interval - (now - session.last_keepalive_sent);
+                            logger_.Debug("gateway_controller.cpp: Session '{}' keepalive not due yet ({}s remaining)", 
+                                         req_id, std::chrono::duration_cast<std::chrono::seconds>(time_until_next).count());
                         }
                     }
                 }
@@ -421,12 +446,16 @@ void GatewayController::on_discovery_failure(const std::string& error_message) {
 
 void GatewayController::on_dp_confirmed() {
     std::lock_guard<std::mutex> lock(state_mutex_);
+    logger_.Info("gateway_controller.cpp: Received DP_CONNECTION_CONFIRMED from Bridge CP");
+    
     if (state_ == State::WAITING_FOR_DP_CONNECTION) {
+        logger_.Info("gateway_controller.cpp: State transition: WAITING_FOR_DP_CONNECTION -> OPERATIONAL");
         gateway_->start_receiver();
         state_ = State::OPERATIONAL;
-        logger_.Info("gateway_controller.cpp: Data plane confirmed. Gateway is now OPERATIONAL.");
+        logger_.Info("gateway_controller.cpp: Data plane confirmed. Gateway is now OPERATIONAL and ready to handle sessions.");
     } else {
-        logger_.Warn("gateway_controller.cpp: Received DP confirmation in unexpected state: {}", static_cast<int>(state_.load()));
+        logger_.Warn("gateway_controller.cpp: Received DP confirmation in unexpected state: {} (expected WAITING_FOR_DP_CONNECTION)", 
+                    static_cast<int>(state_.load()));
     }
     state_cv_.notify_one();
 }
