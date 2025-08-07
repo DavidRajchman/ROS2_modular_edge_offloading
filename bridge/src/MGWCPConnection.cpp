@@ -184,11 +184,20 @@ void MGWCPConnection::handle_dp_info(const nlohmann::json& payload) {
         return;
     }
     
-    dp_host_ = payload["dp_host"];
+    std::string requested_host = payload["dp_host"];
     dp_port_ = payload["dp_port"];
     
-    logger.Info("MGWCPConnection.cpp: Received DP_INFO from '{}': host={}, port={}", 
-               component_id_, dp_host_, dp_port_);
+    // Use the auto-detected IP address instead of the one from the request if it's 0.0.0.0
+    // This follows the same pattern as the Discovery Service
+    if (requested_host == "0.0.0.0") {
+        dp_host_ = client_ip_;  // Use the real client IP detected by transport layer
+        logger.Info("MGWCPConnection.cpp: DP_INFO contained 0.0.0.0, using auto-detected client IP: {}", dp_host_);
+    } else {
+        dp_host_ = requested_host;
+    }
+    
+    logger.Info("MGWCPConnection.cpp: Received DP_INFO from '{}': requested_host={}, using_host={}, port={}", 
+               component_id_, requested_host, dp_host_, dp_port_);
     
     // Attempt data plane connection
     if (dp_connect_callback_(component_id_, dp_host_, dp_port_)) {
