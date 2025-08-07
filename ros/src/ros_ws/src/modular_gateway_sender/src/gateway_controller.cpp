@@ -31,23 +31,34 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
   // --- Mock Task Database Initialization ---
-  task_database_["NAV_BASIC"] = {"Navigation Basic", {"sensor_msgs/msg/LaserScan"}};
-  task_database_["TELEOP_FULL"] = {"Teleoperation Full", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}};
-  task_database_["TEST_INPUT_ONLY"] = {"Test Input Only", {"test/string_input"}};
-  task_database_["TEST_RESULT_ONLY"] = {"Test Result Only", {"test/string_result"}};
+  // Legacy tasks using required_handlers (backward compatibility)
+  task_database_["NAV_BASIC"] = {"Navigation Basic", {"sensor_msgs/msg/LaserScan"}, {}, {}};
+  task_database_["TELEOP_FULL"] = {"Teleoperation Full", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}, {}, {}};
+  task_database_["TEST_INPUT_ONLY"] = {"Test Input Only", {"test/string_input"}, {}, {}};
+  task_database_["TEST_RESULT_ONLY"] = {"Test Result Only", {"test/string_result"}, {}, {}};
+  
+  // New input/output oriented tasks
+  task_database_["STRING_TEST_PIPELINE"] = {"String Test Pipeline", {}, {"test/string_input"}, {"test/string_result"}};
+  
   logger_.Info("gateway_controller.cpp: Initialized mock task database with {} tasks.", task_database_.size());
   // -----------------------------------------
 
-  // Create the ROS 2 services
-  offloading_service_ = this->create_service<modular_gateway_sender::srv::RequestOffloading>(
-    "request_offloading",
-    std::bind(&GatewayController::offloading_request_service_handler, this, std::placeholders::_1, std::placeholders::_2)
-  );
+  // Create the ROS 2 services only for VHC components
+  if (component_type_ == "V") {
+    offloading_service_ = this->create_service<modular_gateway_sender::srv::RequestOffloading>(
+      "request_offloading",
+      std::bind(&GatewayController::offloading_request_service_handler, this, std::placeholders::_1, std::placeholders::_2)
+    );
 
-  terminate_offloading_service_ = this->create_service<modular_gateway_sender::srv::TerminateOffloading>(
-    "terminate_offloading",
-    std::bind(&GatewayController::terminate_offloading_service_handler, this, std::placeholders::_1, std::placeholders::_2)
-  );
+    terminate_offloading_service_ = this->create_service<modular_gateway_sender::srv::TerminateOffloading>(
+      "terminate_offloading",
+      std::bind(&GatewayController::terminate_offloading_service_handler, this, std::placeholders::_1, std::placeholders::_2)
+    );
+
+    logger_.Info("gateway_controller.cpp: Created ROS services for VHC component type.");
+  } else {
+    logger_.Info("gateway_controller.cpp: Skipping ROS service creation for component type: {}", component_type_);
+  }
 
   logger_.Info("gateway_controller.cpp: GatewayController basic construction completed. Call initialize() to complete setup.");
 }
@@ -269,28 +280,34 @@ void GatewayController::control_thread_func() {
                 // Process any queued offloading or termination requests
                 std::unique_lock<std::mutex> lock(queue_mutex_);
                 if (queue_cv_.wait_for(lock, keepalive_interval, [this] { 
-                    return !offloading_request_queue_.empty() || !termination_request_queue_.empty() || !running_; 
+                    bool has_work = !termination_request_queue_.empty() || !running_;
+                    if (component_type_ == "V") {
+                        has_work = has_work || !offloading_request_queue_.empty();
+                    }
+                    return has_work;
                 })) {
                     
-                    // Process offloading requests
-                    while (!offloading_request_queue_.empty() && running_) {
-                        auto req = offloading_request_queue_.front();
-                        offloading_request_queue_.pop();
-                        lock.unlock();
-                        
-                        std::string request_id = std::to_string(request_id_counter_++);
-                        {
-                            std::lock_guard<std::mutex> session_lock(session_mutex_);
-                            active_sessions_[request_id] = {request_id, req.task_id, std::chrono::steady_clock::now()};
+                    // Process offloading requests (VHC only)
+                    if (component_type_ == "V") {
+                        while (!offloading_request_queue_.empty() && running_) {
+                            auto req = offloading_request_queue_.front();
+                            offloading_request_queue_.pop();
+                            lock.unlock();
+                            
+                            std::string request_id = std::to_string(request_id_counter_++);
+                            {
+                                std::lock_guard<std::mutex> session_lock(session_mutex_);
+                                active_sessions_[request_id] = {request_id, req.task_id, std::chrono::steady_clock::now()};
+                            }
+                            
+                            auto task_it = task_database_.find(req.task_id);
+                            if (task_it != task_database_.end()) {
+                                bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name);
+                                logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}'", req.task_id, request_id);
+                            }
+                            
+                            lock.lock();
                         }
-                        
-                        auto task_it = task_database_.find(req.task_id);
-                        if (task_it != task_database_.end()) {
-                            bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name);
-                            logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}'", req.task_id, request_id);
-                        }
-                        
-                        lock.lock();
                     }
                     
                     // Process termination requests
@@ -414,43 +431,107 @@ void GatewayController::on_dp_confirmed() {
     state_cv_.notify_one();
 }
 
-void GatewayController::on_session_approved(const std::string& request_id) {
-    logger_.Info("gateway_controller.cpp: Session with request_id '{}' approved by Bridge.", request_id);
+void GatewayController::on_session_approved(const nlohmann::json& payload) {
+    // Extract request_id for logging and potential session lookup
+    std::string request_id;
+    if (payload.contains("request_id")) {
+        request_id = payload["request_id"];
+        logger_.Info("gateway_controller.cpp: Session with request_id '{}' approved by Bridge.", request_id);
+    } else {
+        logger_.Warn("gateway_controller.cpp: SESSION_APPROVED received without request_id");
+        request_id = "unknown";
+    }
     
     std::lock_guard<std::mutex> lock(session_mutex_);
+    
+    std::string task_id;
+    
+    // Check if this is a VHC case (local session exists) or MEC case (unsolicited SESSION_APPROVED)
     auto session_it = active_sessions_.find(request_id);
-    if (session_it == active_sessions_.end()) {
-        logger_.Error("gateway_controller.cpp: Approved session '{}' not found in active sessions.", request_id);
-        return;
+    if (session_it != active_sessions_.end()) {
+        // VHC case: Look up task_id from local session map
+        task_id = session_it->second.task_id;
+        logger_.Info("gateway_controller.cpp: VHC case - found task_id '{}' in local session map", task_id);
+        
+        // Update the keepalive timestamp to start the timer now that it's approved
+        session_it->second.last_keepalive_sent = std::chrono::steady_clock::now();
+    } else {
+        // MEC case: Extract task_id directly from SESSION_APPROVED payload
+        if (payload.contains("task_id")) {
+            task_id = payload["task_id"];
+            logger_.Info("gateway_controller.cpp: MEC case - extracted task_id '{}' from SESSION_APPROVED payload", task_id);
+        } else {
+            logger_.Error("gateway_controller.cpp: MEC SESSION_APPROVED missing task_id in payload");
+            return;
+        }
     }
 
-    // Update the keepalive timestamp to start the timer now that it's approved
-    session_it->second.last_keepalive_sent = std::chrono::steady_clock::now();
-
-    const std::string& task_id = session_it->second.task_id;
     auto task_it = task_database_.find(task_id);
     if (task_it == task_database_.end()) {
         logger_.Error("gateway_controller.cpp: Session '{}' references unknown task_id '{}'", request_id, task_id);
         return;
     }
 
-    const auto& required_handlers = task_it->second.required_handlers;
-    logger_.Info("gateway_controller.cpp: Activating {} handlers for task '{}' (session {}).", required_handlers.size(), task_id, request_id);
+    const auto& task_details = task_it->second;
+    
+    // Determine which handlers to create and their modes
+    std::vector<std::pair<std::string, HandlerMode>> handlers_to_create;
+    
+    if (!task_details.input_handlers.empty() || !task_details.output_handlers.empty()) {
+        // New input/output oriented task
+        logger_.Info("gateway_controller.cpp: Processing input/output oriented task '{}' with {} input and {} output handlers", 
+                    task_id, task_details.input_handlers.size(), task_details.output_handlers.size());
+        
+        if (component_type_ == "V") {
+            // VHC: Subscribe to inputs, publish outputs
+            for (const auto& handler_type : task_details.input_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::SUBSCRIBER_ONLY);
+            }
+            for (const auto& handler_type : task_details.output_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::PUBLISHER_ONLY);
+            }
+        } else if (component_type_ == "M") {
+            // MEC: Publish to inputs, subscribe to outputs  
+            for (const auto& handler_type : task_details.input_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::PUBLISHER_ONLY);
+            }
+            for (const auto& handler_type : task_details.output_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::SUBSCRIBER_ONLY);
+            }
+        } else {
+            // Unknown component type - use both modes for all handlers
+            for (const auto& handler_type : task_details.input_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::BOTH);
+            }
+            for (const auto& handler_type : task_details.output_handlers) {
+                handlers_to_create.emplace_back(handler_type, HandlerMode::BOTH);
+            }
+        }
+    } else {
+        // Legacy task using required_handlers (backward compatibility)
+        logger_.Info("gateway_controller.cpp: Processing legacy task '{}' with {} required handlers", 
+                    task_id, task_details.required_handlers.size());
+        
+        HandlerMode mode = HandlerMode::BOTH;
+        if (component_type_ == "V") {
+            mode = HandlerMode::SUBSCRIBER_ONLY;
+        } else if (component_type_ == "M") {
+            mode = HandlerMode::PUBLISHER_ONLY;
+        }
+        
+        for (const auto& handler_type : task_details.required_handlers) {
+            handlers_to_create.emplace_back(handler_type, mode);
+        }
+    }
 
-    for (const auto& handler_type : required_handlers) {
+    logger_.Info("gateway_controller.cpp: Activating {} handlers for task '{}' (session {}).", handlers_to_create.size(), task_id, request_id);
+
+    for (const auto& [handler_type, mode] : handlers_to_create) {
         auto handler = handler_factory_->create_handler(handler_type);
         if (handler) {
-            // Configure handler based on component type
-            if (component_type_ == "VHC") {
-                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::SUBSCRIBER_ONLY);
-            } else if (component_type_ == "MEC") {
-                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::PUBLISHER_ONLY);
-            } else {
-                MessageHandlerBase::configure_handler_mode(handler, HandlerMode::BOTH);
-            }
-            
+            MessageHandlerBase::configure_handler_mode(handler, mode);
             gateway_->register_handler(handler);
-            logger_.Info("gateway_controller.cpp: Activated handler '{}'", handler_type);
+            logger_.Info("gateway_controller.cpp: Activated handler '{}' with mode {}", handler_type, static_cast<int>(mode));
         } else {
             logger_.Error("gateway_controller.cpp: Failed to create handler for type '{}'", handler_type);
         }

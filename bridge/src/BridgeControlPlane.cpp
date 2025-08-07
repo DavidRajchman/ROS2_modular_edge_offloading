@@ -548,19 +548,13 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
     if (om_response["payload"].contains("assigned_mec_id")) {
         std::string mec_id = om_response["payload"]["assigned_mec_id"];
         session_manager_->set_assigned_mec(request_id, mec_id);
-        
-        // Create MEC transport handler if needed
-        if (om_response["payload"].contains("mec_host") && om_response["payload"].contains("mec_port")) {
-            std::string mec_host = om_response["payload"]["mec_host"];
-            int mec_port = om_response["payload"]["mec_port"];
-            create_transport_handler_for_mec(mec_id, mec_host, mec_port);
-        }
+        logger.Info("BridgeControlPlane.cpp: Session '{}' assigned to MEC '{}'", request_id, mec_id);
     }
     
     // Create routing rules
     create_routing_rules_for_session(request_id);
     
-    // Forward response to appropriate MGWCP
+    // Forward SESSION_APPROVED to VHC
     const ActiveSession* session = session_manager_->get_session(request_id);
     if (session) {
         std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);
@@ -569,6 +563,23 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
             auto conn_it = mgwcp_connections_.find(it->second);
             if (conn_it != mgwcp_connections_.end()) {
                 conn_it->second->send_session_approved(request_id, om_response["payload"]);
+                logger.Info("BridgeControlPlane.cpp: Forwarded SESSION_APPROVED to VHC '{}'", session->mgwcp_component_id);
+            }
+        }
+        
+        // Forward SESSION_APPROVED to MEC (so MEC knows which task to handle)
+        if (!session->assigned_mec_id.empty()) {
+            auto mec_it = component_id_to_transport_id_.find(session->assigned_mec_id);
+            if (mec_it != component_id_to_transport_id_.end()) {
+                auto mec_conn_it = mgwcp_connections_.find(mec_it->second);
+                if (mec_conn_it != mgwcp_connections_.end()) {
+                    mec_conn_it->second->send_session_approved(request_id, om_response["payload"]);
+                    logger.Info("BridgeControlPlane.cpp: Forwarded SESSION_APPROVED to MEC '{}'", session->assigned_mec_id);
+                } else {
+                    logger.Warn("BridgeControlPlane.cpp: MEC '{}' not found in MGWCP connections - may need transport handler", session->assigned_mec_id);
+                }
+            } else {
+                logger.Warn("BridgeControlPlane.cpp: MEC '{}' component ID not mapped to transport - may need transport handler", session->assigned_mec_id);
             }
         }
     }

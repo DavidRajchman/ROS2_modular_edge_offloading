@@ -24,7 +24,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(Threads REQUIRED)
 # Add /usr/local to the search path for packages installed outside the workspace
 list(APPEND CMAKE_PREFIX_PATH "/usr/local")
-find_package(ControlPlaneProtocol REQUIRED)
+#find_package(ControlPlaneProtocol REQUIRED)
 find_package(DiscoveryProtocol REQUIRED)
 
 # --- Fetch fmt via FetchContent to avoid system library issues ---
@@ -147,7 +147,7 @@ target_include_directories(gateway_controller_lib PUBLIC
 target_link_libraries(gateway_controller_lib 
     ros_gateway_lib
     handlers_lib
-    ControlPlaneProtocol::control_plane_protocol
+    #ControlPlaneProtocol::control_plane_protocol
     DiscoveryProtocol::discovery_protocol
     nlohmann_json::nlohmann_json
 )
@@ -170,6 +170,22 @@ target_link_libraries(gateway_controller
 )
 ament_target_dependencies(gateway_controller rclcpp)
 
+# MEC Gateway executable with MEC-specific defaults
+add_executable(mec_gateway src/mec_main.cpp)
+target_link_libraries(mec_gateway
+    gateway_controller_lib
+    Threads::Threads
+    ${CPPLOGGING_LIBRARY}
+    ${CPPCOMMON_LIBRARY}
+    fmt::fmt              # Link fmt library
+    bfd
+    uuid
+    dl
+    z
+    rt
+)
+ament_target_dependencies(mec_gateway rclcpp)
+
 # --- Make sure the service headers are available to the gateway_controller_lib ---
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(gateway_controller_lib "${cpp_typesupport_target}")
@@ -177,6 +193,7 @@ target_link_libraries(gateway_controller_lib "${cpp_typesupport_target}")
 # --- Installation ---
 install(TARGETS
   gateway_controller
+  mec_gateway
   DESTINATION lib/${PROJECT_NAME}
 )
 

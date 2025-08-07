@@ -98,8 +98,21 @@ void BridgeCpClient::handle_received_message(const json& msg) {
 
     switch (code) {
         case 200: // SESSION_APPROVED
-            if (on_session_approved_ && msg.contains("payload") && msg["payload"].contains("request_id")) {
-                on_session_approved_(msg["payload"]["request_id"]);
+            if (on_session_approved_ && msg.contains("payload")) {
+                // Log additional context for SESSION_APPROVED messages
+                if (msg["payload"].contains("request_id")) {
+                    std::string request_id = msg["payload"]["request_id"];
+                    logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED for request_id '{}'", request_id);
+                } else {
+                    logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED without request_id (likely unsolicited for MEC)");
+                }
+                
+                // Ensure task_id is present for MEC case
+                if (!msg["payload"].contains("task_id")) {
+                    logger_.Warn("bridge_cp_client.cpp: SESSION_APPROVED payload missing task_id - may cause issues for MEC components");
+                }
+                
+                on_session_approved_(msg["payload"]);
             } else {
                 logger_.Error("bridge_cp_client.cpp: Malformed SESSION_APPROVED message.");
             }

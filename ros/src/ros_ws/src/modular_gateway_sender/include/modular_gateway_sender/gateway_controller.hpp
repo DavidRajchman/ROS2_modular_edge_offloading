@@ -35,6 +35,8 @@ struct OffloadingRequestData {
 struct TaskDetails {
     std::string task_name;
     std::vector<std::string> required_handlers; // e.g., {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}
+    std::vector<std::string> input_handlers;     // Handlers for input message types (VHC subscribes, MEC publishes)
+    std::vector<std::string> output_handlers;    // Handlers for output message types (VHC publishes, MEC subscribes)
 };
 
 // Represents the state of a single offloading session
@@ -105,7 +107,7 @@ private:
   void on_discovery_success(const std::string& bridge_host, int bridge_port);
   void on_discovery_failure(const std::string& error_message);
   void on_dp_confirmed();
-  void on_session_approved(const std::string& request_id);
+  void on_session_approved(const nlohmann::json& payload);
   void on_session_denied(const std::string& request_id, const std::string& reason);
 
   // Core Components

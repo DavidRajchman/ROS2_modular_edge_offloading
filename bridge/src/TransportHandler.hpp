@@ -5,7 +5,7 @@
 #include "RoutingTable.hpp"       // For RoutingTable
 #include "ITransportHandlerObserver.hpp" // For the observer interface (even if not fully used yet)
 #include <transport/transport_base.hpp> // From your transportlib
-#include <transport/logging_utils.hpp>    // For LOG_INFO, LOG_ERROR etc.
+#include "logging/logger.h"    // For CppLogging
 
 #include <string>
 #include <memory>   // For std::shared_ptr, std::weak_ptr, std::enable_shared_from_this
@@ -90,6 +90,9 @@ private:
     int connect_retry_delay_ms_;
     const size_t MAX_RECEIVE_BUFFER_SIZE; // Max size for receive_buffer_
     const int minimum_sleep_time_us_;
+
+    // Logging
+    CppLogging::Logger logger_;
 
     // Constants for handshake (example, to be defined)
     static constexpr char HANDSHAKE_MSG_BRIDGE_HELLO[] = "BRIDGE_HELLO_V1";

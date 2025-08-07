@@ -1,56 +1,26 @@
 # CppLogging Binary Log Decoder Output
 # Source: /home/ubuntu/bridge/build/bridge_binary.log
-# Decoded at: 2025-08-04T21:54:18.171638
-# File size: 4796 bytes
+# Decoded at: 2025-08-07T12:06:39.949139
+# File size: 1837 bytes
 # Format: TIMESTAMP [THREAD_ID] LEVEL LOGGER - MESSAGE
 #================================================================================
 
-2025-08-04T21:53:33.555312254Z [0x27073300] INFO  bridge - main.cpp: Bridge Control Plane starting...
-2025-08-04T21:53:33.555316543Z [0x27073300] INFO  bridge - main.cpp: Component ID: 15:10
-2025-08-04T21:53:33.555320931Z [0x27073300] INFO  bridge - main.cpp: OM Port: 8100
-2025-08-04T21:53:33.555322073Z [0x27073300] INFO  bridge - main.cpp: Discovery Service: 192.168.65.5:9090
-2025-08-04T21:53:33.555323175Z [0x27073300] INFO  bridge - main.cpp: MGWCP Server Port: 7000
-2025-08-04T21:53:33.555325940Z [0x27073300] INFO  bridge - main.cpp: Registered signal handlers for graceful shutdown and crash handling
-2025-08-04T21:53:33.555326622Z [0x27073300] INFO  bridge - main.cpp: Creating Bridge Control Plane instance...
-2025-08-04T21:53:33.555355286Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane constructed
-2025-08-04T21:53:33.557756658Z [0x27073300] INFO  bridge - main.cpp: Starting Bridge Control Plane...
-2025-08-04T21:53:33.557760385Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Starting Bridge Control Plane...
-2025-08-04T21:53:33.557761467Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Registering with Discovery Service at 192.168.65.5:9090
-2025-08-04T21:53:33.557999526Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Sent Discovery Service registration request
-2025-08-04T21:53:33.558189744Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: OM connection target received: 192.168.65.10:8100
-2025-08-04T21:53:33.558339135Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Global configuration loaded successfully
-2025-08-04T21:53:33.558355196Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Discovery Service registration successful. Assigned ID: 5:1
-2025-08-04T21:53:33.559138411Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Successfully registered with Discovery Service
-2025-08-04T21:53:33.559197462Z [0x2706E640] INFO  bridge - BridgeControlPlane.cpp: Discovery Service keepalive thread started
-2025-08-04T21:53:33.559903732Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Connecting to OM at 192.168.65.10:8100
-2025-08-04T21:53:33.560040129Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Successfully connected to OM at 192.168.65.10:8100
-2025-08-04T21:53:33.560074744Z [0x2686D640] INFO  bridge - BridgeControlPlane.cpp: OM connection thread started
-2025-08-04T21:53:33.560771306Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Starting MGWCP server on port 7000
-2025-08-04T21:53:33.560919155Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: MGWCP server started successfully
-2025-08-04T21:53:33.560948570Z [0x2606C640] INFO  bridge - BridgeControlPlane.cpp: MGWCP server thread started
-2025-08-04T21:53:33.561788953Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Started periodic maintenance tasks
-2025-08-04T21:53:33.561851480Z [0x2586B640] INFO  bridge - BridgeControlPlane.cpp: Maintenance thread started
-2025-08-04T21:53:33.562590893Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane started successfully
-2025-08-04T21:53:33.563722374Z [0x27073300] INFO  bridge - main.cpp: Bridge Control Plane started successfully
-2025-08-04T21:53:33.563741951Z [0x27073300] INFO  bridge - main.cpp: Bridge Control Plane is operational. Waiting for shutdown signal...
-2025-08-04T21:53:38.559950214Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:53:43.560113143Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:53:48.560259243Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:53:53.560777120Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:53:58.561237976Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:54:03.561401642Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:54:08.561685348Z [0x2706E640] DEBUG bridge - BridgeControlPlane.cpp: Sent Discovery Service keepalive
-2025-08-04T21:54:10.489177623Z [0x27073300] INFO  bridge - main.cpp: Received signal 2 (SIGINT). Initiating graceful shutdown...
-2025-08-04T21:54:10.489184576Z [0x27073300] INFO  bridge - main.cpp: Stopping Bridge Control Plane...
-2025-08-04T21:54:10.489186529Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Stopping Bridge Control Plane...
-2025-08-04T21:54:10.601382648Z [0x2606C640] INFO  bridge - BridgeControlPlane.cpp: MGWCP server thread stopped
-2025-08-04T21:54:10.602460657Z [0x2686D640] ERROR bridge - BridgeControlPlane.cpp: OM connection error
-2025-08-04T21:54:10.602466438Z [0x2686D640] INFO  bridge - BridgeControlPlane.cpp: OM connection thread stopped
-2025-08-04T21:54:13.561836538Z [0x2706E640] INFO  bridge - BridgeControlPlane.cpp: Discovery Service keepalive thread stopped
-2025-08-04T21:54:13.576314294Z [0x2586B640] INFO  bridge - BridgeControlPlane.cpp: Maintenance thread stopped
-2025-08-04T21:54:13.577469438Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane stopped
-2025-08-04T21:54:13.630972217Z [0x27073300] INFO  bridge - main.cpp: Shutdown requested by signal
-2025-08-04T21:54:13.630996242Z [0x27073300] INFO  bridge - main.cpp: Final status - Discovery connected: True, OM connected: False, MGWCP connections: 0
-2025-08-04T21:54:13.630999678Z [0x27073300] INFO  bridge - main.cpp: Destroying Bridge Control Plane instance...
-2025-08-04T21:54:13.631006712Z [0x27073300] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane destructor called
-2025-08-04T21:54:13.633196152Z [0x27073300] INFO  bridge - main.cpp: Bridge Control Plane shutdown completed successfully
+2025-08-07T12:04:40.241523529Z [0x2A02CE40] INFO  bridge - main.cpp: Bridge Control Plane starting...
+2025-08-07T12:04:40.241532608Z [0x2A02CE40] INFO  bridge - main.cpp: Component ID: 15:10
+2025-08-07T12:04:40.241554050Z [0x2A02CE40] INFO  bridge - main.cpp: OM Port: 8100
+2025-08-07T12:04:40.241556424Z [0x2A02CE40] INFO  bridge - main.cpp: Discovery Service: 192.168.65.5:9090
+2025-08-07T12:04:40.241558799Z [0x2A02CE40] INFO  bridge - main.cpp: MGWCP Server Port: 7000
+2025-08-07T12:04:40.241561663Z [0x2A02CE40] INFO  bridge - main.cpp: Registered signal handlers for graceful shutdown and crash handling
+2025-08-07T12:04:40.241562640Z [0x2A02CE40] INFO  bridge - main.cpp: Creating Bridge Control Plane instance...
+2025-08-07T12:04:40.241590228Z [0x2A02CE40] INFO  bridge - RoutingTable: Initialized and reserved space for 1000 potential key entries.
+2025-08-07T12:04:40.241595117Z [0x2A02CE40] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane constructed
+2025-08-07T12:04:40.243822930Z [0x2A02CE40] INFO  bridge - main.cpp: Starting Bridge Control Plane...
+2025-08-07T12:04:40.243836899Z [0x2A02CE40] INFO  bridge - BridgeControlPlane.cpp: Starting Bridge Control Plane...
+2025-08-07T12:04:40.243839762Z [0x2A02CE40] INFO  bridge - BridgeControlPlane.cpp: Registering with Discovery Service at 192.168.65.5:9090
+2025-08-07T12:04:43.311186904Z [0x2A02CE40] ERROR bridge - BridgeControlPlane.cpp: Failed to connect to Discovery Service
+2025-08-07T12:04:43.324319187Z [0x2A02CE40] ERROR bridge - BridgeControlPlane.cpp: Failed to register with Discovery Service
+2025-08-07T12:04:43.325158266Z [0x2A02CE40] ERROR bridge - main.cpp: Failed to start Bridge Control Plane
+2025-08-07T12:04:43.325169720Z [0x2A02CE40] INFO  bridge - main.cpp: Final status - Discovery connected: False, OM connected: False, MGWCP connections: 0
+2025-08-07T12:04:43.325171676Z [0x2A02CE40] INFO  bridge - main.cpp: Destroying Bridge Control Plane instance...
+2025-08-07T12:04:43.325175517Z [0x2A02CE40] INFO  bridge - BridgeControlPlane.cpp: Bridge Control Plane destructor called
+2025-08-07T12:04:43.326707357Z [0x2A02CE40] ERROR bridge - main.cpp: Bridge Control Plane shutdown completed with errors (exit code: 1)

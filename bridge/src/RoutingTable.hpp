@@ -2,6 +2,7 @@
 #define ROUTING_TABLE_HPP
 
 #include "common_types.hpp" // For new RoutingKey, MPSCQueueType, Message
+#include "logging/logger.h" // For CppLogging
 
 #include <unordered_map>
 #include <vector>
@@ -33,6 +34,7 @@ private:
     std::unordered_map<RoutingKey, std::vector<std::shared_ptr<MPSCQueueType>>> actual_map_;
     mutable std::shared_mutex map_mutex_; 
     size_t max_expected_routes_config_;
+    CppLogging::Logger logger_;
 };
 
 #endif // ROUTING_TABLE_HPP

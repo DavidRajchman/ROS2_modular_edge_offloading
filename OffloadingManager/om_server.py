@@ -207,7 +207,7 @@ class OffloadingManagerServer:
         
         if decision.approved:
             self.logger.info(f"APPROVED request {request_id}: assigned MEC {decision.assigned_mec_id}")
-            self._send_session_approved(conn_id, request_id, decision.assigned_mec_id)
+            self._send_session_approved(conn_id, request_id, decision.assigned_mec_id, task_id)
         else:
             self.logger.info(f"DENIED request {request_id}: {decision.reason}")
             self._send_session_denied(conn_id, request_id, decision.reason_code, decision.reason)
@@ -251,7 +251,7 @@ class OffloadingManagerServer:
         }
         self._send_message(conn_id, response)
         
-    def _send_session_approved(self, conn_id: int, request_id: int, assigned_mec_id: str):
+    def _send_session_approved(self, conn_id: int, request_id: int, assigned_mec_id: str, task_id: int):
         """Send SESSION_APPROVED message"""
         response = {
             "component_id": self.component_id,
@@ -260,7 +260,8 @@ class OffloadingManagerServer:
             "sequence_number": self._get_next_sequence(conn_id),
             "payload": {
                 "request_id": request_id,
-                "assigned_mec_id": assigned_mec_id
+                "assigned_mec_id": assigned_mec_id,
+                "task_id": task_id
             }
         }
         self._send_message(conn_id, response)

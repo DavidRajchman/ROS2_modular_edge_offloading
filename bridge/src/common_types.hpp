@@ -1,7 +1,7 @@
 #ifndef COMMON_TYPES_HPP
 #define COMMON_TYPES_HPP
 
-#include <transport/logging_utils.hpp> // For logging
+#include "logging/logger.h" // For CppLogging
 
 
 #include <string>
@@ -136,14 +136,16 @@ struct ParsedHeaderInfo {
  * @return An std::optional containing ParsedHeaderInfo if parsing is successful, otherwise std::nullopt.
  */
 inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char* buffer, size_t buffer_size) {
+    static CppLogging::Logger logger("logger");
+    
     if (buffer_size < ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME) {
-        LOG_ERROR("parse_message_header: Insufficient data for header parsing (need at least %zu, got %zu).", ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME, buffer_size);
+        logger.Error("parse_message_header: Insufficient data for header parsing (need at least {}, got {}).", ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME, buffer_size);
         return std::nullopt;
     }
 
     uint16_t magic_number = read_uint16_big_endian(buffer + ModGW::Header::MAGIC_NUMBER_OFFSET);
     if (magic_number != ModGW::Header::EXPECTED_MAGIC_NUMBER) {
-        LOG_ERROR("parse_message_header: Invalid magic number. Expected 0x%X, got 0x%X.", ModGW::Header::EXPECTED_MAGIC_NUMBER, magic_number);
+        logger.Error("parse_message_header: Invalid magic number. Expected 0x{:X}, got 0x{:X}.", ModGW::Header::EXPECTED_MAGIC_NUMBER, magic_number);
         return std::nullopt;
     }
 
@@ -154,7 +156,7 @@ inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char*
 
     uint8_t topic_length = buffer[ModGW::Header::TOPIC_LENGTH_FIELD_OFFSET];
     if (buffer_size < ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME + topic_length) {
-        LOG_ERROR("parse_message_header: Insufficient data for full topic name (topic_length: %u, buffer_size: %zu, needed: %zu).", topic_length, buffer_size, ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME + topic_length);
+        logger.Error("parse_message_header: Insufficient data for full topic name (topic_length: {}, buffer_size: {}, needed: {}).", topic_length, buffer_size, ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME + topic_length);
         return std::nullopt;
     }
     uint32_t payload_size = read_uint32_big_endian(buffer + ModGW::Header::PAYLOAD_SIZE_FIELD_OFFSET);
@@ -179,8 +181,10 @@ inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char*
  * @return An std::optional containing ParsedHeaderInfo if parsing is successful, otherwise std::nullopt.
  */
 inline std::optional<ParsedHeaderInfo> parse_message_header(const std::vector<unsigned char>& data_buffer) {
+    static CppLogging::Logger logger("parse_message_header");
+    
     if (data_buffer.empty()) {
-        LOG_DEBUG("parse_message_header: Data buffer is empty.");
+        logger.Debug("parse_message_header: Data buffer is empty.");
         return std::nullopt;
     }
     return parse_message_header(data_buffer.data(), data_buffer.size());

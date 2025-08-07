@@ -2,6 +2,7 @@
 #include "common_types.hpp" // For parse_modular_gw_header, Message, etc.
 #include <chrono> // For std::chrono::milliseconds
 #include <vector> // For std::vector used in receive buffer operations
+#include "logging/logger.h" // For CppLogging
 
 // Define handshake constants if not already in header or a common place
 // For this example, assuming they are in the header as static constexpr char[]
@@ -32,7 +33,8 @@ TransportHandler::TransportHandler(
     connect_max_retries_(connect_max_retries),
     connect_retry_delay_ms_(connect_retry_delay_ms),
     MAX_RECEIVE_BUFFER_SIZE(receive_buffer_size), // Initialize const member
-    minimum_sleep_time_us_(minimum_sleep_time_us)
+    minimum_sleep_time_us_(minimum_sleep_time_us),
+    logger_("bridge")
 {
     if (!input_queue_) {
         throw std::invalid_argument("TransportHandler: Input queue cannot be null.");
@@ -54,11 +56,11 @@ TransportHandler::TransportHandler(
     }
     receive_buffer_.resize(MAX_RECEIVE_BUFFER_SIZE); // Pre-allocate receive buffer
     tcp_client_ = std::make_unique<gateway::TcpClientTransport>(target_ip_, target_port_, connect_max_retries_);
-    LOG_INFO("TransportHandler [%s]: Initialized for %s:%d.", gateway_id_.c_str(), target_ip_.c_str(), target_port_);
+    logger_.Info("TransportHandler [{}]: Initialized for {}:{}.", gateway_id_, target_ip_, target_port_);
 }
 
 TransportHandler::~TransportHandler() {
-    LOG_INFO("TransportHandler [%s]: Destructor called. Ensuring shutdown.", gateway_id_.c_str());
+    logger_.Info("TransportHandler [{}]: Destructor called. Ensuring shutdown.", gateway_id_);
     if (!shutdown_requested_.load()) {
         stop(); // Ensure stop is called if not already
     }
@@ -67,24 +69,24 @@ TransportHandler::~TransportHandler() {
 
 void TransportHandler::start() {
     if (handler_thread_.joinable()) {
-        LOG_WARN("TransportHandler [%s]: Start called but thread is already running.", gateway_id_.c_str());
+        logger_.Warn("TransportHandler [{}]: Start called but thread is already running.", gateway_id_);
         return;
     }
     shutdown_requested_.store(false);
     connected_status_.store(false);
     handler_thread_ = std::thread(&TransportHandler::run_internal, this);
-    LOG_INFO("TransportHandler [%s]: Started and spawned processing thread.", gateway_id_.c_str());
+    logger_.Info("TransportHandler [{}]: Started and spawned processing thread.", gateway_id_);
 }
 
 void TransportHandler::stop() {
-    LOG_INFO("TransportHandler [%s]: Stop requested.", gateway_id_.c_str());
+    logger_.Info("TransportHandler [{}]: Stop requested.", gateway_id_);
     shutdown_requested_.store(true);
 
     // Optional: If there's a blocking call in run_internal (like a blocking receive or queue read),
     // you might need to interrupt it. For TCP, closing the socket from this thread
     // will typically cause blocking socket calls in the handler_thread_ to return with an error.
     if (tcp_client_ && tcp_client_->is_connected()) {
-        LOG_INFO("TransportHandler [%s]: Disconnecting client to unblock thread.", gateway_id_.c_str());
+        logger_.Info("TransportHandler [{}]: Disconnecting client to unblock thread.", gateway_id_);
         tcp_client_->disconnect(); // This can help unblock socket operations in run_internal
     }
     
@@ -93,15 +95,15 @@ void TransportHandler::stop() {
     // can be easily interrupted other than by the shutdown_requested_ flag check.
 
     if (handler_thread_.joinable()) {
-        LOG_INFO("TransportHandler [%s]: Waiting for processing thread to join.", gateway_id_.c_str());
+        logger_.Info("TransportHandler [{}]: Waiting for processing thread to join.", gateway_id_);
         try {
             handler_thread_.join();
-            LOG_INFO("TransportHandler [%s]: Processing thread joined.", gateway_id_.c_str());
+            logger_.Info("TransportHandler [{}]: Processing thread joined.", gateway_id_);
         } catch (const std::system_error& e) {
-            LOG_ERROR("TransportHandler [%s]: System error while joining thread: %s", gateway_id_.c_str(), e.what());
+            logger_.Error("TransportHandler [{}]: System error while joining thread: {}", gateway_id_, e.what());
         }
     } else {
-        LOG_INFO("TransportHandler [%s]: Processing thread was not joinable (already joined or not started).", gateway_id_.c_str());
+        logger_.Info("TransportHandler [{}]: Processing thread was not joinable (already joined or not started).", gateway_id_);
     }
     connected_status_.store(false); // Ensure status is updated
 }
@@ -117,19 +119,19 @@ bool TransportHandler::is_connected() const {
 // --- Private Methods ---
 
 void TransportHandler::run_internal() {
-    LOG_INFO("TransportHandler [%s]: Thread %p started execution.", gateway_id_.c_str(), std::this_thread::get_id());
+    logger_.Info("TransportHandler [{}]: Thread started execution.", gateway_id_);
     receive_buffer_watermark_ = 0; // Reset watermark
     bool work_done_this_iteration = false;
 
     while (!shutdown_requested_.load()) {
         if (!connected_status_.load()) {
-            LOG_INFO("TransportHandler [%s]: Not connected. Attempting connection...", gateway_id_.c_str());
+            logger_.Info("TransportHandler [{}]: Not connected. Attempting connection...", gateway_id_);
             if (attempt_connection()) {
-                LOG_INFO("TransportHandler [%s]: Successfully connected to %s:%d.", gateway_id_.c_str(), target_ip_.c_str(), target_port_);
+                logger_.Info("TransportHandler [{}]: Successfully connected to {}:{}.", gateway_id_, target_ip_, target_port_);
                 connected_status_.store(true);
                 notify_observer_connected(); // Placeholder for actual notification
             } else {
-                LOG_WARN("TransportHandler [%s]: Connection attempt failed. Will retry after delay.", gateway_id_.c_str());
+                logger_.Warn("TransportHandler [{}]: Connection attempt failed. Will retry after delay.", gateway_id_);
                 // Delay before retrying connection to avoid busy-looping on persistent failures
                 for (int i = 0; i < connect_retry_delay_ms_ / 100 && !shutdown_requested_.load(); ++i) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -149,7 +151,7 @@ void TransportHandler::run_internal() {
                 handle_incoming_data();
                 work_done_this_iteration = true; 
             } else if (tcp_client_ && !tcp_client_->is_connected()){
-                LOG_WARN("TransportHandler [%s]: TCP client reported disconnected during data_available check.", gateway_id_.c_str());
+                logger_.Warn("TransportHandler [{}]: TCP client reported disconnected during data_available check.", gateway_id_);
                 connected_status_.store(false);
                 notify_observer_disconnected("TCP client disconnected");
                 if(tcp_client_) tcp_client_->disconnect(); // Ensure it's fully closed
@@ -169,31 +171,31 @@ void TransportHandler::run_internal() {
     }
 
     // Shutdown sequence
-    LOG_INFO("TransportHandler [%s]: Shutdown requested. Cleaning up...", gateway_id_.c_str());
+    logger_.Info("TransportHandler [{}]: Shutdown requested. Cleaning up...", gateway_id_);
     if (tcp_client_ && tcp_client_->is_connected()) {
         tcp_client_->disconnect();
     }
     connected_status_.store(false);
-    LOG_INFO("TransportHandler [%s]: Thread %p finished execution.", gateway_id_.c_str(), std::this_thread::get_id());
+    logger_.Info("TransportHandler [{}]: Thread finished execution.", gateway_id_);
 }
 
 bool TransportHandler::attempt_connection() {
     if (!tcp_client_) {
-        LOG_ERROR("TransportHandler [%s]: TCP client is null, cannot attempt connection.", gateway_id_.c_str());
+        logger_.Error("TransportHandler [{}]: TCP client is null, cannot attempt connection.", gateway_id_);
         return false;
     }
 
     int current_retry = 0;
     while (current_retry < connect_max_retries_ && !shutdown_requested_.load()) {
-        LOG_INFO("TransportHandler [%s]: Attempting to connect (%d/%d)...", gateway_id_.c_str(), current_retry + 1, connect_max_retries_);
+        logger_.Info("TransportHandler [{}]: Attempting to connect ({}/{})...", gateway_id_, current_retry + 1, connect_max_retries_);
         if (tcp_client_->connect()) { // TcpClientTransport::connect() handles its own internal retries if configured
-            LOG_INFO("TransportHandler [%s]: TCP connection established. Performing handshake...", gateway_id_.c_str());
+            logger_.Info("TransportHandler [{}]: TCP connection established. Performing handshake...", gateway_id_);
             // handshake is not implemented yet, it will always succeed for now
             if (perform_handshake()) {
-                LOG_INFO("TransportHandler [%s]: Handshake successful.", gateway_id_.c_str());
+                logger_.Info("TransportHandler [{}]: Handshake successful.", gateway_id_);
                 return true; // Successfully connected and handshake complete
             } else {
-                LOG_WARN("TransportHandler [%s]: Handshake failed. Disconnecting.", gateway_id_.c_str());
+                logger_.Warn("TransportHandler [{}]: Handshake failed. Disconnecting.", gateway_id_);
                 tcp_client_->disconnect(); // Disconnect if handshake fails
                 // No immediate retry for handshake failure in this loop, could be added
                 return false; // Handshake failure means connection attempt failed for now
@@ -201,13 +203,13 @@ bool TransportHandler::attempt_connection() {
         }
         current_retry++;
         if (current_retry < connect_max_retries_ && !shutdown_requested_.load()) {
-            LOG_INFO("TransportHandler [%s]: TCP connect failed. Retrying in %d ms.", gateway_id_.c_str(), connect_retry_delay_ms_);
+            logger_.Info("TransportHandler [{}]: TCP connect failed. Retrying in {} ms.", gateway_id_, connect_retry_delay_ms_);
             for (int i = 0; i < connect_retry_delay_ms_ / 100 && !shutdown_requested_.load(); ++i) {
                  std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
     }
-    LOG_ERROR("TransportHandler [%s]: Failed to connect after %d retries.", gateway_id_.c_str(), connect_max_retries_);
+    logger_.Error("TransportHandler [{}]: Failed to connect after {} retries.", gateway_id_, connect_max_retries_);
     return false;
 }
 
@@ -215,13 +217,13 @@ bool TransportHandler::perform_handshake() {
     // No explicit application-level handshake for now.
     // This function is called after TCP connection is established.
     // If we reach here, we consider the "handshake" (or lack thereof) successful.
-    LOG_INFO("TransportHandler [%s]: Skipping explicit handshake protocol.", gateway_id_.c_str());
+    logger_.Info("TransportHandler [{}]: Skipping explicit handshake protocol.", gateway_id_);
     return true; // Always succeed as there's no handshake to fail
 }
 
 void TransportHandler::handle_incoming_data() {
     if (!tcp_client_ || !tcp_client_->is_connected()) {
-        LOG_WARN("TransportHandler [%s]: Attempted to handle incoming data but not connected.", gateway_id_.c_str());
+        logger_.Warn("TransportHandler [{}]: Attempted to handle incoming data but not connected.", gateway_id_);
         connected_status_.store(false); // Ensure status is correct
         notify_observer_disconnected("Not connected during incoming data handling");
         return;
@@ -231,7 +233,7 @@ void TransportHandler::handle_incoming_data() {
     // Ensure not to overflow receive_buffer_ beyond MAX_RECEIVE_BUFFER_SIZE
     size_t space_available_in_buffer = MAX_RECEIVE_BUFFER_SIZE - receive_buffer_watermark_;
     if (space_available_in_buffer == 0) {
-        LOG_ERROR("TransportHandler [%s]: Receive buffer full (%zu bytes). Cannot read more data. Possible parsing stall or message too large.", gateway_id_.c_str(), MAX_RECEIVE_BUFFER_SIZE);
+        logger_.Error("TransportHandler [{}]: Receive buffer full ({} bytes). Cannot read more data. Possible parsing stall or message too large.", gateway_id_, MAX_RECEIVE_BUFFER_SIZE);
         // This is a critical situation. Options:
         // 1. Disconnect and report error.
         // 2. Clear buffer and try to resync (risky).
@@ -247,7 +249,7 @@ void TransportHandler::handle_incoming_data() {
 
     if (bytes_received > 0) {
         receive_buffer_watermark_ += bytes_received;
-        LOG_DEBUG("TransportHandler [%s]: Received %d bytes. Buffer watermark: %zu", gateway_id_.c_str(), bytes_received, receive_buffer_watermark_);
+        logger_.Debug("TransportHandler [{}]: Received {} bytes. Buffer watermark: {}", gateway_id_, bytes_received, receive_buffer_watermark_);
 
         // Process all complete messages in the buffer
         while (!shutdown_requested_.load()) {
@@ -263,7 +265,7 @@ void TransportHandler::handle_incoming_data() {
                 // if parse_modular_gw_header returns nullopt for insufficient data for fixed part.
                 // If it returns nullopt for other reasons (e.g. bad magic number with enough bytes),
                 // we might have a desync.
-                LOG_ERROR("TransportHandler [%s]: Failed to parse message header from buffered data (watermark: %zu). Possible data corruption or desync.", gateway_id_.c_str(), receive_buffer_watermark_);
+                logger_.Error("TransportHandler [{}]: Failed to parse message header from buffered data (watermark: {}). Possible data corruption or desync.", gateway_id_, receive_buffer_watermark_);
                 // Desync handling: clear buffer and hope for the best, or disconnect.
                 // For now, clearing buffer to try to recover. This is a simplistic approach.
                 receive_buffer_watermark_ = 0; 
@@ -275,24 +277,24 @@ void TransportHandler::handle_incoming_data() {
 
             if (receive_buffer_watermark_ >= total_expected_msg_len) {
                 // We have a complete message
-                LOG_DEBUG("TransportHandler [%s]: Complete message received (Total: %zu bytes). Routing...", gateway_id_.c_str(), total_expected_msg_len);
+                logger_.Debug("TransportHandler [{}]: Complete message received (Total: {} bytes). Routing...", gateway_id_, total_expected_msg_len);
                 
                 auto msg_to_route = std::make_shared<Message>();
                 msg_to_route->data.assign(receive_buffer_.data(), receive_buffer_.data() + total_expected_msg_len);
 
                 auto destinations = routing_table_->get_destinations(header_info->routing_key);
                 if (destinations.empty()) {
-                    LOG_WARN("TransportHandler [%s]: No route found for SourceID: %u, MsgType: %u", 
-                             gateway_id_.c_str(), header_info->routing_key.source_id, header_info->routing_key.message_type);
+                    logger_.Warn("TransportHandler [{}]: No route found for SourceID: {}, MsgType: {}", 
+                             gateway_id_, header_info->routing_key.source_id, header_info->routing_key.message_type);
                 } else {
                     for (const auto& dest_queue : destinations) {
                         if (dest_queue) { // Ensure queue pointer is valid
                             if (!dest_queue->enqueue(msg_to_route)) { // MPSC queue enqueue
-                                LOG_ERROR("TransportHandler [%s]: Failed to enqueue message to destination queue.", gateway_id_.c_str());
+                                logger_.Error("TransportHandler [{}]: Failed to enqueue message to destination queue.", gateway_id_);
                                 // Potentially notify CP or handle queue full scenario
                             } else {
-                                LOG_DEBUG("TransportHandler [%s]: Enqueued message for SourceID: %u, MsgType: %u", 
-                                          gateway_id_.c_str(), header_info->routing_key.source_id, header_info->routing_key.message_type);
+                                logger_.Debug("TransportHandler [{}]: Enqueued message for SourceID: {}, MsgType: {}", 
+                                          gateway_id_, header_info->routing_key.source_id, header_info->routing_key.message_type);
                             }
                         }
                     }
@@ -303,23 +305,23 @@ void TransportHandler::handle_incoming_data() {
                     std::memmove(receive_buffer_.data(), receive_buffer_.data() + total_expected_msg_len, receive_buffer_watermark_ - total_expected_msg_len);
                 }
                 receive_buffer_watermark_ -= total_expected_msg_len;
-                LOG_DEBUG("TransportHandler [%s]: Processed message. New buffer watermark: %zu", gateway_id_.c_str(), receive_buffer_watermark_);
+                logger_.Debug("TransportHandler [{}]: Processed message. New buffer watermark: {}", gateway_id_, receive_buffer_watermark_);
 
             } else {
                 // Not enough data for a complete message yet, need to read more
-                LOG_DEBUG("TransportHandler [%s]: Incomplete message. Expected: %zu, Have: %zu. Waiting for more data.", gateway_id_.c_str(), total_expected_msg_len, receive_buffer_watermark_);
+                logger_.Debug("TransportHandler [{}]: Incomplete message. Expected: {}, Have: {}. Waiting for more data.", gateway_id_, total_expected_msg_len, receive_buffer_watermark_);
                 break; 
             }
         }
     } else if (bytes_received == 0) {
         // Peer closed connection gracefully
-        LOG_INFO("TransportHandler [%s]: Connection closed by peer (received 0 bytes).", gateway_id_.c_str());
+        logger_.Info("TransportHandler [{}]: Connection closed by peer (received 0 bytes).", gateway_id_);
         connected_status_.store(false);
         notify_observer_disconnected("Peer closed connection");
         if(tcp_client_) tcp_client_->disconnect(); // Ensure our side is also closed
     } else { // bytes_received < 0
         // Error during receive
-        LOG_ERROR("TransportHandler [%s]: Receive error: %s (errno: %d). Disconnecting.", gateway_id_.c_str(), strerror(errno), errno);
+        logger_.Error("TransportHandler [{}]: Receive error: {} (errno: {}). Disconnecting.", gateway_id_, strerror(errno), errno);
         connected_status_.store(false);
         notify_observer_disconnected("Receive error");
         if(tcp_client_) tcp_client_->disconnect();
@@ -338,18 +340,18 @@ bool TransportHandler::handle_outgoing_messages() {
     if (input_queue_->try_dequeue(msg_to_send)) {
         work_has_been_done = true;
         if (msg_to_send && !msg_to_send->data.empty()) {
-            LOG_DEBUG("TransportHandler [%s]: Dequeued message of size %zu to send.", gateway_id_.c_str(), msg_to_send->data.size());
+            logger_.Debug("TransportHandler [{}]: Dequeued message of size {} to send.", gateway_id_, msg_to_send->data.size());
             if (!tcp_client_->send_data(msg_to_send->data.data(), msg_to_send->data.size())) {
-                LOG_ERROR("TransportHandler [%s]: Failed to send message of size %zu. Error: %s. Disconnecting.", 
-                          gateway_id_.c_str(), msg_to_send->data.size(), strerror(errno));
+                logger_.Error("TransportHandler [{}]: Failed to send message of size {}. Error: {}. Disconnecting.", 
+                          gateway_id_, msg_to_send->data.size(), strerror(errno));
                 connected_status_.store(false);
                 notify_observer_disconnected("Send error");
                 if(tcp_client_) tcp_client_->disconnect();
             } else {
-                LOG_DEBUG("TransportHandler [%s]: Successfully sent message of size %zu.", gateway_id_.c_str(), msg_to_send->data.size());
+                logger_.Debug("TransportHandler [{}]: Successfully sent message of size {}.", gateway_id_, msg_to_send->data.size());
             }
         } else {
-            LOG_WARN("TransportHandler [%s]: Dequeued null or empty message from input queue.", gateway_id_.c_str());
+            logger_.Warn("TransportHandler [{}]: Dequeued null or empty message from input queue.", gateway_id_);
         }
     }
 
@@ -362,20 +364,20 @@ bool TransportHandler::handle_outgoing_messages() {
 void TransportHandler::notify_observer_connected() {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerConnected(gateway_id_); // Uncomment when ready
-        LOG_DEBUG("TransportHandler [%s]: Placeholder: Would notify observer of connection.", gateway_id_.c_str());
+        logger_.Debug("TransportHandler [{}]: Placeholder: Would notify observer of connection.", gateway_id_);
     }
 }
 
 void TransportHandler::notify_observer_disconnected(const std::string& reason) {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerDisconnected(gateway_id_, reason); // Uncomment when ready
-        LOG_DEBUG("TransportHandler [%s]: Placeholder: Would notify observer of disconnection. Reason: %s", gateway_id_.c_str(), reason.c_str());
+        logger_.Debug("TransportHandler [{}]: Placeholder: Would notify observer of disconnection. Reason: {}", gateway_id_, reason);
     }
 }
 
 void TransportHandler::notify_observer_critical_error(const std::string& error_message) {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerCriticalError(gateway_id_, error_message); // Uncomment when ready
-        LOG_DEBUG("TransportHandler [%s]: Placeholder: Would notify observer of critical error: %s", gateway_id_.c_str(), error_message.c_str());
+        logger_.Debug("TransportHandler [{}]: Placeholder: Would notify observer of critical error: {}", gateway_id_, error_message);
     }
 }

@@ -1,7 +1,9 @@
 #include "GlobalConfig.hpp"
-#include <transport/logging_utils.hpp>
+#include "logging/logger.h" // For CppLogging
 
 bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
+    CppLogging::Logger logger("bridge");
+    
     try {
         // Clear existing configuration
         tasks_.clear();
@@ -37,8 +39,8 @@ bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
                 task_id_to_index_[task.task_id] = tasks_.size();
                 tasks_.push_back(std::move(task));
                 
-                LOG_INFO("GlobalConfig: Parsed task %u (%s) with %zu input types and %zu output types",
-                    task.task_id, task.task_name.c_str(),
+                logger.Info("GlobalConfig: Parsed task {} ({}) with {} input types and {} output types",
+                    task.task_id, task.task_name,
                     task.input_message_types.size(),
                     task.output_message_types.size());
             }
@@ -53,13 +55,13 @@ bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
             max_concurrent_sessions_ = config_json["max_concurrent_sessions"];
         }
         
-        LOG_INFO("GlobalConfig: Successfully parsed %zu tasks, timeout=%u, max_sessions=%u",
+        logger.Info("GlobalConfig: Successfully parsed {} tasks, timeout={}, max_sessions={}",
             tasks_.size(), default_session_timeout_, max_concurrent_sessions_);
         
         return true;
         
     } catch (const std::exception& e) {
-        LOG_ERROR("GlobalConfig: Failed to parse configuration JSON: %s", e.what());
+        logger.Error("GlobalConfig: Failed to parse configuration JSON: {}", e.what());
         return false;
     }
 }

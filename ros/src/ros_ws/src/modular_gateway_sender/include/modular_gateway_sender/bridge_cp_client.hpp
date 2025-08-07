@@ -32,7 +32,7 @@ public:
 
     // Callbacks to notify the GatewayController
     using DpConfirmedCallback = std::function<void()>;
-    using SessionApprovedCallback = std::function<void(const std::string& request_id)>;
+    using SessionApprovedCallback = std::function<void(const nlohmann::json& payload)>;
     using SessionDeniedCallback = std::function<void(const std::string& request_id, const std::string& reason)>;
 
     BridgeCpClient();
