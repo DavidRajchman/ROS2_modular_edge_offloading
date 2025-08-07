@@ -164,10 +164,25 @@ void BridgeCpClient::check_for_timeouts() {
     for (const auto& msg : messages_to_resend) {
         std::string msg_str = msg.dump();
         std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
-        transport_->async_send_data(std::move(data));
-        // Also update the time_sent for the resent message
+        TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
+        
         uint64_t seq_num = msg["sequence_number"];
-        pending_acks_[seq_num].time_sent = std::chrono::steady_clock::now();
+        if (result == TransportAsyncSendResult::SUCCESS) {
+            // Only update the time_sent if the resend was successful
+            pending_acks_[seq_num].time_sent = std::chrono::steady_clock::now();
+            logger_.Debug("bridge_cp_client.cpp: Successfully resent message with sequence number {}", seq_num);
+        } else {
+            // Log the specific failure reason
+            const char* error_str = "UNKNOWN";
+            switch (result) {
+                case TransportAsyncSendResult::QUEUE_FULL: error_str = "QUEUE_FULL"; break;
+                case TransportAsyncSendResult::NOT_CONNECTED: error_str = "NOT_CONNECTED"; break;
+                case TransportAsyncSendResult::INTERNAL_ERROR: error_str = "INTERNAL_ERROR"; break;
+                default: break;
+            }
+            logger_.Error("bridge_cp_client.cpp: Failed to resend message with sequence number {}: {}", seq_num, error_str);
+            // Do NOT update time_sent so it will be retried again next timeout check
+        }
     }
 }
 
@@ -180,15 +195,28 @@ void BridgeCpClient::send_reliable_message(json& msg) {
     uint64_t seq_num = sequence_number_++;
     msg["sequence_number"] = seq_num;
 
-    {
-        std::lock_guard<std::mutex> lock(pending_acks_mutex_);
-        pending_acks_[seq_num] = {msg, std::chrono::steady_clock::now()};
-    }
-
     logger_.Info("bridge_cp_client.cpp: Sending reliable message: {}", msg.dump());
     std::string msg_str = msg.dump();
     std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
-    transport_->async_send_data(std::move(data));
+    TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
+    
+    if (result == TransportAsyncSendResult::SUCCESS) {
+        // Only add to pending_acks if the send was successful
+        std::lock_guard<std::mutex> lock(pending_acks_mutex_);
+        pending_acks_[seq_num] = {msg, std::chrono::steady_clock::now()};
+        logger_.Debug("bridge_cp_client.cpp: Message with sequence number {} queued for ACK tracking", seq_num);
+    } else {
+        // Log the specific failure reason
+        const char* error_str = "UNKNOWN";
+        switch (result) {
+            case TransportAsyncSendResult::QUEUE_FULL: error_str = "QUEUE_FULL"; break;
+            case TransportAsyncSendResult::NOT_CONNECTED: error_str = "NOT_CONNECTED"; break;
+            case TransportAsyncSendResult::INTERNAL_ERROR: error_str = "INTERNAL_ERROR"; break;
+            default: break;
+        }
+        logger_.Error("bridge_cp_client.cpp: Failed to send message with sequence number {}: {}", seq_num, error_str);
+        // Do not add to pending_acks since the message was not actually sent
+    }
 }
 
 void BridgeCpClient::send_ack(int ack_sequence_number, const std::string& component_id) {
@@ -204,7 +232,18 @@ void BridgeCpClient::send_ack(int ack_sequence_number, const std::string& compon
     logger_.Info("bridge_cp_client.cpp: Sending ACK for sequence number {}", ack_sequence_number);
     std::string msg_str = ack_msg.dump();
     std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
-    transport_->async_send_data(std::move(data));
+    TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
+    
+    if (result != TransportAsyncSendResult::SUCCESS) {
+        const char* error_str = "UNKNOWN";
+        switch (result) {
+            case TransportAsyncSendResult::QUEUE_FULL: error_str = "QUEUE_FULL"; break;
+            case TransportAsyncSendResult::NOT_CONNECTED: error_str = "NOT_CONNECTED"; break;
+            case TransportAsyncSendResult::INTERNAL_ERROR: error_str = "INTERNAL_ERROR"; break;
+            default: break;
+        }
+        logger_.Warn("bridge_cp_client.cpp: Failed to send ACK for sequence number {}: {}", ack_sequence_number, error_str);
+    }
 }
 
 void BridgeCpClient::send_dp_info(const std::string& component_id, const std::string& dp_host, int dp_port) {

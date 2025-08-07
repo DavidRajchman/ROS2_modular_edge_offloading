@@ -110,8 +110,12 @@ void TcpClientTransport::disconnect()
 
 TransportAsyncSendResult TcpClientTransport::async_send_data(std::vector<uint8_t>&& data)
 {
-    if (!is_connected()) return TransportAsyncSendResult::NOT_CONNECTED;
+    if (!is_connected()) {
+        logger_.Debug("tcp_client_transport.cpp: async_send_data failed - not connected");
+        return TransportAsyncSendResult::NOT_CONNECTED;
+    }
     if (!outgoing_queue_.try_enqueue(std::move(data))) {
+        logger_.Warn("tcp_client_transport.cpp: async_send_data failed - outgoing queue is full");
         return TransportAsyncSendResult::QUEUE_FULL;
     }
     return TransportAsyncSendResult::SUCCESS;
@@ -119,6 +123,9 @@ TransportAsyncSendResult TcpClientTransport::async_send_data(std::vector<uint8_t
 
 void TcpClientTransport::sender_thread_func()
 {
+    auto last_status_log = std::chrono::steady_clock::now();
+    size_t messages_processed = 0;
+    
     while (sender_thread_running_) {
         if (!is_connected()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -128,8 +135,19 @@ void TcpClientTransport::sender_thread_func()
         std::vector<uint8_t> data;
         if (!outgoing_queue_.try_dequeue(data)) {
             std::this_thread::sleep_for(std::chrono::microseconds(50));
+            
+            // Log sender thread status every 30 seconds
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_status_log > std::chrono::seconds(30)) {
+                logger_.Info("tcp_client_transport.cpp: Sender thread active, processed {} messages", messages_processed);
+                last_status_log = now;
+                messages_processed = 0;
+            }
             continue;
         }
+
+        messages_processed++;
+        logger_.Debug("tcp_client_transport.cpp: Sending {} bytes", data.size());
 
         int fd = socket_fd_.load();
         uint64_t timestamp_before_send = connection_timestamp_.load();
@@ -152,7 +170,12 @@ void TcpClientTransport::sender_thread_func()
         if (!send_error && timestamp_before_send != connection_timestamp_.load()) {
             logger_.Error("tcp_client_transport.cpp: CRITICAL FAULT: Data sent successfully, but connection instance changed. Data delivery uncertain.");
         }
+        
+        if (!send_error) {
+            logger_.Debug("tcp_client_transport.cpp: Successfully sent {} bytes", data.size());
+        }
     }
+    logger_.Info("tcp_client_transport.cpp: Sender thread shutting down after processing {} messages", messages_processed);
 }
 
 void TcpClientTransport::handle_disconnect_detected()
