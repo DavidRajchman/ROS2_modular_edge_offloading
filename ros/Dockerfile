@@ -10,8 +10,6 @@ RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-inf
 
 # Nastavte pracovní adresář
 COPY ./src /home/ubuntu/
-COPY ./cpplib /home/ubuntu/cpplib_src_build_time
-
 
 # Instalace balíčků pro ROS 2 a gz_bridge
 RUN apt update && apt install -y \
@@ -39,15 +37,6 @@ python3-serial
 # Install gil (used by CppCommon and CppLogging)
 RUN python3 -m pip config set global.break-system-packages true
 RUN pip3 install gil
-
-#build and install discovery protocol
-WORKDIR /home/ubuntu/cpplib_src_build_time/discovery_protocol
-RUN rm -rf build && \
-    mkdir build && \
-    cd build && \
-    cmake .. && \
-    make -j$(nproc) && \
-    make install
 
 # --- Setup External Libraries (CppCommon, CppLogging, fmt, moodycamel) ---
 # Create a directory to hold the cloned sources
