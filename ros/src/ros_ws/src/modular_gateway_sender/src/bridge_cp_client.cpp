@@ -1,6 +1,8 @@
 #include "modular_gateway_sender/bridge_cp_client.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
 #include <vector>
+#include <thread>
+#include <chrono>
 
 namespace gateway {
 
@@ -56,6 +58,8 @@ void BridgeCpClient::stop() {
 
 void BridgeCpClient::client_thread_func() {
     while (running_) {
+        bool received_data = false;
+        
         if (transport_ && transport_->is_connected() && transport_->data_available(1000)) { // Check for data with a 1s timeout
             std::vector<uint8_t> buffer(4096); // Buffer for incoming data
             int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
@@ -66,6 +70,7 @@ void BridgeCpClient::client_thread_func() {
                 try {
                     json msg = json::parse(json_str);
                     handle_received_message(msg);
+                    received_data = true;
                 } catch (const json::parse_error& e) {
                     logger_.Error("bridge_cp_client.cpp: JSON parse error: {}. Received data: {}", e.what(), json_str);
                 }
@@ -74,8 +79,15 @@ void BridgeCpClient::client_thread_func() {
                 // The loop will continue, and is_connected() will eventually be false.
             }
         }
+        
         // Periodically check for messages that need to be re-sent
         check_for_timeouts();
+        
+        // If we didn't receive any data and transport is not connected, add a small delay
+        // to prevent tight looping when connection is lost
+        if (!received_data && (!transport_ || !transport_->is_connected())) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     }
 }
 
@@ -151,26 +163,37 @@ void BridgeCpClient::handle_received_message(const json& msg) {
 void BridgeCpClient::check_for_timeouts() {
     std::lock_guard<std::mutex> lock(pending_acks_mutex_);
     auto now = std::chrono::steady_clock::now();
-    std::vector<json> messages_to_resend;
+    std::vector<std::pair<uint64_t, json>> messages_to_resend; // Store seq_num with message for debugging
 
+    logger_.Debug("bridge_cp_client.cpp: Checking timeouts for {} pending messages", pending_acks_.size());
+    
     for (auto const& [seq_num, pending] : pending_acks_) {
+        auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - pending.time_sent);
+        logger_.Debug("bridge_cp_client.cpp: Sequence {} elapsed time: {}s, timeout: {}s", 
+                     seq_num, time_elapsed.count(), ack_timeout_.count());
+        
         if (now - pending.time_sent > ack_timeout_) {
             logger_.Warn("bridge_cp_client.cpp: ACK timeout for sequence number {}. Resending.", seq_num);
-            messages_to_resend.push_back(pending.message);
+            messages_to_resend.emplace_back(seq_num, pending.message);
         }
     }
 
+    logger_.Debug("bridge_cp_client.cpp: Found {} messages to resend", messages_to_resend.size());
+
     // Resend outside the loop to avoid iterator invalidation issues if we were modifying the map
-    for (const auto& msg : messages_to_resend) {
+    for (const auto& [seq_num, msg] : messages_to_resend) {
+        logger_.Info("bridge_cp_client.cpp: Attempting to resend sequence number {}", seq_num);
         std::string msg_str = msg.dump();
         std::vector<uint8_t> data(msg_str.begin(), msg_str.end());
         TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
         
-        uint64_t seq_num = msg["sequence_number"];
         if (result == TransportAsyncSendResult::SUCCESS) {
             // Only update the time_sent if the resend was successful
-            pending_acks_[seq_num].time_sent = std::chrono::steady_clock::now();
-            logger_.Debug("bridge_cp_client.cpp: Successfully resent message with sequence number {}", seq_num);
+            auto it = pending_acks_.find(seq_num);
+            if (it != pending_acks_.end()) {
+                it->second.time_sent = std::chrono::steady_clock::now();
+                logger_.Debug("bridge_cp_client.cpp: Successfully resent message with sequence number {}", seq_num);
+            }
         } else {
             // Log the specific failure reason
             const char* error_str = "UNKNOWN";
