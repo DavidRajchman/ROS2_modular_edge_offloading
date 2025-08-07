@@ -38,6 +38,15 @@ python3-serial
 RUN python3 -m pip config set global.break-system-packages true
 RUN pip3 install gil
 
+#build and install discovery protocol
+WORKDIR /home/ubuntu/cpplib_src_build_time/discovery_protocol
+RUN rm -rf build && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
+
 # --- Setup External Libraries (CppCommon, CppLogging, fmt, moodycamel) ---
 # Create a directory to hold the cloned sources
 ARG EXTERNAL_LIBS_DIR=/home/ubuntu/external_libs
