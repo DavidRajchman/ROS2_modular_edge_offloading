@@ -115,6 +115,8 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
         logger.Error("MGWCPConnection.cpp: Invalid message structure from connection {}", connection_id_);
         return;
     }
+
+
     
     // Extract component_id and set it if this is the first message
     std::string msg_component_id = message["component_id"];
@@ -238,7 +240,7 @@ void MGWCPConnection::handle_session_keepalive(const nlohmann::json& payload) {
     
     // Update keepalive in session manager
     if (session_manager_->update_keepalive(request_id)) {
-        logger.Debug("MGWCPConnection.cpp: Updated keepalive for session '{}' from '{}'", request_id, component_id_);
+        logger.Info("MGWCPConnection.cpp: Updated keepalive for session '{}' from '{}'", request_id, component_id_);
     } else {
         logger.Warn("MGWCPConnection.cpp: Unknown session '{}' in keepalive from '{}'", request_id, component_id_);
     }
