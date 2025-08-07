@@ -399,8 +399,8 @@ bool BridgeControlPlane::start_mgwcp_server() {
     
     logger.Info("BridgeControlPlane.cpp: Starting MGWCP server on port {}", MGWCP_SERVER_PORT);
     
-    // Create MGWCP server
-    mgwcp_server_ = std::make_unique<gateway::TcpServerTransport>(MGWCP_SERVER_PORT, true, MAX_MGWCP_CONNECTIONS);
+    // Create MGWCP server as shared_ptr
+    mgwcp_server_ = std::make_shared<gateway::TcpServerTransport>(MGWCP_SERVER_PORT, true, MAX_MGWCP_CONNECTIONS);
     
     // Set up callbacks
     mgwcp_server_->set_connect_callback([this](uint32_t client_id, const std::string& ip, int port) {
@@ -440,11 +440,11 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
     logger.Info("BridgeControlPlane.cpp: New MGWCP connection from {} (transport ID: {})", 
                client_ip, transport_client_id);
     
-    // Create MGWCPConnection using the server transport
+    // Now we can pass the shared_ptr directly without fake conversion
     auto mgwcp_connection = std::make_unique<MGWCPConnection>(
         next_mgwcp_connection_id_++,
-        std::shared_ptr<gateway::TcpServerTransport>(mgwcp_server_.get(), [](gateway::TcpServerTransport*){}),  // Convert unique_ptr to shared_ptr without taking ownership
-        transport_client_id,  // Pass the client ID
+        mgwcp_server_,  // Pass shared_ptr directly
+        transport_client_id,
         client_ip,
         session_manager_,
         [this](const std::string& mgwcp_id, const nlohmann::json& msg) {

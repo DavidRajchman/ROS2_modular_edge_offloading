@@ -110,7 +110,7 @@ private:
     std::mutex om_send_mutex_;
     
     // MGWCP server
-    std::unique_ptr<gateway::TcpServerTransport> mgwcp_server_;
+    std::shared_ptr<gateway::TcpServerTransport> mgwcp_server_;
     std::thread mgwcp_server_thread_;
     
     // MGWCP connections management

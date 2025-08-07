@@ -53,23 +53,56 @@ void MGWCPConnection::start() {
 void MGWCPConnection::stop() {
     CppLogging::Logger logger("bridge");
     
+    // Signal thread to stop
     running_.store(false);
     
-    if (connection_thread_.joinable()) {
-        logger.Info("MGWCPConnection.cpp: Stopping connection thread for connection {}", connection_id_);
-        connection_thread_.join();
+    // Disconnect client from server transport to unblock any pending operations
+    if (server_transport_ && server_transport_->is_client_connected(transport_client_id_)) {
+        try {
+            server_transport_->disconnect_client(transport_client_id_);
+            logger.Info("MGWCPConnection.cpp: Disconnected client {} from server transport", transport_client_id_);
+        } catch (const std::exception& e) {
+            logger.Error("MGWCPConnection.cpp: Error disconnecting client {}: {}", transport_client_id_, e.what());
+        }
     }
     
-    if (server_transport_ && server_transport_->is_client_connected(transport_client_id_)) {
-        server_transport_->disconnect_client(transport_client_id_);
+    // Wait for thread to finish with timeout
+    if (connection_thread_.joinable()) {
+        logger.Info("MGWCPConnection.cpp: Stopping connection thread for connection {}", connection_id_);
+        
+        // Use a separate thread to join with timeout
+        std::atomic<bool> thread_joined{false};
+        std::thread join_thread([this, &thread_joined]() {
+            connection_thread_.join();
+            thread_joined.store(true);
+        });
+        
+        // Wait up to 5 seconds for thread to join
+        auto start_time = std::chrono::steady_clock::now();
+        while (!thread_joined.load() && 
+               (std::chrono::steady_clock::now() - start_time) < std::chrono::seconds(5)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        if (thread_joined.load()) {
+            join_thread.join();
+            logger.Info("MGWCPConnection.cpp: Connection thread {} joined successfully", connection_id_);
+        } else {
+            logger.Warn("MGWCPConnection.cpp: Connection thread {} did not join within timeout", connection_id_);
+            join_thread.detach(); // Detach the helper thread
+        }
     }
     
     // Clean up sessions for this MGWCP
     if (session_manager_ && !component_id_.empty()) {
-        size_t cleaned_sessions = session_manager_->cleanup_sessions_for_mgwcp(component_id_);
-        if (cleaned_sessions > 0) {
-            logger.Info("MGWCPConnection.cpp: Cleaned up {} sessions for disconnected MGWCP '{}'", 
-                       cleaned_sessions, component_id_);
+        try {
+            size_t cleaned_sessions = session_manager_->cleanup_sessions_for_mgwcp(component_id_);
+            if (cleaned_sessions > 0) {
+                logger.Info("MGWCPConnection.cpp: Cleaned up {} sessions for disconnected MGWCP '{}'", 
+                           cleaned_sessions, component_id_);
+            }
+        } catch (const std::exception& e) {
+            logger.Error("MGWCPConnection.cpp: Error cleaning up sessions: {}", e.what());
         }
     }
     
@@ -83,33 +116,39 @@ void MGWCPConnection::connection_thread_func() {
     std::vector<uint8_t> buffer(MAX_MESSAGE_SIZE);
     
     while (running_.load() && server_transport_ && server_transport_->is_client_connected(transport_client_id_)) {
-        // Check for incoming data with timeout
-        if (server_transport_->data_available_from(transport_client_id_, 1000)) { // 1 second timeout
-            int bytes_received = server_transport_->receive_from(transport_client_id_, buffer.data(), buffer.size() - 1);
-            logger.Debug("MGWCPConnection.cpp: READ SOME DATA ");
-            if (bytes_received > 0) {
-                buffer[bytes_received] = '\0';
-                std::string json_str(reinterpret_cast<char*>(buffer.data()), bytes_received);
-                
-                // LOG ALL INCOMING CP MESSAGES AT INFO LEVEL
-                logger.Debug("MGWCPConnection.cpp: [INCOMING CP MESSAGE] Connection {}: {}", connection_id_, json_str);
+        try {
+            // Check for incoming data with timeout
+            if (server_transport_->data_available_from(transport_client_id_, 1000)) { // 1 second timeout
+                int bytes_received = server_transport_->receive_from(transport_client_id_, buffer.data(), buffer.size() - 1);
+                logger.Debug("MGWCPConnection.cpp: READ SOME DATA ");
+                if (bytes_received > 0) {
+                    buffer[bytes_received] = '\0';
+                    std::string json_str(reinterpret_cast<char*>(buffer.data()), bytes_received);
+                    
+                    // LOG ALL INCOMING CP MESSAGES AT INFO LEVEL
+                    logger.Debug("MGWCPConnection.cpp: [INCOMING CP MESSAGE] Connection {}: {}", connection_id_, json_str);
 
-
-                try {
-                    nlohmann::json message = nlohmann::json::parse(json_str);
-                    handle_received_message(message);
-                } catch (const nlohmann::json::parse_error& e) {
-                    logger.Error("MGWCPConnection.cpp: JSON parse error from connection {}: {}. Data: {}", 
-                                connection_id_, e.what(), json_str);
+                    try {
+                        nlohmann::json message = nlohmann::json::parse(json_str);
+                        handle_received_message(message);
+                    } catch (const nlohmann::json::parse_error& e) {
+                        logger.Error("MGWCPConnection.cpp: JSON parse error from connection {}: {}. Data: {}", 
+                                    connection_id_, e.what(), json_str);
+                    }
+                } else if (bytes_received < 0) {
+                    logger.Error("MGWCPConnection.cpp: Receive error on connection {}", connection_id_);
+                    break;
                 }
-            } else if (bytes_received < 0) {
-                logger.Error("MGWCPConnection.cpp: Receive error on connection {}", connection_id_);
-                break;
             }
+            
+            // Check for ACK timeouts and retries
+            check_for_timeouts();
+            
+        } catch (const std::exception& e) {
+            logger.Error("MGWCPConnection.cpp: Exception in connection thread {}: {}", connection_id_, e.what());
+            // Break on exception to avoid infinite crash loops
+            break;
         }
-        
-        // Check for ACK timeouts and retries
-        check_for_timeouts();
     }
     
     logger.Info("MGWCPConnection.cpp: Connection thread finished for connection {}", connection_id_);
@@ -130,7 +169,7 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
         handle_ack(message["payload"]);
         return;
     }
-    
+
     // Extract component_id and set it if this is the first message
     std::string msg_component_id = message["component_id"];
     if (component_id_.empty()) {
