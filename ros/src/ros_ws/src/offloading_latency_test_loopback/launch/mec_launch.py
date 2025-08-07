@@ -7,7 +7,7 @@ def generate_launch_description():
     # Declare launch arguments with default values
     discovery_host_arg = DeclareLaunchArgument(
         'discovery_host',
-        default_value='192.168.65.10',
+        default_value='192.168.65.5',
         description='Discovery service host address'
     )
     
@@ -61,7 +61,7 @@ def generate_launch_description():
     # MEC Test Node (echoes back received strings with processing timestamp)
     mec_test_node = Node(
         package='offloading_latency_test_loopback',
-        executable='mec_node',
+        executable='mec_processing_node',
         name='mec_test_node',
         parameters=[{
             'subscribe_topic': 'test/string_input',
