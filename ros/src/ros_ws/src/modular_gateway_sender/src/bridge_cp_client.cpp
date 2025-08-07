@@ -288,7 +288,7 @@ void BridgeCpClient::send_offload_request(const std::string& component_id, const
         {"message_code", 100},
         {"message_type", "OFFLOAD_REQUEST"},
         {"payload", {
-            {"request_id", request_id,  // Convert to numeric
+            {"request_id", request_id},  // Convert to numeric
             {"task_id", std::stoi(task_id)},        // Convert to numeric
             {"task_name", task_name}
         }}
@@ -302,7 +302,7 @@ void BridgeCpClient::send_session_keepalive(const std::string& component_id, con
         {"message_code", 101},
         {"message_type", "SESSION_KEEPALIVE"},
         {"payload", {
-            {"request_id", request_id  // Convert to numeric
+            {"request_id", request_id}  // Convert to numeric
         }}
     };
     send_reliable_message(msg);
@@ -314,7 +314,7 @@ void BridgeCpClient::send_session_terminate_request(const std::string& component
         {"message_code", 102},
         {"message_type", "SESSION_TERMINATE_REQUEST"},
         {"payload", {
-            {"request_id", request_id  // Convert to numeric
+            {"request_id", request_id}  // Convert to numeric
         }}
     };
     send_reliable_message(msg);
