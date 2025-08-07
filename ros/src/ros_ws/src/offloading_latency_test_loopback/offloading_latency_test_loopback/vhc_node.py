@@ -115,7 +115,7 @@ class VHCNode(Node):
             return
             
         request = RequestOffloading.Request()
-        request.task_id = "STRING_TEST_PIPELINE"
+        request.task_id = "3"  # Numeric task ID for STRING_TEST_PIPELINE from global config
         
         self.get_logger().info(f"VHC: Requesting offloading for task: {request.task_id}")
         

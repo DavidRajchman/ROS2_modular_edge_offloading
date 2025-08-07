@@ -31,14 +31,13 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
   // --- Mock Task Database Initialization ---
-  // Legacy tasks using required_handlers (backward compatibility)
-  task_database_["NAV_BASIC"] = {"Navigation Basic", {"sensor_msgs/msg/LaserScan"}, {}, {}};
-  task_database_["TELEOP_FULL"] = {"Teleoperation Full", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}, {}, {}};
-  task_database_["TEST_INPUT_ONLY"] = {"Test Input Only", {"test/string_input"}, {}, {}};
-  task_database_["TEST_RESULT_ONLY"] = {"Test Result Only", {"test/string_result"}, {}, {}};
-  
-  // New input/output oriented tasks
-  task_database_["STRING_TEST_PIPELINE"] = {"String Test Pipeline", {}, {"test/string_input"}, {"test/string_result"}};
+  // Using numeric task IDs as per global configuration
+  task_database_["1"] = {"STRING_PROCESSING", {"sensor_msgs/msg/LaserScan"}, {}, {}};
+  task_database_["2"] = {"LASER_SCAN_PROCESSING", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}, {}, {}};
+  task_database_["3"] = {"STRING_TEST_PIPELINE", {}, {"test/string_input"}, {"test/string_result"}};
+  task_database_["4"] = {"BASIC_DATA_PROCESSING", {"test/string_input"}, {}, {}};
+  task_database_["5"] = {"SENSOR_FUSION", {"test/string_result"}, {}, {}};
+  task_database_["6"] = {"COMPLETE_TEST_SUITE", {}, {"test/string_input"}, {"test/string_result"}};
   
   logger_.Info("gateway_controller.cpp: Initialized mock task database with {} tasks.", task_database_.size());
   // -----------------------------------------
