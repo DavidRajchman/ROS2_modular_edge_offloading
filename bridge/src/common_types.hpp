@@ -136,7 +136,7 @@ struct ParsedHeaderInfo {
  * @return An std::optional containing ParsedHeaderInfo if parsing is successful, otherwise std::nullopt.
  */
 inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char* buffer, size_t buffer_size) {
-    static CppLogging::Logger logger("logger");
+    static CppLogging::Logger logger("bridge");
     
     if (buffer_size < ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME) {
         logger.Error("parse_message_header: Insufficient data for header parsing (need at least {}, got {}).", ModGW::Header::MIN_HEADER_LEN_BEFORE_TOPIC_NAME, buffer_size);
@@ -181,7 +181,7 @@ inline std::optional<ParsedHeaderInfo> parse_message_header(const unsigned char*
  * @return An std::optional containing ParsedHeaderInfo if parsing is successful, otherwise std::nullopt.
  */
 inline std::optional<ParsedHeaderInfo> parse_message_header(const std::vector<unsigned char>& data_buffer) {
-    static CppLogging::Logger logger("parse_message_header");
+    static CppLogging::Logger logger("bridge");
     
     if (data_buffer.empty()) {
         logger.Debug("parse_message_header: Data buffer is empty.");
