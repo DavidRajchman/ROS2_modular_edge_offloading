@@ -16,7 +16,7 @@ std::unique_ptr<BridgeControlPlane> bridge_cp;
 
 void configure_logger() {
     // Create a binary layout processor for high-performance logging
-    auto sink = std::make_shared<CppLogging::Processor>(std::make_shared<CppLogging::BinaryLayout>());
+    auto sink = std::make_shared<CppLogging::AsyncWaitFreeProcessor>(std::make_shared<CppLogging::BinaryLayout>());
     
     // Add file appender for bridge logs
     sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
