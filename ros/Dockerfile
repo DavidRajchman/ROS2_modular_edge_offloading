@@ -10,6 +10,8 @@ RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-inf
 
 # Nastavte pracovní adresář
 COPY ./src /home/ubuntu/
+COPY ./cpplib /home/ubuntu/cpplib_src_build_time
+
 
 # Instalace balíčků pro ROS 2 a gz_bridge
 RUN apt update && apt install -y \
