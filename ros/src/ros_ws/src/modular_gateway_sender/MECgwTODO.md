@@ -66,11 +66,19 @@
   - ✅ Add new executable target for `mec_main.cpp` - COMPLETED
   - ✅ Ensure same dependencies as VHC executable - COMPLETED
 
-- [ ] **Launch Files (if any)**
-  - Create MEC-specific launch files with component_type parameter set to "M"
-  - Different default parameters (component_name, group_id, id_in_group)
+- [x] **Launch Files (if any)**
+  - ✅ Create MEC-specific launch files with component_type parameter set to "M" - COMPLETED
+  - ✅ Different default parameters (component_name, group_id, id_in_group) - COMPLETED
+  - ✅ Create VHC launch file that launches both MGW and VHC test node - COMPLETED
 
 ## Testing and Validation
+
+- [x] **Enhanced VHC Test Node**
+  - ✅ Modified VHC node to automatically request STRING_TEST_PIPELINE offloading - COMPLETED
+  - ✅ Added service client for RequestOffloading service - COMPLETED  
+  - ✅ Added proper error handling and logging for offloading requests - COMPLETED
+  - ✅ Uses correct string task identifier "STRING_TEST_PIPELINE" matching MGW task database - COMPLETED
+  - ✅ Launch file properly launches both MGW VHC executable and VHC test node - COMPLETED
 
 - [ ] **Test MEC Registration**
   - Verify MEC registers with DiscoveryService as type "M"

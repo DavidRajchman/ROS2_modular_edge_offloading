@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from modular_gateway_sender.srv import RequestOffloading
 import time
 
 class VHCNode(Node):
@@ -16,6 +17,8 @@ class VHCNode(Node):
         publish_interval = self.get_parameter('publish_interval_sec').get_parameter_value().double_value
         self.message_counter_max_val = self.get_parameter('message_counter_max').get_parameter_value().integer_value
 
+        # Create service client for requesting offloading from MGW
+        self.offloading_client = self.create_client(RequestOffloading, 'request_offloading')
 
         self.publisher_ = self.create_publisher(String, self.publish_topic_name, 10)
         self.subscription = self.create_subscription(
@@ -26,8 +29,13 @@ class VHCNode(Node):
         
         self.timer = self.create_timer(publish_interval, self.timer_callback)
         self.message_counter = 0 # Start counter at 0, will become 1 on first message
+        self.offloading_requested = False
+        
         self.get_logger().info(f"VHC Node started. Publishing to '{self.publish_topic_name}', "
                                f"subscribing to '{self.subscribe_topic_name}'.")
+        
+        # Request offloading after a short delay to ensure all services are ready
+        self.create_timer(2.0, self.request_offloading_once)
 
     def get_current_timestamp_ns(self):
         now_rclpy_time = self.get_clock().now()
@@ -96,6 +104,36 @@ class VHCNode(Node):
             self.get_logger().error(f"VHC: Error parsing timestamps: {e}. Data: {received_data}")
         except Exception as e:
             self.get_logger().error(f"VHC: An unexpected error occurred: {e}. Data: {received_data}")
+
+    def request_offloading_once(self):
+        """Request offloading of STRING_TEST_PIPELINE task from MGW (one-time only)"""
+        if self.offloading_requested:
+            return
+            
+        if not self.offloading_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error("VHC: MGW offloading service not available after 5 seconds")
+            return
+            
+        request = RequestOffloading.Request()
+        request.task_id = "STRING_TEST_PIPELINE"
+        
+        self.get_logger().info(f"VHC: Requesting offloading for task: {request.task_id}")
+        
+        future = self.offloading_client.call_async(request)
+        future.add_done_callback(self.offloading_response_callback)
+        self.offloading_requested = True
+
+    def offloading_response_callback(self, future):
+        """Handle the response from the offloading request"""
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(f"VHC: Offloading request successful! Request ID: {response.request_id}")
+                self.get_logger().info(f"VHC: Message: {response.message}")
+            else:
+                self.get_logger().error(f"VHC: Offloading request failed: {response.message}")
+        except Exception as e:
+            self.get_logger().error(f"VHC: Error in offloading request: {str(e)}")
 
 def main(args=None):
     rclpy.init(args=args)

@@ -8,6 +8,8 @@
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>modular_gateway_sender</depend>
+  <depend>launch_ros</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
