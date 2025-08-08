@@ -35,6 +35,7 @@ public:
   virtual bool receive_exact(void* buffer, size_t size) = 0;
 
   // Make accept_connection a public part of the interface for server transports
+  // Return value semantics for server transports: true => a NEW connection was accepted this call; false => no new connection.
   virtual bool accept_connection() { return false; } // Default implementation for clients
 };
 
@@ -50,6 +51,7 @@ public:
   bool data_available(int timeout_ms = 0) override;
   int receive_data(void* buffer, size_t max_size) override;
   bool receive_exact(void* buffer, size_t size) override;
+  // Returns true only when a NEW client connection is accepted; returns false if already connected or on error/timeout.
   bool accept_connection() override;
 
 private:

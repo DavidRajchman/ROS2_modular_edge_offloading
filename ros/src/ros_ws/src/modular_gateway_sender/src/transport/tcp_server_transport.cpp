@@ -175,8 +175,9 @@ bool TcpServerTransport::accept_connection()
     }
     if (client_connected_)
     {
-        logger_.Warn("tcp_server_transport.cpp: Already have a client, not accepting new one.");
-        return true;
+        // Already have an active client connection. Do not log repeatedly or report a new accept.
+        // Returning false prevents higher-level logic from treating this as a freshly accepted connection.
+        return false;
     }
 
     logger_.Info("tcp_server_transport.cpp: Waiting to accept a new connection...");
