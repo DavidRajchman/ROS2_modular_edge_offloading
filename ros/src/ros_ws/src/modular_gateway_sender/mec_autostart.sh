@@ -68,8 +68,22 @@ fi
 echo "Building modular_gateway_sender and offloading_latency_test_loopback..."
 colcon build --packages-select modular_gateway_sender offloading_latency_test_loopback
 
-echo "Sourcing workspace..."
-source "${ROS_WS}/install/setup.bash"
+# Safe sourcing helper to avoid 'set -u' unbound variable errors in generated scripts
+safe_source() {
+  local script="$1"
+  if [[ -f "$script" ]]; then
+    # Ensure COLCON_TRACE is defined (even empty) to avoid unbound variable when referenced
+    : "${COLCON_TRACE:=}"
+    set +u
+    . "$script"
+    set -u
+  else
+    echo "WARNING: Tried to source missing script: $script" >&2
+  fi
+}
+
+echo "Sourcing workspace (safe)..."
+safe_source "${ROS_WS}/install/setup.bash"
 
 echo "Launching MEC stack..."
 exec ros2 launch offloading_latency_test_loopback mec_launch.py

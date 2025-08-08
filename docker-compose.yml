@@ -20,7 +20,7 @@ services:
 
     privileged: true
     tty: true
-    command: ["/bin/bash","-c","source /opt/ros/jazzy/setup.bash && /home/ubuntu/ros_ws/src/modular_gateway_sender/vhc_autostart.sh"] 
+    command: ["/bin/bash","-c","source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/vhc_autostart.sh"] 
     networks:
       public_net:
           ipv4_address: 192.168.65.101
@@ -47,7 +47,7 @@ services:
 
     privileged: true
     tty: true
-    command: ["/bin/bash","-c","source /opt/ros/jazzy/setup.bash && /home/ubuntu/ros_ws/src/modular_gateway_sender/vhc_autostart.sh"] # Example: different command, or another rviz2 if display handles it
+    command: ["/bin/bash","-c","source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/mec_autostart.sh"] # Example: different command, or another rviz2 if display handles it
     networks:
       public_net:
           ipv4_address: 192.168.65.102
