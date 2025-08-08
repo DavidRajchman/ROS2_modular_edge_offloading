@@ -111,27 +111,66 @@ void BridgeCpClient::handle_received_message(const json& msg) {
     switch (code) {
         case 200: // SESSION_APPROVED
             if (on_session_approved_ && msg.contains("payload")) {
-                // Log additional context for SESSION_APPROVED messages
-                if (msg["payload"].contains("request_id")) {
-                    std::string request_id = msg["payload"]["request_id"];
-                    logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED for request_id '{}'", request_id);
+                json payload_copy = msg["payload"]; // make a mutable copy we can normalize
+
+                // Normalize request_id (may be number or string)
+                if (payload_copy.contains("request_id")) {
+                    try {
+                        if (payload_copy["request_id"].is_string()) {
+                            std::string request_id_str = payload_copy["request_id"].get<std::string>();
+                            logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED for request_id '{}'", request_id_str);
+                        } else if (payload_copy["request_id"].is_number_integer()) {
+                            auto rid_val = payload_copy["request_id"].get<int64_t>();
+                            std::string request_id_str = std::to_string(rid_val);
+                            payload_copy["request_id"] = request_id_str; // replace with string for downstream code expecting string
+                            logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED for numeric request_id {} (normalized to '{}')", rid_val, request_id_str);
+                        } else {
+                            logger_.Warn("bridge_cp_client.cpp: SESSION_APPROVED request_id has unexpected type (neither string nor integer)");
+                        }
+                    } catch (const std::exception& ex) {
+                        logger_.Error("bridge_cp_client.cpp: Exception normalizing request_id: {}", ex.what());
+                    }
                 } else {
                     logger_.Info("bridge_cp_client.cpp: Processing SESSION_APPROVED without request_id (likely unsolicited for MEC)");
                 }
                 
-                // Ensure task_id is present for MEC case
-                if (!msg["payload"].contains("task_id")) {
+                // Ensure task_id is present for MEC case and normalize
+                if (payload_copy.contains("task_id")) {
+                    try {
+                        if (payload_copy["task_id"].is_number_integer()) {
+                            auto tid_val = payload_copy["task_id"].get<int64_t>();
+                            std::string task_id_str = std::to_string(tid_val);
+                            payload_copy["task_id"] = task_id_str; // store as string for uniform handling downstream
+                            logger_.Info("bridge_cp_client.cpp: Normalized numeric task_id {} to '{}'", tid_val, task_id_str);
+                        } else if (payload_copy["task_id"].is_string()) {
+                            logger_.Info("bridge_cp_client.cpp: task_id already string: '{}'", payload_copy["task_id"].get<std::string>());
+                        } else {
+                            logger_.Warn("bridge_cp_client.cpp: SESSION_APPROVED task_id has unexpected type");
+                        }
+                    } catch (const std::exception& ex) {
+                        logger_.Error("bridge_cp_client.cpp: Exception normalizing task_id: {}", ex.what());
+                    }
+                } else {
                     logger_.Warn("bridge_cp_client.cpp: SESSION_APPROVED payload missing task_id - may cause issues for MEC components");
                 }
                 
-                on_session_approved_(msg["payload"]);
+                on_session_approved_(payload_copy);
             } else {
                 logger_.Error("bridge_cp_client.cpp: Malformed SESSION_APPROVED message.");
             }
             break;
         case 201: // SESSION_DENIED
             if (on_session_denied_ && msg.contains("payload") && msg["payload"].contains("request_id") && msg["payload"].contains("reason_description")) {
-                on_session_denied_(msg["payload"]["request_id"], msg["payload"]["reason_description"]);
+                try {
+                    std::string request_id_str;
+                    const auto& rid = msg["payload"]["request_id"];
+                    if (rid.is_string()) request_id_str = rid.get<std::string>();
+                    else if (rid.is_number_integer()) request_id_str = std::to_string(rid.get<int64_t>());
+                    else request_id_str = "";
+                    on_session_denied_(request_id_str, msg["payload"]["reason_description"].get<std::string>());
+                } catch (const std::exception& ex) {
+                    logger_.Error("bridge_cp_client.cpp: Exception handling SESSION_DENIED: {}", ex.what());
+                }
             } else {
                 logger_.Error("bridge_cp_client.cpp: Malformed SESSION_DENIED message.");
             }
@@ -288,8 +327,8 @@ void BridgeCpClient::send_offload_request(const std::string& component_id, const
         {"message_code", 100},
         {"message_type", "OFFLOAD_REQUEST"},
         {"payload", {
-            {"request_id", request_id},  // Convert to numeric
-            {"task_id", std::stoi(task_id)},        // Convert to numeric
+            {"request_id", request_id},  // Convert to numeric upstream if required
+            {"task_id", std::stoi(task_id)},        // Convert to numeric for transport
             {"task_name", task_name}
         }}
     };
@@ -302,7 +341,7 @@ void BridgeCpClient::send_session_keepalive(const std::string& component_id, con
         {"message_code", 101},
         {"message_type", "SESSION_KEEPALIVE"},
         {"payload", {
-            {"request_id", request_id}  // Convert to numeric
+            {"request_id", request_id}  // Convert to numeric upstream if required
         }}
     };
     send_reliable_message(msg);
@@ -314,7 +353,7 @@ void BridgeCpClient::send_session_terminate_request(const std::string& component
         {"message_code", 102},
         {"message_type", "SESSION_TERMINATE_REQUEST"},
         {"payload", {
-            {"request_id", request_id}  // Convert to numeric
+            {"request_id", request_id}  // Convert to numeric upstream if required
         }}
     };
     send_reliable_message(msg);
