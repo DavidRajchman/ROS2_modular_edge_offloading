@@ -31,7 +31,8 @@ public:
         int connect_max_retries = 5,
         int connect_retry_delay_ms = 1000,
         size_t receive_buffer_size = 8192, // 8KB default buffer for incoming data
-        int minimum_sleep_time_us = 200 //time the running loop will sleep for in us if no messages are received or sent
+        int minimum_sleep_time_us = 200, //time the running loop will sleep for in us if no messages are received or sent
+        int max_connect_cycles = 2 // Number of full attempt_connection() cycles before permanent failure
     );
 
     ~TransportHandler();
@@ -90,6 +91,8 @@ private:
     int connect_retry_delay_ms_;
     const size_t MAX_RECEIVE_BUFFER_SIZE; // Max size for receive_buffer_
     const int minimum_sleep_time_us_;
+    int max_connect_cycles_;              // New: maximum number of connection cycles allowed
+    int failed_connect_cycles_;           // New: number of failed cycles so far
 
     // Logging
     CppLogging::Logger logger_;

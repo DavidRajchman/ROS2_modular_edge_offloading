@@ -20,7 +20,8 @@ TransportHandler::TransportHandler(
     int connect_max_retries,
     int connect_retry_delay_ms,
     size_t receive_buffer_size,
-    int minimum_sleep_time_us 
+    int minimum_sleep_time_us,
+    int max_connect_cycles
 ) : gateway_id_(std::move(gateway_id)),
     target_ip_(std::move(target_ip)),
     target_port_(target_port),
@@ -34,6 +35,8 @@ TransportHandler::TransportHandler(
     connect_retry_delay_ms_(connect_retry_delay_ms),
     MAX_RECEIVE_BUFFER_SIZE(receive_buffer_size), // Initialize const member
     minimum_sleep_time_us_(minimum_sleep_time_us),
+    max_connect_cycles_(max_connect_cycles),
+    failed_connect_cycles_(0),
     logger_("bridge")
 {
     if (!input_queue_) {
@@ -129,14 +132,22 @@ void TransportHandler::run_internal() {
             if (attempt_connection()) {
                 logger_.Info("TransportHandler [{}]: Successfully connected to {}:{}.", gateway_id_, target_ip_, target_port_);
                 connected_status_.store(true);
+                failed_connect_cycles_ = 0; // Reset cycle failures on success
                 notify_observer_connected(); // Placeholder for actual notification
             } else {
-                logger_.Warn("TransportHandler [{}]: Connection attempt failed. Will retry after delay.", gateway_id_);
-                // Delay before retrying connection to avoid busy-looping on persistent failures
+                failed_connect_cycles_++;
+                logger_.Warn("TransportHandler [{}]: Connection attempt failed (cycle {} of {}). Will retry after delay.",
+                             gateway_id_, failed_connect_cycles_, max_connect_cycles_);
+                if (failed_connect_cycles_ >= max_connect_cycles_) {
+                    logger_.Error("TransportHandler [{}]: Permanent connection failure after {} cycles. Giving up and marking handler inactive.",
+                                   gateway_id_, failed_connect_cycles_);
+                    notify_observer_disconnected("Permanent connection failure");
+                    break; // Exit main loop -> cleanup
+                }
                 for (int i = 0; i < connect_retry_delay_ms_ / 100 && !shutdown_requested_.load(); ++i) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
-                continue; // Loop back to check shutdown_requested_ and retry connection
+                continue; // Loop back to attempt another cycle
             }
         }
 
