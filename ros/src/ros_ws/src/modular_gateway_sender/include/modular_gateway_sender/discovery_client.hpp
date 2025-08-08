@@ -85,7 +85,7 @@ private:
 
     // Keepalive management
     std::atomic<bool> registered_{false};
-    std::chrono::milliseconds keepalive_interval_ms_{15000}; // default 15s
+    std::chrono::milliseconds keepalive_interval_ms_{5000}; // default 5s
 };
 
 } // namespace gateway
