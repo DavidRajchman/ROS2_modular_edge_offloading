@@ -57,7 +57,6 @@ services:
       context: .
       dockerfile: ./bridge/Dockerfile
     container_name: my_bridge_instance # Custom name
-    #network_mode: "host"
     environment:
       - DISPLAY=${DISPLAY}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -67,12 +66,9 @@ services:
       - ./DiscoveryService:/home/ubuntu/DiscoveryService
       - ./OffloadingManager:/home/ubuntu/OffloadingManager
       - ./cpplib:/home/ubuntu/cpplib_src
-
     working_dir: /home/ubuntu/bridge
     privileged: true
-    stdin_open: true
-    tty: true
-    command: ["/bin/bash", "-c", bash "/home/ubuntu/bridge/autostart_bridge.sh && exec bash"]
+    command: ["/bin/bash","-c","chmod +x /home/ubuntu/bridge/autostart_bridge.sh 2>/dev/null || true; exec /home/ubuntu/bridge/autostart_bridge.sh"]
     networks:
       public_net:
           ipv4_address: 192.168.65.10
