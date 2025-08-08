@@ -552,12 +552,28 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
         return;
     }
     
-    std::string request_id = om_response["payload"]["request_id"];
+    const auto& payload = om_response["payload"];
+    std::string request_id;
+    try {
+        if (payload["request_id"].is_string()) {
+            request_id = payload["request_id"].get<std::string>();
+        } else if (payload["request_id"].is_number_integer()) {
+            request_id = std::to_string(payload["request_id"].get<long long>());
+            logger.Debug("BridgeControlPlane.cpp: Coerced numeric request_id to string '{}'", request_id);
+        } else {
+            logger.Error("BridgeControlPlane.cpp: Unsupported request_id type in SESSION_APPROVED payload");
+            return;
+        }
+    } catch (const std::exception& e) {
+        logger.Error("BridgeControlPlane.cpp: Exception extracting request_id: {}", e.what());
+        return;
+    }
+    
     logger.Info("BridgeControlPlane.cpp: Received SESSION_APPROVED for request '{}'", request_id);
     
     // Update session with MEC assignment if provided
-    if (om_response["payload"].contains("assigned_mec_id")) {
-        std::string mec_id = om_response["payload"]["assigned_mec_id"];
+    if (payload.contains("assigned_mec_id") && payload["assigned_mec_id"].is_string()) {
+        std::string mec_id = payload["assigned_mec_id"].get<std::string>();
         session_manager_->set_assigned_mec(request_id, mec_id);
         logger.Info("BridgeControlPlane.cpp: Session '{}' assigned to MEC '{}'", request_id, mec_id);
     }
@@ -573,7 +589,7 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
         if (it != component_id_to_transport_id_.end()) {
             auto conn_it = mgwcp_connections_.find(it->second);
             if (conn_it != mgwcp_connections_.end()) {
-                conn_it->second->send_session_approved(request_id, om_response["payload"]);
+                conn_it->second->send_session_approved(request_id, payload);
                 logger.Info("BridgeControlPlane.cpp: Forwarded SESSION_APPROVED to VHC '{}'", session->mgwcp_component_id);
             }
         }
@@ -584,7 +600,7 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
             if (mec_it != component_id_to_transport_id_.end()) {
                 auto mec_conn_it = mgwcp_connections_.find(mec_it->second);
                 if (mec_conn_it != mgwcp_connections_.end()) {
-                    mec_conn_it->second->send_session_approved(request_id, om_response["payload"]);
+                    mec_conn_it->second->send_session_approved(request_id, payload);
                     logger.Info("BridgeControlPlane.cpp: Forwarded SESSION_APPROVED to MEC '{}'", session->assigned_mec_id);
                 } else {
                     logger.Warn("BridgeControlPlane.cpp: MEC '{}' not found in MGWCP connections - may need transport handler", session->assigned_mec_id);
@@ -593,6 +609,8 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
                 logger.Warn("BridgeControlPlane.cpp: MEC '{}' component ID not mapped to transport - may need transport handler", session->assigned_mec_id);
             }
         }
+    } else {
+        logger.Warn("BridgeControlPlane.cpp: SESSION_APPROVED received for unknown session '{}' (may have expired)", request_id);
     }
 }
 
@@ -604,15 +622,30 @@ void BridgeControlPlane::handle_session_denied(const nlohmann::json& om_response
         return;
     }
     
-    std::string request_id = om_response["payload"]["request_id"];
-    std::string reason = om_response["payload"].value("reason_description", "No reason provided");
+    const auto& payload = om_response["payload"];
+    std::string request_id;
+    try {
+        if (payload["request_id"].is_string()) {
+            request_id = payload["request_id"].get<std::string>();
+        } else if (payload["request_id"].is_number_integer()) {
+            request_id = std::to_string(payload["request_id"].get<long long>());
+            logger.Debug("BridgeControlPlane.cpp: Coerced numeric request_id to string '{}'", request_id);
+        } else {
+            logger.Error("BridgeControlPlane.cpp: Unsupported request_id type in SESSION_DENIED payload");
+            return;
+        }
+    } catch (const std::exception& e) {
+        logger.Error("BridgeControlPlane.cpp: Exception extracting request_id in SESSION_DENIED: {}", e.what());
+        return;
+    }
     
+    std::string reason = payload.value("reason_description", std::string("No reason provided"));
     logger.Info("BridgeControlPlane.cpp: Received SESSION_DENIED for request '{}': {}", request_id, reason);
     
-    // Remove session
+    // Remove session (only if it exists)
     session_manager_->remove_session(request_id);
     
-    // Forward response to appropriate MGWCP
+    // Forward response to appropriate MGWCP (if still present)
     const ActiveSession* session = session_manager_->get_session(request_id);
     if (session) {
         std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);

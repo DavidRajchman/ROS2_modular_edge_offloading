@@ -68,7 +68,10 @@ services:
       - ./cpplib:/home/ubuntu/cpplib_src
     working_dir: /home/ubuntu/bridge
     privileged: true
-    command: ["/bin/bash","-c","chmod +x /home/ubuntu/bridge/autostart_bridge.sh 2>/dev/null || true; exec /home/ubuntu/bridge/autostart_bridge.sh"]
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["/bin/bash","-c","chmod +x /home/ubuntu/bridge/autostart_bridge.sh 2>/dev/null || true; exec /home/ubuntu/bridge/autostart_bridge.sh"]
     networks:
       public_net:
           ipv4_address: 192.168.65.10
