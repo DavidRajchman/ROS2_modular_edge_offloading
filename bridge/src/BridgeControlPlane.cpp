@@ -452,6 +452,13 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
         },
         [this](const std::string& mgwcp_id, const std::string& host, int port) {
             return establish_mgwcp_data_plane_connection(mgwcp_id, host, port);
+        },
+        // component registration callback
+        [this](const std::string& component_id, uint32_t transport_id) {
+            CppLogging::Logger logger("bridge");
+            std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);
+            component_id_to_transport_id_[component_id] = transport_id;
+            logger.Info("BridgeControlPlane.cpp: Registered component_id '{}' to transport id {}", component_id, transport_id);
         }
     );
     

@@ -36,6 +36,8 @@ public:
     // Callback function types for communicating with BridgeControlPlane
     using MessageForwarder = std::function<void(const std::string&, const nlohmann::json&)>;
     using DataPlaneConnectCallback = std::function<bool(const std::string&, const std::string&, int)>;
+    // New callback invoked when component_id is first learned so Bridge can register mapping
+    using ComponentRegistrationCallback = std::function<void(const std::string&, uint32_t)>;
     
     MGWCPConnection(uint32_t connection_id,
                    std::shared_ptr<gateway::TcpServerTransport> server_transport,
@@ -43,7 +45,8 @@ public:
                    const std::string& client_ip,
                    std::shared_ptr<SessionManager> session_manager,
                    MessageForwarder message_forwarder,
-                   DataPlaneConnectCallback dp_connect_callback);
+                   DataPlaneConnectCallback dp_connect_callback,
+                   ComponentRegistrationCallback component_registration_callback);
     
     ~MGWCPConnection();
     
@@ -111,6 +114,7 @@ private:
     std::shared_ptr<SessionManager> session_manager_;
     MessageForwarder message_forwarder_;
     DataPlaneConnectCallback dp_connect_callback_;
+    ComponentRegistrationCallback component_registration_callback_; // new
     
     // ACK reliability mechanism
     std::mutex pending_acks_mutex_;

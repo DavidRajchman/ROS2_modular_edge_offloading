@@ -8,7 +8,8 @@ MGWCPConnection::MGWCPConnection(uint32_t connection_id,
                                const std::string& client_ip,
                                std::shared_ptr<SessionManager> session_manager,
                                MessageForwarder message_forwarder,
-                               DataPlaneConnectCallback dp_connect_callback)
+                               DataPlaneConnectCallback dp_connect_callback,
+                               ComponentRegistrationCallback component_registration_callback)
     : connection_id_(connection_id),
       server_transport_(server_transport),
       transport_client_id_(transport_client_id),
@@ -19,6 +20,7 @@ MGWCPConnection::MGWCPConnection(uint32_t connection_id,
       session_manager_(session_manager),
       message_forwarder_(message_forwarder),
       dp_connect_callback_(dp_connect_callback),
+      component_registration_callback_(component_registration_callback),
       sequence_number_(1)
 {
     CppLogging::Logger logger("bridge");
@@ -176,6 +178,14 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
         if (is_valid_component_id(msg_component_id)) {
             component_id_ = msg_component_id;
             logger.Info("MGWCPConnection.cpp: Set component_id '{}' for connection {}", component_id_, connection_id_);
+            // invoke registration callback so Bridge can map component_id -> transport_client_id
+            if (component_registration_callback_) {
+                try {
+                    component_registration_callback_(component_id_, transport_client_id_);
+                } catch (const std::exception& e) {
+                    logger.Error("MGWCPConnection.cpp: Component registration callback failed for '{}': {}", component_id_, e.what());
+                }
+            }
         } else {
             logger.Error("MGWCPConnection.cpp: Invalid component_id '{}' from connection {}", 
                         msg_component_id, connection_id_);
