@@ -517,9 +517,19 @@ void BridgeControlPlane::forward_message_to_om(const std::string& mgwcp_componen
         }
     }
     
-    // Forward message to OM with Bridge component ID
+    // Forward message to OM WITHOUT overwriting original component_id (bug fix)
+    // Preserve the sender's component_id so OM sees the true source (e.g., '60:5').
+    // Add bridge identity separately if OM needs to know which bridge forwarded it.
     nlohmann::json forward_message = message;
-    forward_message["component_id"] = BRIDGE_COMPONENT_ID;
+    if (!forward_message.contains("bridge_component_id")) {
+        forward_message["bridge_component_id"] = BRIDGE_COMPONENT_ID; // metadata
+    }
+    // Remove any accidental previous overwrite (not needed, just ensuring clarity)
+    // (Do NOT set forward_message["component_id"] = BRIDGE_COMPONENT_ID;)
+
+    logger.Debug("BridgeControlPlane.cpp: Forward payload to OM (source component_id='{}', bridge_component_id='{}')", 
+                 forward_message.value("component_id", "<missing>"), 
+                 forward_message.value("bridge_component_id", "<missing>"));
     
     send_om_message(forward_message);
 }

@@ -23,7 +23,7 @@ class MessageCode(IntEnum):
     SESSION_APPROVED = 200
     SESSION_DENIED = 201
     BRIDGE_DP_FAILURE = 301
-    ACK = 900
+    # ACK = 900  # Deprecated for Bridge<->OM channel (stable network assumption)
 
 
 @dataclass
@@ -158,43 +158,34 @@ class OffloadingManagerServer:
             self.logger.info(f"Connection {conn_id} cleaned up")
             
     def _process_message(self, conn_id: int, message_str: str):
-        """Process incoming JSON message from Bridge CP"""
+        """Process incoming JSON message from Bridge CP (ACKs disabled)."""
         try:
-            # Parse JSON
             message = json.loads(message_str)
-            # Log full raw JSON structure for debugging (at debug) and basic details at info
             self.logger.debug(f"Full parsed message object from {conn_id}: {message}")
-            self.logger.info(f"Processing message from {conn_id}: type={message.get('message_type', 'UNKNOWN')} code={message.get('message_code', 'UNKNOWN')} seq={message.get('sequence_number', 'UNKNOWN')}")
-            
-            # Validate message structure
-            required_fields = ['component_id', 'message_code', 'message_type', 'sequence_number', 'payload']
-            missing = [f for f in required_fields if f not in message]
+            msg_type = message.get('message_type', 'UNKNOWN')
+            msg_code = message.get('message_code', 'UNKNOWN')
+            seq = message.get('sequence_number', None)
+            self.logger.info(f"Processing message from {conn_id}: type={msg_type} code={msg_code} seq={seq if seq is not None else 'N/A'}")
+
+            # Validation: sequence_number now optional; payload required
+            base_required = ['component_id', 'message_code', 'message_type', 'payload']
+            missing = [f for f in base_required if f not in message]
             if missing:
                 self.logger.error(f"Missing required field(s) {missing} in message from {conn_id}. Raw: {message_str}")
                 return
-            
-            # Defensive: ensure payload is a dict
             if not isinstance(message['payload'], dict):
                 self.logger.error(f"Payload is not an object in message from {conn_id}. Raw: {message_str}")
                 return
-            
-            # Send ACK immediately
-            self._send_ack(conn_id, message['sequence_number'])
-            
-            # Process based on message type
+
             message_code = message['message_code']
-            
             if message_code == MessageCode.OFFLOAD_REQUEST:
                 self._handle_offload_request(conn_id, message)
             elif message_code == MessageCode.SESSION_KEEPALIVE:
                 self._handle_session_keepalive(conn_id, message)
             elif message_code == MessageCode.BRIDGE_DP_FAILURE:
                 self._handle_bridge_dp_failure(conn_id, message)
-            elif message_code == MessageCode.ACK:
-                self._handle_ack(conn_id, message)
             else:
-                self.logger.warning(f"Unknown message code {message_code} from {conn_id}. Full message: {message}")
-                
+                self.logger.warning(f"Unknown/unsupported message code {message_code} from {conn_id} (ACKs disabled). Full: {message}")
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON from {conn_id}: {e}. Raw: {message_str}")
         except Exception as e:
@@ -254,23 +245,12 @@ class OffloadingManagerServer:
         self.decision_engine.handle_session_failure(request_id, reason)
         
     def _handle_ack(self, conn_id: int, message: Dict):
-        """Handle ACK message"""
-        payload = message['payload']
-        ack_seq = payload.get('ack_sequence_number')
-        self.logger.debug(f"Received ACK from {conn_id} for sequence {ack_seq}")
+        """(Deprecated) ACK handler retained for backward compatibility logs."""
+        self.logger.debug(f"Received legacy ACK (ignored) from {conn_id}: {message}")
         
     def _send_ack(self, conn_id: int, ack_sequence_number: int):
-        """Send ACK message"""
-        response = {
-            "component_id": self.component_id,
-            "message_code": MessageCode.ACK,
-            "message_type": "ACK",
-            "sequence_number": self._get_next_sequence(conn_id),
-            "payload": {
-                "ack_sequence_number": ack_sequence_number
-            }
-        }
-        self._send_message(conn_id, response)
+        """(Deprecated) ACK sending disabled."""
+        self.logger.debug(f"ACK mechanism disabled; not sending ACK for seq {ack_sequence_number} to {conn_id}")
         
     def _send_session_approved(self, conn_id: int, request_id: int, assigned_mec_id: str, task_id: int):
         """Send SESSION_APPROVED message"""
