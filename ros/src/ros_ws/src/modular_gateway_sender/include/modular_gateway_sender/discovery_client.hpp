@@ -9,6 +9,7 @@
 #include <atomic>
 #include <thread>
 #include <functional>
+#include <chrono>
 
 namespace gateway {
 
@@ -29,6 +30,7 @@ public:
      * 
      * Connects to the DiscoveryService and attempts to register the component.
      * This method is non-blocking and launches a dedicated thread for communication.
+     * After successful registration, periodic keepalive pings are sent while running.
      * 
      * @param host The hostname or IP address of the DiscoveryService.
      * @param port The port of the DiscoveryService.
@@ -80,6 +82,10 @@ private:
     // Callbacks
     DiscoverySuccessCallback success_cb_;
     DiscoveryFailureCallback failure_cb_;
+
+    // Keepalive management
+    std::atomic<bool> registered_{false};
+    std::chrono::milliseconds keepalive_interval_ms_{15000}; // default 15s
 };
 
 } // namespace gateway

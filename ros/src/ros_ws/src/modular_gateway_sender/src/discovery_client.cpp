@@ -43,6 +43,7 @@ bool DiscoveryClient::start(
     failure_cb_ = failure_cb;
 
     running_ = true;
+    registered_ = false;
     client_thread_ = std::thread(&DiscoveryClient::client_thread_func, this);
     return true;
 }
@@ -88,67 +89,127 @@ void DiscoveryClient::client_thread_func() {
         return;
     }
 
-    // Add validation to ensure we're not sending empty data
     if (encoded_msg.empty()) {
         logger_.Error("discovery_client.cpp: Encoded message is empty!");
         if (failure_cb_) failure_cb_("Encoded message is empty.");
         return;
     }
 
-    logger_.Info("discovery_client.cpp: Sending encoded message ({} bytes): '{}'", encoded_msg.size(), encoded_msg);
+    logger_.Info("discovery_client.cpp: Sending encoded registration message ({} bytes)", encoded_msg.size());
     
     std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
     transport_->async_send_data(std::move(reg_data));
 
-    // Wait for the response
+    // Wait for the registration response
     if (transport_->data_available(5000)) { // 5 second timeout
-        std::vector<uint8_t> buffer(2048);
+        std::vector<uint8_t> buffer(4096);
         int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
         if (bytes_received > 0) {
-            buffer[bytes_received] = '\0'; // Null-terminate
+            buffer[bytes_received] = '\0';
             std::string response_str(reinterpret_cast<char*>(buffer.data()));
-            
             logger_.Info("discovery_client.cpp: Received raw response from DiscoveryService: '{}'", response_str);
-            
+
             discovery_protocol::Message response_msg;
             if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
                 logger_.Info("discovery_client.cpp: Successfully decoded message with type: {}", static_cast<int>(response_msg.type));
-                
                 if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
                     auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
                     if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
                         logger_.Info("discovery_client.cpp: Discovery successful. Bridge target at {}:{}", resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
                         try {
                             int bridge_port = std::stoi(resp_payload.connectionTargetPort);
+                            registered_ = true;
                             if (success_cb_) {
                                 success_cb_(resp_payload.connectionTargetAddress, bridge_port);
                             }
+                            // Optionally update interval if provided via config JSON (future enhancement)
                         } catch (const std::invalid_argument& e) {
                             logger_.Error("discovery_client.cpp: Invalid port number received from DiscoveryService: '{}'", resp_payload.connectionTargetPort);
                             if (failure_cb_) failure_cb_("Invalid port number from DiscoveryService.");
+                            return;
                         }
                     } else {
                         logger_.Error("discovery_client.cpp: Registration denied by DiscoveryService: {}", resp_payload.humanReadableMessage);
                         if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);
+                        return;
                     }
                 } else {
-                    logger_.Error("discovery_client.cpp: Received unexpected message type from DiscoveryService. Expected: {}, Got: {}", 
-                                static_cast<int>(discovery_protocol::MessageType::REGISTRATION_RESPONSE), 
-                                static_cast<int>(response_msg.type));
+                    logger_.Error("discovery_client.cpp: Unexpected message type after registration: {}", static_cast<int>(response_msg.type));
                     if (failure_cb_) failure_cb_("Unexpected message type from DiscoveryService.");
+                    return;
                 }
             } else {
                 logger_.Error("discovery_client.cpp: Failed to decode response from DiscoveryService. Raw message: '{}'", response_str);
                 if (failure_cb_) failure_cb_("Failed to decode response.");
+                return;
             }
         } else {
             logger_.Error("discovery_client.cpp: No data received from DiscoveryService or connection lost.");
             if (failure_cb_) failure_cb_("No response from DiscoveryService.");
+            return;
         }
     } else {
         logger_.Warn("discovery_client.cpp: Timed out waiting for response from DiscoveryService.");
         if (failure_cb_) failure_cb_("Timeout waiting for DiscoveryService response.");
+        return;
     }
+
+    // Keepalive loop: send ping if no data received within interval
+    logger_.Info("discovery_client.cpp: Entering keepalive loop (interval {} ms)", keepalive_interval_ms_.load().count());
+    auto last_ping_sent = std::chrono::steady_clock::now();
+
+    while (running_ && registered_) {
+        auto now = std::chrono::steady_clock::now();
+        int wait_ms = static_cast<int>(keepalive_interval_ms_.count());
+        if (transport_->data_available(wait_ms)) {
+            std::vector<uint8_t> buffer(4096);
+            int bytes = transport_->receive_data(buffer.data(), buffer.size() - 1);
+            if (bytes > 0) {
+                buffer[bytes] = '\0';
+                std::string msg(reinterpret_cast<char*>(buffer.data()));
+                discovery_protocol::Message incoming;
+                if (discovery_protocol::decode_message(msg, incoming) == discovery_protocol::ProtocolStatus::OK) {
+                    if (incoming.type == discovery_protocol::MessageType::KEEPALIVE_RESPONSE) {
+                        auto& pong = std::get<discovery_protocol::KeepaliveResponse>(incoming.data);
+                        logger_.Info("discovery_client.cpp: Received keepalive response: '{}' nextIntervalMs={}", pong.humanReadableMessage, pong.nextIntervalMs);
+                        if (pong.nextIntervalMs > 0) {
+                            keepalive_interval_ms_ = std::chrono::milliseconds(pong.nextIntervalMs);
+                        }
+                        last_ping_sent = now; // reset timer
+                    } else {
+                        logger_.Info("discovery_client.cpp: Ignoring non-keepalive message type {} during keepalive phase", static_cast<int>(incoming.type));
+                    }
+                } else {
+                    logger_.Warn("discovery_client.cpp: Failed to decode incoming keepalive-phase message ({} bytes)", bytes);
+                }
+            }
+        } else {
+            // Timeout -> send keepalive ping
+            discovery_protocol::KeepalivePing ping_payload;
+            ping_payload.componentId = component_name_;
+            ping_payload.status = "OK";
+            ping_payload.humanReadableMessage = "keepalive ping";
+            discovery_protocol::Message ping_msg(ping_payload);
+            std::string encoded_ping;
+            if (discovery_protocol::encode_message(ping_msg, encoded_ping) == discovery_protocol::ProtocolStatus::OK && !encoded_ping.empty()) {
+                std::vector<uint8_t> send_buf(encoded_ping.begin(), encoded_ping.end());
+                auto result = transport_->async_send_data(std::move(send_buf));
+                if (result == TransportAsyncSendResult::SUCCESS) {
+                    logger_.Info("discovery_client.cpp: Sent keepalive ping (interval {} ms)", keepalive_interval_ms_.load().count());
+                } else if (result == TransportAsyncSendResult::NOT_CONNECTED) {
+                    logger_.Error("discovery_client.cpp: Transport not connected while sending keepalive. Exiting keepalive loop.");
+                    break;
+                } else {
+                    logger_.Warn("discovery_client.cpp: Failed to enqueue keepalive ping (queue/result code {})", static_cast<int>(result));
+                }
+            } else {
+                logger_.Error("discovery_client.cpp: Failed to encode keepalive ping message");
+            }
+            last_ping_sent = std::chrono::steady_clock::now();
+        }
+    }
+
+    logger_.Info("discovery_client.cpp: Exiting keepalive loop (running_={}, registered_={})", running_.load(), registered_.load());
 }
 
 } // namespace gateway
