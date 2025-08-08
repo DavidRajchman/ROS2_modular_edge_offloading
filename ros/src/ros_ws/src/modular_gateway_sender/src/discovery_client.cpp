@@ -155,7 +155,7 @@ void DiscoveryClient::client_thread_func() {
     }
 
     // Keepalive loop: send ping if no data received within interval
-    logger_.Info("discovery_client.cpp: Entering keepalive loop (interval {} ms)", keepalive_interval_ms_.load().count());
+    logger_.Info("discovery_client.cpp: Entering keepalive loop (interval {} ms)", keepalive_interval_ms_.count());
     auto last_ping_sent = std::chrono::steady_clock::now();
 
     while (running_ && registered_) {
@@ -195,7 +195,7 @@ void DiscoveryClient::client_thread_func() {
                 std::vector<uint8_t> send_buf(encoded_ping.begin(), encoded_ping.end());
                 auto result = transport_->async_send_data(std::move(send_buf));
                 if (result == TransportAsyncSendResult::SUCCESS) {
-                    logger_.Info("discovery_client.cpp: Sent keepalive ping (interval {} ms)", keepalive_interval_ms_.load().count());
+                    logger_.Info("discovery_client.cpp: Sent keepalive ping (interval {} ms)", keepalive_interval_ms_.count());
                 } else if (result == TransportAsyncSendResult::NOT_CONNECTED) {
                     logger_.Error("discovery_client.cpp: Transport not connected while sending keepalive. Exiting keepalive loop.");
                     break;

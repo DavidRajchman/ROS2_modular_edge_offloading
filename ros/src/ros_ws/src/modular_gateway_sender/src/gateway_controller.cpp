@@ -385,7 +385,7 @@ void GatewayController::data_plane_connection_thread_func()
     auto tcp_server = dynamic_cast<TcpServerTransport*>(transport);
     if (tcp_server && tcp_server->accept_connection()) {
       logger_.Info("gateway_controller.cpp: Data plane connection accepted from Bridge.");
-      // The connection is now established. The bridge should send DP_CONNECTION_CONFIRMED.
+      // After a successful accept, do not log again until a new connection occurs (accept_connection will return false while connected).
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     } else {
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
