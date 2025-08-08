@@ -72,7 +72,7 @@ services:
     privileged: true
     stdin_open: true
     tty: true
-    command: ["/bin/bash", "-c", "/home/ubuntu/autostart_bridge.sh && exec bash"]
+    command: ["/bin/bash", "-c", "/home/ubuntu/bridge/autostart_bridge.sh && exec bash"]
     networks:
       public_net:
           ipv4_address: 192.168.65.10
