@@ -162,15 +162,22 @@ class OffloadingManagerServer:
         try:
             # Parse JSON
             message = json.loads(message_str)
-            self.logger.info(f"Processing message from {conn_id}: {message.get('message_type', 'UNKNOWN')}")
+            # Log full raw JSON structure for debugging (at debug) and basic details at info
+            self.logger.debug(f"Full parsed message object from {conn_id}: {message}")
+            self.logger.info(f"Processing message from {conn_id}: type={message.get('message_type', 'UNKNOWN')} code={message.get('message_code', 'UNKNOWN')} seq={message.get('sequence_number', 'UNKNOWN')}")
             
             # Validate message structure
             required_fields = ['component_id', 'message_code', 'message_type', 'sequence_number', 'payload']
-            for field in required_fields:
-                if field not in message:
-                    self.logger.error(f"Missing required field '{field}' in message from {conn_id}")
-                    return
-                    
+            missing = [f for f in required_fields if f not in message]
+            if missing:
+                self.logger.error(f"Missing required field(s) {missing} in message from {conn_id}. Raw: {message_str}")
+                return
+            
+            # Defensive: ensure payload is a dict
+            if not isinstance(message['payload'], dict):
+                self.logger.error(f"Payload is not an object in message from {conn_id}. Raw: {message_str}")
+                return
+            
             # Send ACK immediately
             self._send_ack(conn_id, message['sequence_number'])
             
@@ -186,18 +193,32 @@ class OffloadingManagerServer:
             elif message_code == MessageCode.ACK:
                 self._handle_ack(conn_id, message)
             else:
-                self.logger.warning(f"Unknown message code {message_code} from {conn_id}")
+                self.logger.warning(f"Unknown message code {message_code} from {conn_id}. Full message: {message}")
                 
         except json.JSONDecodeError as e:
-            self.logger.error(f"Invalid JSON from {conn_id}: {e}")
+            self.logger.error(f"Invalid JSON from {conn_id}: {e}. Raw: {message_str}")
         except Exception as e:
-            self.logger.error(f"Error processing message from {conn_id}: {e}")
+            self.logger.error(f"Error processing message from {conn_id}: {e}. Raw: {message_str}")
             
+    def _coerce_int(self, value, field_name: str):
+        """Attempt to coerce a value to int; log if coercion was needed."""
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            try:
+                iv = int(value)
+                self.logger.debug(f"Coerced string field '{field_name}' value '{value}' to int {iv}")
+                return iv
+            except ValueError:
+                self.logger.warning(f"Cannot coerce field '{field_name}' value '{value}' to int")
+                return value
+        return value
+
     def _handle_offload_request(self, conn_id: int, message: Dict):
         """Handle OFFLOAD_REQUEST message"""
         payload = message['payload']
-        request_id = payload.get('request_id')
-        task_id = payload.get('task_id')
+        request_id = self._coerce_int(payload.get('request_id'), 'request_id')
+        task_id = self._coerce_int(payload.get('task_id'), 'task_id')
         mgwcp_component_id = payload.get('mgwcp_component_id')
         
         self.logger.info(f"Offload request {request_id}: task_id={task_id}, from={mgwcp_component_id}")
