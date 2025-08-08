@@ -186,7 +186,9 @@ void DiscoveryClient::client_thread_func() {
         } else {
             // Timeout -> send keepalive ping
             discovery_protocol::KeepalivePing ping_payload;
-            ping_payload.componentId = component_name_;
+            //component id should be groupID.IDingroup (there is no function to format this in discovery_protocol)
+            std::string component_id = std::to_string(group_id_) + "." + std::to_string(id_in_group_);
+            ping_payload.componentId = component_id;
             ping_payload.status = "OK";
             ping_payload.humanReadableMessage = "keepalive ping";
             discovery_protocol::Message ping_msg(ping_payload);
