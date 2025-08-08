@@ -96,6 +96,10 @@ RUN chmod +x /home/ubuntu/autostart.sh
 COPY ./OffloadingManager/autostart_om.sh /home/ubuntu/autostart_om.sh
 RUN chmod +x /home/ubuntu/autostart_om.sh
 
+# Copy and setup autostart script for Bridge
+COPY ./bridge/autostart_bridge.sh /home/ubuntu/autostart_bridge.sh
+RUN chmod +x /home/ubuntu/autostart_bridge.sh
+
 RUN mkdir -p /etc/sudoers.d && \
     useradd -m ubuntu && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
