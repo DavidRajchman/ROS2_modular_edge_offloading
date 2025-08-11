@@ -5,7 +5,7 @@ import datetime
 import os
 
 # --- Configuration ---
-DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/ros_ws/UNKNOWN_binary.log"
+DEFAULT_BINARY_LOG_PATH = "/home/ubuntu/ros_ws/V_binary.log"
 DEFAULT_OUTPUT_TXT_PATH = "/home/ubuntu/ros_ws/decoded_log.txt"
 
 # Define CppLogging Level enum mapping
