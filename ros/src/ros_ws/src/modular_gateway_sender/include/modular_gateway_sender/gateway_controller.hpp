@@ -7,6 +7,7 @@
 #include "modular_gateway_sender/bridge_cp_client.hpp"
 #include "modular_gateway_sender/discovery_client.hpp"
 #include "modular_gateway_sender/handler_factory.hpp"
+#include "modular_gateway_sender/message_header.hpp"
 
 #include "logging/logger.h"
 
@@ -34,9 +35,11 @@ struct OffloadingRequestData {
 // Represents the details of a specific offloading task
 struct TaskDetails {
     std::string task_name;
-    std::vector<std::string> required_handlers; // e.g., {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}
-    std::vector<std::string> input_handlers;     // Handlers for input message types (VHC subscribes, MEC publishes)
-    std::vector<std::string> output_handlers;    // Handlers for output message types (VHC publishes, MEC subscribes)
+  // New JSON-driven fields using numeric message types mapped to enum
+  std::vector<MessageType> input_types;      // Input message types (VHC subscribes, MEC publishes)
+  std::vector<MessageType> output_types;     // Output message types (VHC publishes, MEC subscribes)
+  // Legacy fallback (kept for backward compatibility until fully removed)
+  std::vector<std::string> required_handlers; // e.g., {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}
 };
 
 // Represents the state of a single offloading session
@@ -104,11 +107,15 @@ private:
   void handle_session_teardown(const std::string& request_id);
 
   // Callbacks for async clients
-  void on_discovery_success(const std::string& bridge_host, int bridge_port);
+  void on_discovery_success(const std::string& bridge_host, int bridge_port, const std::string& config_json);
   void on_discovery_failure(const std::string& error_message);
   void on_dp_confirmed();
   void on_session_approved(const nlohmann::json& payload);
   void on_session_denied(const std::string& request_id, const std::string& reason);
+
+  // Parse and load global config JSON received from DiscoveryService
+  bool load_global_config_from_json(const std::string& config_json);
+  static bool message_type_from_id(uint32_t id, MessageType& out);
 
   // Core Components
   std::unique_ptr<RosGateway> gateway_;
@@ -125,6 +132,10 @@ private:
   std::map<std::string, TaskDetails> task_database_;
   std::map<std::string, SessionState> active_sessions_; // Maps request_id to session state
   std::mutex session_mutex_;
+
+  // Global configuration (non-dynamic in runtime)
+  int default_session_timeout_{300};
+  int max_concurrent_sessions_{100};
 
   // Identity & Configuration
   std::string component_id_;

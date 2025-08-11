@@ -36,7 +36,21 @@ void HandlerFactory::register_known_handlers() {
         return std::make_shared<StringTestResultHandler>(gw, n);
     };
 
-    logger_.Info("handler_factory.cpp: Registered {} known handler types.", creator_map_.size());
+    // New: MessageType-based creators (canonical registry)
+    mt_creator_map_[MessageType::STRING] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<StringHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::smLASERSCAN] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<LaserScanHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::STRING_TEST_INPUT] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<StringTestInputHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::STRING_TEST_RESULT] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<StringTestResultHandler>(gw, n);
+    };
+
+    logger_.Info("handler_factory.cpp: Registered {} legacy string types and {} MessageType creators.", creator_map_.size(), mt_creator_map_.size());
 }
 
 std::shared_ptr<MessageHandlerBase> HandlerFactory::create_handler(const std::string& handler_type_name) {
@@ -49,6 +63,24 @@ std::shared_ptr<MessageHandlerBase> HandlerFactory::create_handler(const std::st
     logger_.Info("handler_factory.cpp: Creating handler for type '{}'", handler_type_name);
     // Execute the stored lambda function to create the handler
     return it->second(gateway_, node_);
+}
+
+std::shared_ptr<MessageHandlerBase> HandlerFactory::get_or_create(MessageType type) {
+    // Reuse existing instance if present
+    auto found = instances_by_type_.find(type);
+    if (found != instances_by_type_.end()) {
+        return found->second;
+    }
+    auto it = mt_creator_map_.find(type);
+    if (it == mt_creator_map_.end()) {
+        logger_.Error("handler_factory.cpp: No MessageType creator registered for id {}", static_cast<int>(type));
+        return nullptr;
+    }
+    auto inst = it->second(gateway_, node_);
+    if (inst) {
+        instances_by_type_[type] = inst;
+    }
+    return inst;
 }
 
 } // namespace gateway

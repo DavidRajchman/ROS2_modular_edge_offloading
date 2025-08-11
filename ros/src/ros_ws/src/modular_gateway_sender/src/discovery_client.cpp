@@ -120,7 +120,7 @@ void DiscoveryClient::client_thread_func() {
                             int bridge_port = std::stoi(resp_payload.connectionTargetPort);
                             registered_ = true;
                             if (success_cb_) {
-                                success_cb_(resp_payload.connectionTargetAddress, bridge_port);
+                                success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
                             }
                             // Optionally update interval if provided via config JSON (future enhancement)
                         } catch (const std::invalid_argument& e) {

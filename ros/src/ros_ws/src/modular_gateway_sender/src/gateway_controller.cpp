@@ -3,8 +3,82 @@
 #include "discovery_protocol/protocol.hpp"
 #include "modular_gateway_sender/handler_factory.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
+#include <nlohmann/json.hpp>
 
 namespace gateway {
+
+    bool GatewayController::message_type_from_id(uint32_t id, MessageType& out) {
+    switch (id) {
+        case 1: out = MessageType::STRING; return true;
+        case 2: out = MessageType::INT32; return true;
+        case 3: out = MessageType::FLOAT32; return true;
+        case 4: out = MessageType::BOOL; return true;
+        case 11: out = MessageType::smLASERSCAN; return true;
+        case 201: out = MessageType::STRING_TEST_INPUT; return true;
+        case 202: out = MessageType::STRING_TEST_RESULT; return true;
+        default: return false;
+    }
+}
+
+bool GatewayController::load_global_config_from_json(const std::string& config_json) {
+    logger_.Info("gateway_controller.cpp: Parsing global config JSON ({} bytes)", config_json.size());
+    nlohmann::json doc;
+    try {
+        doc = nlohmann::json::parse(config_json);
+    } catch (const std::exception& e) {
+        logger_.Error("gateway_controller.cpp: Failed to parse global config JSON: {}", e.what());
+        return false;
+    }
+
+    // Reset current DB
+    task_database_.clear();
+
+    if (doc.contains("default_session_timeout")) {
+        default_session_timeout_ = doc["default_session_timeout"].get<int>();
+    }
+    if (doc.contains("max_concurrent_sessions")) {
+        max_concurrent_sessions_ = doc["max_concurrent_sessions"].get<int>();
+    }
+
+    if (!doc.contains("available_tasks") || !doc["available_tasks"].is_array()) {
+        logger_.Error("gateway_controller.cpp: Global config missing 'available_tasks' array");
+        return false;
+    }
+
+    int loaded = 0;
+    for (const auto& t : doc["available_tasks"]) {
+        if (!t.contains("task_id") || !t.contains("task_name")) {
+            logger_.Warn("gateway_controller.cpp: Skipping task with missing id/name");
+            continue;
+        }
+        std::string key = std::to_string(t["task_id"].get<int>());
+        TaskDetails details;
+        details.task_name = t["task_name"].get<std::string>();
+
+        auto parse_types = [&](const char* field, std::vector<MessageType>& outv){
+            if (!t.contains(field)) return; 
+            for (const auto& val : t[field]) {
+                uint32_t id = val.get<uint32_t>();
+                MessageType mt;
+                if (message_type_from_id(id, mt)) {
+                    outv.push_back(mt);
+                } else {
+                    logger_.Warn("gateway_controller.cpp: Unknown message type id {} in task {}", id, key);
+                }
+            }
+        };
+
+        parse_types("input_message_types", details.input_types);
+        parse_types("output_message_types", details.output_types);
+
+        task_database_[key] = std::move(details);
+        ++loaded;
+    }
+
+    logger_.Info("gateway_controller.cpp: Loaded {} tasks from global config. defaults: timeout={}s, max_sessions={}",
+                             loaded, default_session_timeout_, max_concurrent_sessions_);
+    return loaded > 0;
+}
 
 GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   : rclcpp::Node("gateway_controller", options),
@@ -30,17 +104,7 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   data_plane_listen_port_ = this->get_parameter("data_plane.listen_port").as_int();
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
-  // --- Mock Task Database Initialization ---
-  // Using numeric task IDs as per global configuration
-  task_database_["1"] = {"STRING_PROCESSING", {"sensor_msgs/msg/LaserScan"}, {}, {}};
-  task_database_["2"] = {"LASER_SCAN_PROCESSING", {"std_msgs/msg/String", "sensor_msgs/msg/LaserScan"}, {}, {}};
-  task_database_["3"] = {"STRING_TEST_PIPELINE", {}, {"test/string_input"}, {"test/string_result"}};
-  task_database_["4"] = {"BASIC_DATA_PROCESSING", {"test/string_input"}, {}, {}};
-  task_database_["5"] = {"SENSOR_FUSION", {"test/string_result"}, {}, {}};
-  task_database_["6"] = {"COMPLETE_TEST_SUITE", {}, {"test/string_input"}, {"test/string_result"}};
-  
-  logger_.Info("gateway_controller.cpp: Initialized mock task database with {} tasks.", task_database_.size());
-  // -----------------------------------------
+    // No mock task DB: will be populated from DiscoveryService global config JSON after successful registration
 
   // Create the ROS 2 services only for VHC components
   if (component_type_ == "V") {
@@ -222,7 +286,7 @@ void GatewayController::control_thread_func() {
                 if (discovery_client_->start(
                     discovery_host_, discovery_port_, comp_type, component_name_,
                     static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_), data_plane_listen_port_,
-                    std::bind(&GatewayController::on_discovery_success, this, std::placeholders::_1, std::placeholders::_2),
+                    std::bind(&GatewayController::on_discovery_success, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
                     std::bind(&GatewayController::on_discovery_failure, this, std::placeholders::_1))) {
                     
                     logger_.Info("gateway_controller.cpp: Discovery client started. Waiting for response...");
@@ -404,14 +468,29 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
     const std::string& task_id = session_it->second.task_id;
     auto task_it = task_database_.find(task_id);
     if (task_it != task_database_.end()) {
-        const auto& required_handlers = task_it->second.required_handlers;
-        logger_.Info("gateway_controller.cpp: Deactivating {} handlers for session '{}'", required_handlers.size(), request_id);
-        
-        for (const auto& handler_type : required_handlers) {
-            auto handler = handler_factory_->create_handler(handler_type);
-            if (handler) {
-                gateway_->unregister_handler(handler->get_name());
-                logger_.Info("gateway_controller.cpp: Deactivated handler '{}'", handler_type);
+        const auto& td = task_it->second;
+        // Prefer deactivation by MessageType if present
+        if (!td.input_types.empty() || !td.output_types.empty()) {
+            auto deactivate = [&](const std::vector<MessageType>& list){
+                for (auto mt : list) {
+                    auto handler = handler_factory_->get_or_create(mt);
+                    if (handler) {
+                        gateway_->unregister_handler(handler->get_name());
+                        logger_.Info("gateway_controller.cpp: Deactivated handler for msgType {}", static_cast<int>(mt));
+                    }
+                }
+            };
+            deactivate(td.input_types);
+            deactivate(td.output_types);
+        } else {
+            const auto& required_handlers = td.required_handlers;
+            logger_.Info("gateway_controller.cpp: Deactivating {} legacy handlers for session '{}'", required_handlers.size(), request_id);
+            for (const auto& handler_type : required_handlers) {
+                auto handler = handler_factory_->create_handler(handler_type);
+                if (handler) {
+                    gateway_->unregister_handler(handler->get_name());
+                    logger_.Info("gateway_controller.cpp: Deactivated legacy handler '{}'", handler_type);
+                }
             }
         }
     } else {
@@ -424,11 +503,26 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
 
 // --- Callback Implementations ---
 
-void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port) {
+void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port, const std::string& config_json) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (state_ == State::DISCOVERING) {
         bridge_cp_host_ = bridge_host;
         bridge_cp_port_ = bridge_port;
+        // Parse and load global config JSON before moving forward
+        if (!config_json.empty()) {
+            bool ok = load_global_config_from_json(config_json);
+            if (!ok) {
+                logger_.Error("gateway_controller.cpp: Failed to parse global config JSON from DiscoveryService. Staying in FAILED state.");
+                state_ = State::FAILED;
+                state_cv_.notify_one();
+                return;
+            }
+        } else {
+            logger_.Error("gateway_controller.cpp: DiscoveryService returned empty config JSON. Cannot continue without task database.");
+            state_ = State::FAILED;
+            state_cv_.notify_one();
+            return;
+        }
         state_ = State::CONNECTING_TO_BRIDGE;
         logger_.Info("gateway_controller.cpp: Discovery successful. Bridge found at {}:{}", bridge_host, bridge_port);
     }
@@ -503,65 +597,57 @@ void GatewayController::on_session_approved(const nlohmann::json& payload) {
     const auto& task_details = task_it->second;
     
     // Determine which handlers to create and their modes
-    std::vector<std::pair<std::string, HandlerMode>> handlers_to_create;
-    
-    if (!task_details.input_handlers.empty() || !task_details.output_handlers.empty()) {
-        // New input/output oriented task
-        logger_.Info("gateway_controller.cpp: Processing input/output oriented task '{}' with {} input and {} output handlers", 
-                    task_id, task_details.input_handlers.size(), task_details.output_handlers.size());
-        
+    // Prefer JSON-driven message type vectors if available; else fallback to legacy required_handlers
+    if (!task_details.input_types.empty() || !task_details.output_types.empty()) {
+        logger_.Info("gateway_controller.cpp: Processing JSON-driven task '{}' with {} input types and {} output types",
+                     task_id, task_details.input_types.size(), task_details.output_types.size());
+
+        // Activate handlers by MessageType using the factory
+        auto activate = [&](const std::vector<MessageType>& list, HandlerMode mode){
+            for (auto mt : list) {
+                auto handler = handler_factory_->get_or_create(mt);
+                if (handler) {
+                    MessageHandlerBase::configure_handler_mode(handler, mode);
+                    gateway_->register_handler(handler);
+                    logger_.Info("gateway_controller.cpp: Activated handler for msgType {} with mode {}",
+                                  static_cast<int>(mt), static_cast<int>(mode));
+                } else {
+                    logger_.Error("gateway_controller.cpp: No handler registered for msgType {}", static_cast<int>(mt));
+                }
+            }
+        };
+
         if (component_type_ == "V") {
-            // VHC: Subscribe to inputs, publish outputs
-            for (const auto& handler_type : task_details.input_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::SUBSCRIBER_ONLY);
-            }
-            for (const auto& handler_type : task_details.output_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::PUBLISHER_ONLY);
-            }
+            activate(task_details.input_types, HandlerMode::SUBSCRIBER_ONLY);
+            activate(task_details.output_types, HandlerMode::PUBLISHER_ONLY);
         } else if (component_type_ == "M") {
-            // MEC: Publish to inputs, subscribe to outputs  
-            for (const auto& handler_type : task_details.input_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::PUBLISHER_ONLY);
-            }
-            for (const auto& handler_type : task_details.output_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::SUBSCRIBER_ONLY);
-            }
+            activate(task_details.input_types, HandlerMode::PUBLISHER_ONLY);
+            activate(task_details.output_types, HandlerMode::SUBSCRIBER_ONLY);
         } else {
-            // Unknown component type - use both modes for all handlers
-            for (const auto& handler_type : task_details.input_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::BOTH);
-            }
-            for (const auto& handler_type : task_details.output_handlers) {
-                handlers_to_create.emplace_back(handler_type, HandlerMode::BOTH);
-            }
+            activate(task_details.input_types, HandlerMode::BOTH);
+            activate(task_details.output_types, HandlerMode::BOTH);
         }
     } else {
-        // Legacy task using required_handlers (backward compatibility)
-        logger_.Info("gateway_controller.cpp: Processing legacy task '{}' with {} required handlers", 
-                    task_id, task_details.required_handlers.size());
-        
+        // Legacy fallback path
+        std::vector<std::pair<std::string, HandlerMode>> handlers_to_create;
+        logger_.Info("gateway_controller.cpp: Processing legacy task '{}' with {} required handlers",
+                     task_id, task_details.required_handlers.size());
         HandlerMode mode = HandlerMode::BOTH;
-        if (component_type_ == "V") {
-            mode = HandlerMode::SUBSCRIBER_ONLY;
-        } else if (component_type_ == "M") {
-            mode = HandlerMode::PUBLISHER_ONLY;
-        }
-        
+        if (component_type_ == "V") mode = HandlerMode::SUBSCRIBER_ONLY; else if (component_type_ == "M") mode = HandlerMode::PUBLISHER_ONLY;
         for (const auto& handler_type : task_details.required_handlers) {
             handlers_to_create.emplace_back(handler_type, mode);
         }
-    }
-
-    logger_.Info("gateway_controller.cpp: Activating {} handlers for task '{}' (session {}).", handlers_to_create.size(), task_id, request_id);
-
-    for (const auto& [handler_type, mode] : handlers_to_create) {
-        auto handler = handler_factory_->create_handler(handler_type);
-        if (handler) {
-            MessageHandlerBase::configure_handler_mode(handler, mode);
-            gateway_->register_handler(handler);
-            logger_.Info("gateway_controller.cpp: Activated handler '{}' with mode {}", handler_type, static_cast<int>(mode));
-        } else {
-            logger_.Error("gateway_controller.cpp: Failed to create handler for type '{}'", handler_type);
+        logger_.Info("gateway_controller.cpp: Activating {} legacy handlers for task '{}' (session {}).",
+                     handlers_to_create.size(), task_id, request_id);
+        for (const auto& [handler_type, mode2] : handlers_to_create) {
+            auto handler = handler_factory_->create_handler(handler_type);
+            if (handler) {
+                MessageHandlerBase::configure_handler_mode(handler, mode2);
+                gateway_->register_handler(handler);
+                logger_.Info("gateway_controller.cpp: Activated legacy handler '{}' with mode {}", handler_type, static_cast<int>(mode2));
+            } else {
+                logger_.Error("gateway_controller.cpp: Failed to create legacy handler for type '{}'", handler_type);
+            }
         }
     }
 }

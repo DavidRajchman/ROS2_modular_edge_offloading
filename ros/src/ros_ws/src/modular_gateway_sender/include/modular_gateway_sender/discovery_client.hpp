@@ -19,7 +19,8 @@ class TransportBase;
 class DiscoveryClient {
 public:
     // Callbacks to notify the GatewayController
-    using DiscoverySuccessCallback = std::function<void(const std::string& bridge_host, int bridge_port)>;
+    // On success, also return the raw global config JSON provided by DiscoveryService
+    using DiscoverySuccessCallback = std::function<void(const std::string& bridge_host, int bridge_port, const std::string& config_json)>;
     using DiscoveryFailureCallback = std::function<void(const std::string& error_message)>;
 
     DiscoveryClient();

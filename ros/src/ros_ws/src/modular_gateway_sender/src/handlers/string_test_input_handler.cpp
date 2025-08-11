@@ -11,7 +11,8 @@ StringTestInputHandler::StringTestInputHandler(RosGateway* gateway, rclcpp::Node
 
 void StringTestInputHandler::initialize()
 {
-  node_->declare_parameter("string_test_input_handler.topic", "test_input_topic"); 
+  // Updated default to align with task database and VHC publisher topic
+  node_->declare_parameter("string_test_input_handler.topic", "test/string_input"); 
   topic_name_ = node_->get_parameter("string_test_input_handler.topic").as_string();
   
   subscription_ = node_->create_subscription<std_msgs::msg::String>(
