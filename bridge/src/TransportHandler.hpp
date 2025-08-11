@@ -49,6 +49,9 @@ public:
     // Checks if the handler's internal thread believes it's connected
     bool is_connected() const;
 
+    // Expose the input queue so CP can add routing entries pointing to this handler
+    std::shared_ptr<MPSCQueueType> get_input_queue() const;
+
 private:
     // Core logic executed in the dedicated thread
     void run_internal();

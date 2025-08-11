@@ -119,6 +119,10 @@ bool TransportHandler::is_connected() const {
     return connected_status_.load();
 }
 
+std::shared_ptr<MPSCQueueType> TransportHandler::get_input_queue() const {
+    return input_queue_;
+}
+
 // --- Private Methods ---
 
 void TransportHandler::run_internal() {

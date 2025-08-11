@@ -714,15 +714,29 @@ void BridgeControlPlane::create_routing_rules_for_session(const std::string& req
         // Create routing rules for input message types (VHC → MEC)
         for (uint8_t msg_type : session->input_message_types) {
             RoutingKey key = construct_routing_key(source_group, source_id, msg_type);
-            // TODO: Get MEC handler input queue - need to modify TransportHandler to expose input queue
-            // routing_table_->add_route(key, mec_handler->get_input_queue());
-            logger.Debug("BridgeControlPlane.cpp: Would create route for input message type {}", msg_type);
+            routing_table_->add_route(key, mec_handler->get_input_queue());
+            logger.Info("BridgeControlPlane.cpp: Added VHC→MEC route for {}:{} msg_type {}", (int)source_group, (int)source_id, (int)msg_type);
         }
-        
+
         // Create routing rules for output message types (MEC → VHC)
-        // TODO: Parse MEC component ID and create reverse routes
-        logger.Debug("BridgeControlPlane.cpp: Would create routes for {} output message types", 
-                    session->output_message_types.size());
+        // Parse MEC component ID
+        if (!session->assigned_mec_id.empty()) {
+            size_t mec_colon = session->assigned_mec_id.find(':');
+            if (mec_colon == std::string::npos) {
+                logger.Error("BridgeControlPlane.cpp: Invalid MEC component ID format: {}", session->assigned_mec_id);
+                return;
+            }
+            uint8_t mec_group = static_cast<uint8_t>(std::stoi(session->assigned_mec_id.substr(0, mec_colon)));
+            uint8_t mec_id = static_cast<uint8_t>(std::stoi(session->assigned_mec_id.substr(mec_colon + 1)));
+
+            for (uint8_t msg_type : session->output_message_types) {
+                RoutingKey key = construct_routing_key(mec_group, mec_id, msg_type);
+                routing_table_->add_route(key, mgwcp_handler->get_input_queue());
+                logger.Info("BridgeControlPlane.cpp: Added MEC→VHC route for {}:{} msg_type {}", (int)mec_group, (int)mec_id, (int)msg_type);
+            }
+        } else {
+            logger.Warn("BridgeControlPlane.cpp: No assigned MEC for session '{}' when creating reverse routes", request_id);
+        }
         
         session_manager_->set_routing_rules_created(request_id, true);
         logger.Info("BridgeControlPlane.cpp: Successfully created routing rules for session '{}'", request_id);
@@ -755,15 +769,28 @@ void BridgeControlPlane::remove_routing_rules_for_session(const std::string& req
         uint8_t source_group = static_cast<uint8_t>(std::stoi(mgwcp_id.substr(0, colon_pos)));
         uint8_t source_id = static_cast<uint8_t>(std::stoi(mgwcp_id.substr(colon_pos + 1)));
         
-        // Remove routing rules for input message types
+        // Remove routing rules for input message types (VHC → MEC)
         for (uint8_t msg_type : session->input_message_types) {
             RoutingKey key = construct_routing_key(source_group, source_id, msg_type);
             routing_table_->remove_routes_for_key(key);
-            logger.Debug("BridgeControlPlane.cpp: Removed route for input message type {}", msg_type);
+            logger.Info("BridgeControlPlane.cpp: Removed VHC→MEC route for {}:{} msg_type {}", (int)source_group, (int)source_id, (int)msg_type);
         }
-        
-        // Remove routing rules for output message types
-        // TODO: Parse MEC component ID and remove reverse routes
+
+        // Remove routing rules for output message types (MEC → VHC)
+        if (!session->assigned_mec_id.empty()) {
+            size_t mec_colon = session->assigned_mec_id.find(':');
+            if (mec_colon != std::string::npos) {
+                uint8_t mec_group = static_cast<uint8_t>(std::stoi(session->assigned_mec_id.substr(0, mec_colon)));
+                uint8_t mec_id = static_cast<uint8_t>(std::stoi(session->assigned_mec_id.substr(mec_colon + 1)));
+                for (uint8_t msg_type : session->output_message_types) {
+                    RoutingKey key = construct_routing_key(mec_group, mec_id, msg_type);
+                    routing_table_->remove_routes_for_key(key);
+                    logger.Info("BridgeControlPlane.cpp: Removed MEC→VHC route for {}:{} msg_type {}", (int)mec_group, (int)mec_id, (int)msg_type);
+                }
+            } else {
+                logger.Error("BridgeControlPlane.cpp: Invalid MEC component ID format during route removal: {}", session->assigned_mec_id);
+            }
+        }
         
         session_manager_->set_routing_rules_created(request_id, false);
         logger.Info("BridgeControlPlane.cpp: Successfully removed routing rules for session '{}'", request_id);
