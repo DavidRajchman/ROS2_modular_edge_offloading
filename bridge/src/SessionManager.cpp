@@ -106,7 +106,7 @@ std::vector<std::string> SessionManager::find_expired_sessions(std::chrono::seco
         auto time_since_keepalive = now - session.last_keepalive;
         
         if (time_since_keepalive > timeout_duration) {
-            expired_sessions.push_back(session.request_id);
+            //expired_sessions.push_back(session.request_id);
             logger.Debug("SessionManager.cpp: Found expired session '{}' (last keepalive {} seconds ago)",
                 session.request_id, 
                 std::chrono::duration_cast<std::chrono::seconds>(time_since_keepalive).count());

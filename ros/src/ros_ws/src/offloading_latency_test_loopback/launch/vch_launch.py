@@ -53,7 +53,10 @@ def generate_launch_description():
             'identity.component_name': LaunchConfiguration('component_name'),
             'identity.group_id': LaunchConfiguration('group_id'),
             'identity.id_in_group': LaunchConfiguration('id_in_group'),
-            'data_plane.listen_port': LaunchConfiguration('listen_port')
+            'data_plane.listen_port': LaunchConfiguration('listen_port'),
+            # Override handler topics to align with test app
+            'string_test_input_handler.topic': 'test_input_topic',
+            'string_test_result_handler.topic': 'test_result_topic'
         }],
         output='screen'
     )
