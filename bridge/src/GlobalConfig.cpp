@@ -48,7 +48,8 @@ bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
         
         // Parse optional configuration parameters
         if (config_json.contains("default_session_timeout")) {
-            default_session_timeout_ = config_json["default_session_timeout"] + 10;
+            default_session_timeout_ = config_json["default_session_timeout"];
+            default_session_timeout_ = default_session_timeout_ + 10;
         }
         
         if (config_json.contains("max_concurrent_sessions")) {
