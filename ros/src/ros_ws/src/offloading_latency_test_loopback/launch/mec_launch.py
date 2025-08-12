@@ -63,10 +63,6 @@ def generate_launch_description():
         package='offloading_latency_test_loopback',
         executable='mec_processing_node',
         name='mec_test_node',
-        parameters=[{
-            'subscribe_topic': 'test/string_input',
-            'publish_topic': 'test/string_result'
-        }],
         output='screen'
     )
 

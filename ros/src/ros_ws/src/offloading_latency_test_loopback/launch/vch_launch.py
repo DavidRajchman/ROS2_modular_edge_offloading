@@ -63,12 +63,6 @@ def generate_launch_description():
         package='offloading_latency_test_loopback',
         executable='vhc_node',
         name='vhc_test_node',
-        parameters=[{
-            'publish_topic': 'test/string_input',
-            'subscribe_topic': 'test/string_result',
-            'publish_interval_sec': 5.0,
-            'message_counter_max': 9999
-        }],
         output='screen'
     )
 
