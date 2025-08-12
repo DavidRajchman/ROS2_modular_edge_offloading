@@ -204,7 +204,7 @@ void BridgeCpClient::check_for_timeouts() {
     auto now = std::chrono::steady_clock::now();
     std::vector<std::pair<uint64_t, json>> messages_to_resend; // Store seq_num with message for debugging
 
-    logger_.Debug("bridge_cp_client.cpp: Checking timeouts for {} pending messages", pending_acks_.size());
+    //logger_.Debug("bridge_cp_client.cpp: Checking timeouts for {} pending messages", pending_acks_.size());
     
     for (auto const& [seq_num, pending] : pending_acks_) {
         auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - pending.time_sent);
@@ -217,7 +217,7 @@ void BridgeCpClient::check_for_timeouts() {
         }
     }
 
-    logger_.Debug("bridge_cp_client.cpp: Found {} messages to resend", messages_to_resend.size());
+    //logger_.Debug("bridge_cp_client.cpp: Found {} messages to resend", messages_to_resend.size());
 
     // Resend outside the loop to avoid iterator invalidation issues if we were modifying the map
     for (const auto& [seq_num, msg] : messages_to_resend) {
