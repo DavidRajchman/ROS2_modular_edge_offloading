@@ -45,3 +45,43 @@ Extending:
 - Add stop/destroy command: `docker compose -p <project> down -v`.
 - Record per-phase timestamps.
 - SQLite migration for richer state (runs, metrics).
+
+## Example use
+
+To launch with the required delays (OM + DiscoveryService → 1s → Bridge → 1s → MEC → 15s → VHC) you can use the orchestrator we added.
+
+Steps:
+1. Use descriptor exp_delayed.yaml (I just created it) which encodes the exact phase order and delays.
+2. Run the launcher; it will execute docker compose up -d for only the services in each phase, then sleep the specified delay_before_next (delay_after in file).
+
+Run (from repo root or cd orchestrator first):
+```
+cd orchestrator
+python3 launcher.py exp_delayed.yaml
+```
+
+What happens internally:
+- Phase core: launches discovery_service and offloading_manager, then sleeps 1s.
+- Phase bridge: launches bridge, then sleeps 1s.
+- Phase mec: launches ros2_mec, then sleeps 15s.
+- Phase vhc: launches ros2_vhc, then records experiment in state.json.
+
+If you just want to preview commands:
+```
+python3 launcher.py exp_delayed.yaml --dry-run
+```
+
+If you wanted to tweak delays, edit `delay_after` values in `exp_delayed.yaml`.
+
+Manual alternative (without launcher) using your current docker-compose.yml:
+```
+docker compose -p expDelayed up -d discovery_service offloading_manager
+sleep 1
+docker compose -p expDelayed up -d bridge
+sleep 1
+docker compose -p expDelayed up -d ros2_mec
+sleep 15
+docker compose -p expDelayed up -d ros2_vhc
+```
+(Adjust -f flags if you need overrides: add `-f docker-compose.yml -f docker-compose.expA.override.yml` before `up`.)
+
