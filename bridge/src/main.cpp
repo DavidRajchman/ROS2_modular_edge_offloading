@@ -19,7 +19,7 @@ void configure_logger() {
     auto sink = std::make_shared<CppLogging::AsyncWaitFreeProcessor>(std::make_shared<CppLogging::TextLayout>());
     
     // Add file appender for bridge logs
-    sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
+    //sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
     sink->appenders().push_back(std::make_shared<CppLogging::ConsoleAppender>());
 
     // Configure the bridge logger

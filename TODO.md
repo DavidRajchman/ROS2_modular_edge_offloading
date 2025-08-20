@@ -7,3 +7,6 @@ Popsat do global configu informace vykonu jedntlivych HW serveru pro MEC
 - propojit se subtype MEC kontejneru
 
 Auticko musi byt schopno k requesty pripojit "aditional data" coz je string (json) ktery algoritmus vyhodnoti, budou obsahovat informace o narocnisti tasku
+
+
+Pokud BridgeDP nedosahne na MGWDP tak logy bridge tvrdi ze DP connected, pritom neni.
