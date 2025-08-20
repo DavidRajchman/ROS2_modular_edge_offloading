@@ -6,14 +6,13 @@ services:
   # Override VHC to use host network (runs on its own physical machine; no macvlan IP needed)
   ros2_vhc:
     network_mode: host
-    # Remove any previous network attachment & static IP from base compose.
-    # Host's own IP will be advertised. Ensure required ports are exposed/allowed.
-    networks: []
+  # Host's own IP will be advertised. Ensure required ports are exposed/allowed.
+  # Removed 'networks' key to avoid conflict (docker compose forbids network_mode + networks).
 
   # Override MEC similarly to use host network on its own machine.
   ros2_mec:
     network_mode: host
-    networks: []
+  # Removed 'networks' key to avoid conflict.
 
   discovery_service:
     networks:
