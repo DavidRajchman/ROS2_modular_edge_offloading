@@ -1,0 +1,17 @@
+networks:
+  pubnet:
+    external: true
+
+services:
+  discovery_service:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.114
+  offloading_manager:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.115
+  bridge:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.116
