@@ -7,7 +7,7 @@ def generate_launch_description():
     # Declare launch arguments with default values
     discovery_host_arg = DeclareLaunchArgument(
         'discovery_host',
-        default_value='192.168.65.5',
+        default_value='192.168.50.114',
         description='Discovery service host address'
     )
     

@@ -24,7 +24,7 @@
 // Constants
 const uint16_t OM_PORT = 8100;
 const std::string BRIDGE_COMPONENT_ID = "15:10";
-const std::string DISCOVERY_SERVICE_HOST = "192.168.65.5";
+const std::string DISCOVERY_SERVICE_HOST = "192.168.50.114";
 const uint16_t DISCOVERY_SERVICE_PORT = 9090;
 const uint16_t MGWCP_SERVER_PORT = 7000;
 
