@@ -84,7 +84,7 @@ class OffloadingAlgorithm:
         self.logger.info(f"MEC selection: {'RANDOM' if USE_RANDOM_MEC_SELECTION else MEC_SELECTION_STRATEGY}")
         self.logger.info(f"Discovery query interval: {DISCOVERY_QUERY_INTERVAL_SECONDS}s")
     self.logger.info(f"Discovery service target: {DISCOVERY_SERVICE_HOST}:{DISCOVERY_SERVICE_PORT}")
-    
+
     # Algorithm statistics for research
     self.decisions_made = 0
     self.approvals = 0
