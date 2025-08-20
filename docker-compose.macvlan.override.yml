@@ -3,6 +3,18 @@ networks:
     external: true
 
 services:
+  # Override VHC to use host network (runs on its own physical machine; no macvlan IP needed)
+  ros2_vhc:
+    network_mode: host
+    # Remove any previous network attachment & static IP from base compose.
+    # Host's own IP will be advertised. Ensure required ports are exposed/allowed.
+    networks: []
+
+  # Override MEC similarly to use host network on its own machine.
+  ros2_mec:
+    network_mode: host
+    networks: []
+
   discovery_service:
     networks:
       pubnet:

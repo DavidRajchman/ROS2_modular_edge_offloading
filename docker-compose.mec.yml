@@ -1,0 +1,22 @@
+services:
+  ros2_mec:
+    build:
+      context: ./ros/
+      dockerfile: Dockerfile
+    container_name: ros2_mec
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=13
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
+      - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
+      - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
+      - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
+      - ./cpplib:/home/ubuntu/cpplib_src
+    privileged: true
+    tty: true
+    command: ["/bin/bash","-c","source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/mec_autostart.sh"]
