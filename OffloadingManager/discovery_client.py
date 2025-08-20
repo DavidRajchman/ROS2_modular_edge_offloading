@@ -15,7 +15,8 @@ from config_manager import ConfigManager
 from algorithm import (DISCOVERY_QUERY_INTERVAL_SECONDS, DISCOVERY_INITIAL_QUERY_DELAY,
                       DISCOVERY_KEEPALIVE_MAX_FAILURES, DISCOVERY_KEEPALIVE_TIMEOUT_SECONDS,
                       DISCOVERY_REGISTRATION_TIMEOUT_MINUTES, DISCOVERY_REGISTRATION_RETRY_DELAY_SECONDS,
-                      DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER, DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS)
+                      DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER, DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS,
+                      DISCOVERY_SERVICE_HOST, DISCOVERY_SERVICE_PORT)
 
 class ComponentType(Enum):
     """Discovery Service component types"""
@@ -70,7 +71,7 @@ class DiscoveryClient:
     """Discovery Service client for the OM"""
     
     def __init__(self, config_manager: ConfigManager, shutdown_event: threading.Event,
-                 host: str = "192.168.65.5", port: int = 9090):
+                 host: str = DISCOVERY_SERVICE_HOST, port: int = DISCOVERY_SERVICE_PORT):
         self.logger = logging.getLogger('OM.discovery')
         self.config_manager = config_manager
         self.shutdown_event = shutdown_event
@@ -104,6 +105,8 @@ class DiscoveryClient:
         self.subtype = 0  # OM always uses subtype 0
         
         self.logger.info(f"Discovery client initialized for {self.host}:{self.port}")
+        if self.host.startswith("127.") or self.host in ("localhost", "0.0.0.0"):
+            self.logger.warning("Discovery Service host appears to be loopback; remote components may not connect.")
         
     def set_resource_update_callback(self, callback: Callable[[Set[str]], None]):
         """Set callback for when resource availability changes"""

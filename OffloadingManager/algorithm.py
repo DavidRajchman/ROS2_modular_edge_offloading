@@ -7,6 +7,7 @@ ALGORITHM CONFIGURATION - Modify these values to change algorithm behavior:
 
 import logging
 import random
+import os
 from typing import Dict, Set, Optional, Any
 from dataclasses import dataclass
 
@@ -48,6 +49,14 @@ DISCOVERY_REGISTRATION_RETRY_DELAY_SECONDS = 2.0  # Delay between registration r
 DISCOVERY_REGISTRATION_BACKOFF_MULTIPLIER = 1.5  # Exponential backoff multiplier for delays
 DISCOVERY_REGISTRATION_MAX_DELAY_SECONDS = 30.0  # Maximum delay between retry attempts
 
+# Discovery Service endpoint (moved here for centralized configuration)
+# Default points to macvlan-assigned Discovery Service; overridable via environment
+DISCOVERY_SERVICE_HOST = os.getenv("DISCOVERY_SERVICE_HOST", "192.168.50.114")
+try:
+    DISCOVERY_SERVICE_PORT = int(os.getenv("DISCOVERY_SERVICE_PORT", "9090"))
+except ValueError:
+    DISCOVERY_SERVICE_PORT = 9090
+
 # ===================================================================
 
 
@@ -74,6 +83,7 @@ class OffloadingAlgorithm:
         self.logger.info(f"Auto-approve mode: {AUTO_APPROVE_ALL_REQUESTS}")
         self.logger.info(f"MEC selection: {'RANDOM' if USE_RANDOM_MEC_SELECTION else MEC_SELECTION_STRATEGY}")
         self.logger.info(f"Discovery query interval: {DISCOVERY_QUERY_INTERVAL_SECONDS}s")
+    self.logger.info(f"Discovery service target: {DISCOVERY_SERVICE_HOST}:{DISCOVERY_SERVICE_PORT}")
         
         # Algorithm statistics for research
         self.decisions_made = 0
@@ -202,6 +212,8 @@ class OffloadingAlgorithm:
                 "auto_approve_all": AUTO_APPROVE_ALL_REQUESTS,
                 "random_mec_selection": USE_RANDOM_MEC_SELECTION,
                 "mec_selection_strategy": MEC_SELECTION_STRATEGY,
-                "discovery_query_interval": DISCOVERY_QUERY_INTERVAL_SECONDS
+                "discovery_query_interval": DISCOVERY_QUERY_INTERVAL_SECONDS,
+                "discovery_service_host": DISCOVERY_SERVICE_HOST,
+                "discovery_service_port": DISCOVERY_SERVICE_PORT
             }
         }
