@@ -79,16 +79,22 @@ class OffloadingAlgorithm:
     
     def __init__(self):
         self.logger = logging.getLogger('OM.algorithm')
+        # Apply configured log level
+        try:
+            self.logger.setLevel(getattr(logging, ALGORITHM_LOG_LEVEL.upper(), logging.INFO))
+        except Exception:
+            self.logger.setLevel(logging.INFO)
         self.logger.info(f"Algorithm initialized: {ALGORITHM_NAME} v{ALGORITHM_VERSION}")
         self.logger.info(f"Auto-approve mode: {AUTO_APPROVE_ALL_REQUESTS}")
         self.logger.info(f"MEC selection: {'RANDOM' if USE_RANDOM_MEC_SELECTION else MEC_SELECTION_STRATEGY}")
         self.logger.info(f"Discovery query interval: {DISCOVERY_QUERY_INTERVAL_SECONDS}s")
-    self.logger.info(f"Discovery service target: {DISCOVERY_SERVICE_HOST}:{DISCOVERY_SERVICE_PORT}")
-
-    # Algorithm statistics for research
-    self.decisions_made = 0
-    self.approvals = 0
-    self.denials = 0
+        self.logger.info(f"Discovery service target: {DISCOVERY_SERVICE_HOST}:{DISCOVERY_SERVICE_PORT}")
+        if DISCOVERY_SERVICE_HOST in ("localhost", "0.0.0.0") or DISCOVERY_SERVICE_HOST.startswith("127."):
+            self.logger.warning("Configured Discovery Service host is loopback; remote components may fail to connect.")
+        # Algorithm statistics for research
+        self.decisions_made = 0
+        self.approvals = 0
+        self.denials = 0
     
     def make_allocation_decision(self, 
                                request_id: int,
