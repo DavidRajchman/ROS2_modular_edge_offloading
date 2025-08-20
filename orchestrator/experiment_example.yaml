@@ -1,0 +1,28 @@
+# Example experiment descriptor
+experiment_id: expA
+project_name: expA
+phases:
+  - name: core
+    services:
+      - discovery_service
+      - offloading_manager
+    delay_after: 5  # seconds to wait after bringing up these services
+  - name: ros_nodes
+    services:
+      - ros2_vhc
+      - ros2_mec
+    delay_after: 3
+  - name: bridge
+    services:
+      - bridge
+    delay_after: 0
+compose:
+  base_file: ../docker-compose.yml
+  overrides:
+    - ../docker-compose.expA.override.yml
+metadata:
+  description: "Baseline experiment A with single VHC/MEC pair"
+  ros_domain_id: 25
+  env:
+    ROS_DOMAIN_ID: "25"
+    CUSTOM_FLAG: "true"

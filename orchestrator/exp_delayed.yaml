@@ -1,0 +1,29 @@
+experiment_id: expDelayed
+project_name: expDelayed
+phases:
+  - name: core
+    services:
+      - discovery_service
+      - offloading_manager
+    delay_after: 1   # Wait 1s before next phase
+  - name: bridge
+    services:
+      - bridge
+    delay_after: 1   # Wait 1s before launching MEC
+  - name: mec
+    services:
+      - ros2_mec
+    delay_after: 15  # Wait 15s before launching VHC
+  - name: vhc
+    services:
+      - ros2_vhc
+    delay_after: 0
+compose:
+  base_file: ../docker-compose.yml
+  overrides:
+    - ../docker-compose.expA.override.yml  # reuse existing override (ROS_DOMAIN_ID etc.)
+metadata:
+  description: "Experiment with phased delayed startup: core -> bridge -> mec -> vhc"
+  ros_domain_id: 25
+  env:
+    ROS_DOMAIN_ID: "25"
