@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
+import re
 
 try:
     import yaml  # type: ignore
@@ -85,7 +86,15 @@ def phased_launch(descriptor: Dict[str, Any], only: List[str] = None, dry_run: b
     compose_cfg = descriptor.get("compose", {})
     base = compose_cfg.get("base_file")
     overrides = compose_cfg.get("overrides", [])
-    project = descriptor.get("project_name") or descriptor.get("experiment_id")
+    raw_project = descriptor.get("project_name") or descriptor.get("experiment_id") or "exp"
+    # Sanitize project name to docker compose rules: lowercase alnum, hyphen, underscore
+    sanitized = re.sub(r"[^a-z0-9_-]", "", raw_project.lower())
+    if not sanitized or not re.match(r"^[a-z0-9][a-z0-9_-]*$", sanitized):
+        # Fallback prefix if first char invalid or empty after cleaning
+        sanitized = f"exp_{sanitized}" if sanitized else "exp_auto"
+    project = sanitized
+    if project != raw_project:
+        print(f"[launcher] Adjusted project name '{raw_project}' -> '{project}' to satisfy docker naming rules")
     phases = descriptor.get("phases", [])
     global_env = descriptor.get("metadata", {}).get("env", {})
     env = merge_env(global_env)

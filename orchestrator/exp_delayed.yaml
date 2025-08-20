@@ -1,5 +1,5 @@
-experiment_id: expDelayed
-project_name: expDelayed
+experiment_id: expdelayed
+project_name: expdelayed
 phases:
   - name: core
     services:
