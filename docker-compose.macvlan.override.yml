@@ -18,7 +18,7 @@ services:
         ipv4_address: 192.168.50.116
 
 
-# #HOW TO CREATE MACVLAN:
+# #HOW TO CREATE MACVLAN (put into terminal):
 # docker network create -d macvlan \
 #   --subnet=192.168.50.0/24 \
 #   --gateway=192.168.50.1 \
