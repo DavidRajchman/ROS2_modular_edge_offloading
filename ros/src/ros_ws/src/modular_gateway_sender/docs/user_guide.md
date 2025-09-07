@@ -198,25 +198,31 @@ Troubleshooting Checklist:
 This section describes EXACTLY what exists for logging, how binary records are laid out, and how researchers convert them to human‑readable text for analysis.
 
 ### 9.1 Logging Framework In Use
-* Library: CppLogging (external) – used via `logger_.Info/Warn/Error/Fatal/Debug`.
-* Every emitted message string we provide already embeds the source file name prefix manually (e.g. `gateway_controller.cpp: Loaded 3 tasks ...`). This is deliberate so that after decoding we can filter by simple string matching without needing extra metadata.
-* Log levels (enum values) encountered: NONE(0x00), FATAL(0x1F), ERROR(0x3F), WARN(0x7F), INFO(0x9F), DEBUG(0xBF), ALL(0xFF). Typical research runs use INFO.
-
+* **Library**: CppLogging (external) – used via `logger_.Info/Warn/Error/Fatal/Debug`.
+* **Performance considerations**: Binary logging causes less than 5μs latency per message; text logging can cause up to 200μs per message. Binary is recommended for research runs; text for direct debugging only.
+* **Compilation mode selection**: MGW supports both binary and text logging modes, selectable at build time via CMake parameters (see section 9.6).
+* **Message structure**: Every emitted message string embeds the source file name prefix manually (e.g. `gateway_controller.cpp: Loaded 3 tasks ...`). This is deliberate so that after decoding we can filter by simple string matching without needing extra metadata.
+* **Log levels** (enum values): NONE(0x00), FATAL(0x1F), ERROR(0x3F), WARN(0x7F), INFO(0x9F), DEBUG(0xBF), ALL(0xFF). Typical research runs use INFO.
 
 ### 9.2 Converting Binary Log To Text
-Tool: `BinLogDecoder.py` (root of workspace). Supports default paths or explicit arguments.
+**Tool**: `BinLogDecoder.py` (container workspace root). Uses known fmt library format specifiers to decode binary logs.
+
+**Important**: Multiple BinLogDecoder.py scripts exist in this repository  for different components. When updating format specifiers, modify all relevant decoders. In the MGW container, only this one is present.
 
 Basic usage (inside workspace root):
+```bash
+python3 BinLogDecoder.py                          # uses defaults /home/ubuntu/ros_ws/V_binary.log -> decoded_log.txt
+python3 BinLogDecoder.py V_binary.log             # specify input, default output path
+python3 BinLogDecoder.py V_binary.log run1.txt    # specify both input & output
 ```
-python3 BinLogDecoder.py                      # uses defaults /home/ubuntu/ros_ws/V_binary.log -> decoded_log.txt
-python3 BinLogDecoder.py V_binary.log         # specify input, default output path
-python3 BinLogDecoder.py V_binary.log run1.txt # specify both input & output
-```
+
+**Decoder behavior**: If format specifiers are not recognized, they will be ignored. Update the script's format mapping when new logging patterns are introduced.
 
 Decoder output line format:
 ```
 YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ [0xTHREAD] LEVEL LOGGER_NAME - fully_formatted_message
 ```
+
 Example (illustrative):
 ```
 2025-08-14T09:15:27.123456789Z [0x3A7F12] INFO  gateway - gateway_controller.cpp: Loaded 3 tasks from global config
@@ -227,26 +233,40 @@ Our emitted message strings intentionally begin with `<file>.cpp:` or similar. P
 * `gateway_controller.cpp: STATE TRANSITION X->Y`
 * `gateway_controller.cpp: Loaded N tasks ...`
 * `bridge_cp_client.cpp: Sending OFFLOAD_REQUEST request_id=... task_id=...`
-* `bridge_cp_client.cpp: SESSION_APPROVED request_id=... task_id=...`
-* `handler_factory.cpp: Activating handler msgType=... mode=...`
-* `string_test_input_handler.cpp: Forwarding payload size=...`
 
-Use these stable prefixes for scripting (they should not be changed casually; downstream parsing may rely on them).
-
-### 9.4 Common Diagnostic Paths Using Logs
-* Missing results: Search decoded log for `SESSION_APPROVED` and subsequent handler activation; absence means CP issue.
-* Silent drops: Look for `No handler processed message type` (INFO/WARN). If present, add factory registration or handler.
-* Performance spikes: Measure deltas between first `Forwarding payload` and matching result publish log (if instrumented) to approximate round-trip latency.
-* Session timeout: Inspect keepalive warnings (future: explicit timeout logs once enforcement added).
 
 
 ### 9.5 Failure Modes In Decoding
-* `Truncated record` / `Incomplete data block`: Binary log corrupted or truncated mid-write; keep original, note corruption in metadata.
-* `FORMAT_ERROR`: Mismatch between placeholders `{}` count and parsed arguments (should be rare – indicates code/log format drift or decoder desync).
-* Unknown `arg_type`: Update `ARG_TYPES` mapping in `BinLogDecoder.py` if new CppLogging types were introduced.
+* **`Truncated record` / `Incomplete data block`**: Binary log corrupted or truncated mid-write; keep original, note corruption in metadata.
+* **`FORMAT_ERROR`**: Mismatch between placeholders `{}` count and parsed arguments (should be rare – indicates code/log format drift or decoder desync).
+* **Unknown `arg_type`**: Update `ARG_TYPES` mapping in `BinLogDecoder.py` if new CppLogging types were introduced.
+
+### 9.6 Logging Mode Configuration
+MGW supports compile-time selection between binary and text logging modes via CMake cache variables:
+
+**Available modes**:
+* `MGW_LOG_MODE=BINARY` (default, recommended for research): High-performance binary output requiring decoder
+* `MGW_LOG_MODE=TEXT`: Direct console output for debugging (higher latency up to 500 us per message)
+
+**Log level selection**:
+* Preset: `MGW_LOG_LEVEL_PRESET=<NONE|FATAL|ERROR|WARN|INFO|DEBUG|ALL>`
+* Direct: `MGW_LOG_LEVEL=0xBF` (when preset not specified)
+
+**Build examples**:
+```bash
+# Research/production (binary logging, INFO level)
+colcon build --packages-select modular_gateway_sender --cmake-args -DMGW_LOG_MODE=BINARY -DMGW_LOG_LEVEL_PRESET=INFO
+
+# Development/debugging (text logging, DEBUG level)
+colcon build --packages-select modular_gateway_sender --cmake-args -DMGW_LOG_MODE=TEXT -DMGW_LOG_LEVEL_PRESET=DEBUG
+
+# Custom level using hex mask
+colcon build --packages-select modular_gateway_sender --cmake-args -DMGW_LOG_MODE=BINARY -DMGW_LOG_LEVEL=0xBF
+```
+
+**Performance recommendation**: Use binary mode for everything, except for direct code debugging sessions where immediate console output is needed.
 
 
 
 ---
 
-End of user guide (research-focused). For deeper protocol/state machine details refer to the internal technical documentation.

@@ -1,6 +1,47 @@
 cmake_minimum_required(VERSION 3.8)
 project(modular_gateway_sender)
 
+# ------------------------------------------------------------------
+# Logging configuration (user-adjustable via cmake command line)
+# ------------------------------------------------------------------
+# MGW_LOG_MODE: BINARY or TEXT
+set(MGW_LOG_MODE "BINARY" CACHE STRING "Logging output mode: BINARY or TEXT")
+set_property(CACHE MGW_LOG_MODE PROPERTY STRINGS BINARY TEXT)
+
+# MGW_LOG_LEVEL_PRESET: convenience presets (optional)
+set(MGW_LOG_LEVEL_PRESET "" CACHE STRING "Log level preset: NONE FATAL ERROR WARN INFO DEBUG ALL (leave empty for direct MGW_LOG_LEVEL)")
+set_property(CACHE MGW_LOG_LEVEL_PRESET PROPERTY STRINGS "" NONE FATAL ERROR WARN INFO DEBUG ALL)
+
+# MGW_LOG_LEVEL: direct hex mask (used when no preset specified)
+set(MGW_LOG_LEVEL "0x9F" CACHE STRING "Direct logging level mask (e.g. 0x9F INFO, 0xBF DEBUG, 0xFF ALL)")
+
+# Apply logging mode
+if(MGW_LOG_MODE STREQUAL "TEXT")
+    add_compile_definitions(MGW_LOG_MODE_TEXT)
+else()
+    add_compile_definitions(MGW_LOG_MODE_BINARY)
+endif()
+
+# Apply logging level (preset takes precedence over direct)
+if(NOT MGW_LOG_LEVEL_PRESET STREQUAL "")
+    add_compile_definitions(MGW_LOG_LEVEL_PRESET_${MGW_LOG_LEVEL_PRESET})
+    message(STATUS "MGW log level: preset ${MGW_LOG_LEVEL_PRESET}")
+else()
+    add_compile_definitions(MGW_LOG_LEVEL=${MGW_LOG_LEVEL})
+    message(STATUS "MGW log level: direct ${MGW_LOG_LEVEL}")
+endif()
+
+# ------------------------------------------------------------------
+# Existing project configuration continues below
+# ------------------------------------------------------------------
+
+# Set version information
+add_definitions(-DVERSION_MAJOR=0)
+add_definitions(-DVERSION_MINOR=20)
+add_definitions(-DVERSION_PATCH=0)
+
+
+
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -10,10 +51,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
 endif()
 
-# Set version information
-add_definitions(-DVERSION_MAJOR=0)
-add_definitions(-DVERSION_MINOR=20)
-add_definitions(-DVERSION_PATCH=0)
 
 # --- Find Dependencies ---
 find_package(ament_cmake REQUIRED)

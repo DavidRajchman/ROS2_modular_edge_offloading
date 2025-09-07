@@ -15,7 +15,7 @@ Due to the system ability to be deployed on a mobile network, it is designed not
 ## Architecture of a simple of an minimal offloading testing experiment
 The current design of all components requires that the Bridge, DISC and OM components do not share the same network interface and are not reachable by each other on the localhost network. Every one of those components must have an IP adress of its own. This can be achieved with a simple docker bridge network. 
 
-If using multiple computers is needed for testing the offloading in a realworld scenario, the simplest solution is to use dedicated HW for those 3 restricted components. However an untested solution using macvlan has beed implemented and is able to launch (but there were isues with network routing, likely unrelated to the macvlan itself.) See `docker-compose.macvlan.override.yml` for more information on how to setup the macvlan 
+If using multiple computers is needed for testing the offloading in a realworld scenario, the simplest solution is to use dedicated HW for those 3 restricted components. However an untested solution using macvlan has beed implemented and is able to launch (but there were isues with network routing, likely unrelated to the macvlan itself.) See [docker-compose.macvlan.override.yml](./docker-compose.macvlan.override.yml) for more information on how to setup the macvlan
 
 Here is a list of containers that need to be started and a brief description of their functionality
 - [offloading-manager](./bridge/Dockerfile) image runs the offloading manager for the offloading system. It is responsible for coordinating the offloading process and making decisions about which tasks to offload. It contains the [global configuration](./OffloadingManager/config.json) for the offloading system. Which list all configurable experiments. It also contains the [algorithm](./OffloadingManager/algorithm.py) which is the only file that should be edited during research. It contains OM configuration as well as the actual offloading algorithm (single persistent thread). Curently an autoaproove placeholder is present.
@@ -38,7 +38,7 @@ Please note that there are multiple BinlogDecoder.py scripts in this repository 
 ### Python logging
 Python based components utilize the built-in logging library for logging. The logging library supports different log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) and can be configured to output logs in different formats. It is recommended to use the logging library's built-in features for log management.
 
-## More detailed documentation for all components <WIP>. 
+## More detailed documentation for all components *WIP*. 
 There are many .md files curently present in all components folders. THESE SHOULD NOT BE CONSIDERED DOCUMENTATION. Only files listed bellow can be used for reference. The other files were mainly used to guide asisted coding tools like github copilot and are not meant for human reading.
 ### list of reference documentation and user guides
 - VHC and MEC - [ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md)
@@ -49,6 +49,17 @@ There are many .md files curently present in all components folders. THESE SHOUL
 - docker compose
 
 ## How to run
+The system includes fail-broken mechanisms to prevent unintended behavior. One of these is in DISC. It wont allow any component to connect before the OM has registered, then it will allow the bridge to connect, and finally other components can be registered.
+
+**HOWEVER** to prevent the issue of incorect global configuration, the DISC service will shut down if the OM disconects. Which means that the DISC must be restarted for every experiment. Also currently there is no mechanism to auto-asign the component ID, its recomended to restart the DISC even if the OM has not been disconected when changing experiments.
+
+Order of launching the components:
+1. Discovery Service
+2. Offloading Manager
+3. Bridge
+4. **SYSTEM READY** other components can be launched.
+
+
 TBD 
 
 
@@ -62,3 +73,27 @@ Change the Discovery Service IP (and if needed the port) in ALL of the following
 4. ROS2 MEC launch: [ros/src/ros_ws/src/offloading_latency_test_loopback/launch/mec_launch.py](ros/src/ros_ws/src/offloading_latency_test_loopback/launch/mec_launch.py) -> DeclareLaunchArgument('discovery_host', default_value='192.168.50.114', ...)
 5. Docker macvlan override: [docker-compose.macvlan.override.yml](docker-compose.macvlan.override.yml) -> discovery_service: ipv4_address: 192.168.50.114
 6. Discovery Service port (only if changing port): [DiscoveryService/CMakeLists.txt](DiscoveryService/CMakeLists.txt) -> DISCOVERY_SERVICE_PORT=9090
+
+## APPENDIX B - NAMING CONVENTION *WIP*
+Core terms actually used in the codebase (see referenced files):
+* **component** – Any participating runtime (VHC, MEC, OM, Bridge, DiscoveryService).
+* **component_id** – Concatenation `group_id:id_in_group` (e.g. `60:5`) built in `gateway_controller.cpp` from parameters `identity.group_id` & `identity.id_in_group`.
+* **VHC** – Vehicle host component (identity.component_type="V"). Requests offloading via service `request_offloading`.
+* **MEC** – Mirror execution component (identity.component_type="M"). Receives unsolicited SESSION_APPROVED and processes data.
+* **OM** – Offloading Manager (external, not implemented here) that decides approvals.
+* **Bridge / BridgeCP / BridgeDP** – Bridge Control Plane (JSON session/control messages) & Data Plane (binary framed payload). The gateway connects CP via `BridgeCpClient` and DP via `TcpServerTransport`.
+* **DiscoveryService** – Entry point supplying `RegistrationResponse` with `configJson` consumed in `GatewayController::on_discovery_success`.
+* **DP** – Data Plane (binary framed messages; see `message_header.hpp`).
+* **CP** – Control Plane (session negotiation & keepalives; see `bridge_cp_client.cpp`).
+* **MGW** – Modular Gateway node (`gateway_controller` executable for VHC; `mec_gateway` for MEC) orchestrating handlers + transports.
+* **task** – Offloadable unit defined in global config JSON (fields: `task_id`, `task_name`, `input_message_types`, `output_message_types`). Parsed into internal TaskDetails in `gateway_controller.cpp`.
+* **request** – OFFLOAD_REQUEST initiated by VHC (see `BridgeCpClient::send_offload_request`). Identified by `request_id` (local monotonic counter) + component_id.
+* **session** – Active offloaded task lifecycle between VHC & MEC. Internally tracked in `active_sessions_` keyed by `request_id` (no separate session ID on the wire).
+* **MessageType** – Numeric enumeration (`message_header.hpp`) used for both global config and binary header type byte.
+* **handler** – Concrete subclass of `MessageHandlerBase` bridging a ROS 2 topic to the MGW DP (e.g. `StringTestInputHandler`).
+* **handler mode** – One of SUBSCRIBER_ONLY / PUBLISHER_ONLY / BOTH (see `message_handler_base.hpp`, configured per role in `on_session_approved`).
+* **task database** – In-memory map `<task_id, TaskDetails>` populated once from `configJson` (see `load_global_config_from_json`).
+* **global configuration JSON** – Distributed once via Discovery; authoritative catalog of tasks.
+* **binary log** – Persistent logging output (CppLogging format) including per-source file prefixes; used for diagnostics and research analysis.
+* **keepalive** – CP ping/pong for session liveness (Discovery keepalive) & session-level keepalives (Bridge CP).
+* **ACK** – Control-plane acknowledgement for reliable message sequences (managed in `BridgeCpClient`).
