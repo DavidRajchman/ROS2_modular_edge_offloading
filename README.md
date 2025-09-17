@@ -59,9 +59,23 @@ Order of launching the components:
 3. Bridge
 4. **SYSTEM READY** other components can be launched.
 
+TBD
 
-TBD 
+## YML overide files
+To make launching the system easier, yml overide files are provided. bellow is a list of the overide files and their intended use
 
+to run the overide options use the following command:
+```
+docker compose -f docker-compose.yml -f <overide file> up <container names (optional)> -d
+```
+
+- [docker-compose.devmode.yml](./docker-compose.devmode.yml) - this file disables the autostart script off all components, allowing for development containers to be launched.
+
+- [docker-compose.macvlan.yml](./docker-compose.macvlan.override.yml) - this file launches the DISC, OM and Bridge components on a macvlan network. With dedicated IP addresses for each component. This allows those 3 components to be launched on a single computer with a single network interface. **MACVLAN setup required on the host computer; details are in the .mcvlan file comments**
+
+- [docker-compose.mec.yml](./docker-compose.mec.override.yml) - this file launches only the MEC component using an autostart script. It is useful for runing the MEC container on a dedicated computer.
+
+- [docker-compose.vhc.yml](./docker-compose.vhc.override.yml) - this file launches only the VHC component using an autostart script. It is useful for runing the VHC container on a dedicated computer.
 
 ## APPENDIX A - Discovery Service IP/Port Change Locations
 

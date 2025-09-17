@@ -1,0 +1,15 @@
+services:
+  ros2_vhc:
+    command: ["/bin/bash"]
+
+  ros2_mec:
+    command: ["/bin/bash"]
+
+  bridge:
+    command: ["/bin/bash"]
+
+  discovery_service:
+    command: ["/bin/bash"]
+
+  offloading_manager:
+    command: ["/bin/bash"]

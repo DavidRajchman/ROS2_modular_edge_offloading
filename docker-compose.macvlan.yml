@@ -1,0 +1,36 @@
+networks:
+  pubnet:
+    external: true
+
+services:
+
+  discovery_service:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.114
+  offloading_manager:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.115
+  bridge:
+    networks:
+      pubnet:
+        ipv4_address: 192.168.50.116
+
+
+# #HOW TO CREATE MACVLAN 
+# #(put into terminal):
+
+# docker network create -d macvlan \
+#   --subnet=192.168.50.0/24 \
+#   --gateway=192.168.50.1 \
+#   --ip-range=192.168.50.112/28 \
+#   -o parent=eno1 pubnet
+
+# #HOW TO ADD MCVLAN TO HOST LINK:
+# sudo ip link add macvlan0 link eno1 type macvlan mode bridge
+# sudo ip addr add 192.168.50.113/24 dev macvlan0
+# sudo ip link set macvlan0 up
+
+# #DO NOT FORGET TO ENABLE FORWARDING
+# sudo sysctl -w net.ipv4.ip_forward=1

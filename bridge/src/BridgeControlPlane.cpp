@@ -170,7 +170,7 @@ bool BridgeControlPlane::perform_discovery_registration() {
     request.listenPort = std::to_string(MGWCP_SERVER_PORT);
     request.humanReadableMessage = "Bridge Control Plane requesting registration";
     
-    // Encode message
+    // Encode message once (it doesn't change between retries)
     discovery_protocol::Message message(request);
     std::string encoded_message;
     if (discovery_protocol::encode_message(message, encoded_message) != discovery_protocol::ProtocolStatus::OK) {
@@ -178,43 +178,59 @@ bool BridgeControlPlane::perform_discovery_registration() {
         return false;
     }
     
-    // Send registration request
-    if (!discovery_transport_->send_data(encoded_message.data(), encoded_message.size())) {
-        logger.Error("BridgeControlPlane.cpp: Failed to send Discovery Service registration request");
-        return false;
-    }
+    // Declare response variable outside loop so it's accessible after loop ends
+    discovery_protocol::RegistrationResponse response;
     
-    logger.Info("BridgeControlPlane.cpp: Sent Discovery Service registration request");
-    
-    // Wait for response
-    std::vector<uint8_t> response_buffer(2048);
-    int bytes_received = discovery_transport_->receive_data(response_buffer.data(), response_buffer.size());
-    
-    if (bytes_received <= 0) {
-        logger.Error("BridgeControlPlane.cpp: Failed to receive Discovery Service registration response");
-        return false;
-    }
-    
-    // Decode response
-    std::string response_str(response_buffer.begin(), response_buffer.begin() + bytes_received);
-    discovery_protocol::Message response_message;
-    
-    if (discovery_protocol::decode_message(response_str, response_message) != discovery_protocol::ProtocolStatus::OK) {
-        logger.Error("BridgeControlPlane.cpp: Failed to decode Discovery Service registration response");
-        return false;
-    }
-    
-    if (response_message.type != discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
-        logger.Error("BridgeControlPlane.cpp: Unexpected Discovery Service response message type");
-        return false;
-    }
-    
-    auto& response = std::get<discovery_protocol::RegistrationResponse>(response_message.data);
-    
-    if (response.responseCode != discovery_protocol::ResponseCode::SUCCESS) {
-        logger.Error("BridgeControlPlane.cpp: Discovery Service registration failed: {}", 
-                    response.humanReadableMessage);
-        return false;
+    // Retry loop for registration
+    while (true) {
+        // Send registration request
+        if (!discovery_transport_->send_data(encoded_message.data(), encoded_message.size())) {
+            logger.Error("BridgeControlPlane.cpp: Failed to send Discovery Service registration request");
+            return false;
+        }
+        
+        logger.Info("BridgeControlPlane.cpp: Sent Discovery Service registration request");
+        
+        // Wait for response
+        std::vector<uint8_t> response_buffer(2048);
+        int bytes_received = discovery_transport_->receive_data(response_buffer.data(), response_buffer.size());
+        
+        if (bytes_received <= 0) {
+            logger.Error("BridgeControlPlane.cpp: Failed to receive Discovery Service registration response");
+            return false;
+        }
+        
+        // Decode response
+        std::string response_str(response_buffer.begin(), response_buffer.begin() + bytes_received);
+        discovery_protocol::Message response_message;
+        
+        if (discovery_protocol::decode_message(response_str, response_message) != discovery_protocol::ProtocolStatus::OK) {
+            logger.Error("BridgeControlPlane.cpp: Failed to decode Discovery Service registration response");
+            return false;
+        }
+        
+        if (response_message.type != discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
+            logger.Error("BridgeControlPlane.cpp: Unexpected Discovery Service response message type");
+            return false;
+        }
+        
+        response = std::get<discovery_protocol::RegistrationResponse>(response_message.data);
+        
+        if (response.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
+            // Success - break out of retry loop and continue with normal processing
+            logger.Info("BridgeControlPlane.cpp: Discovery Service registration successful");
+            break;
+        } else if (response.responseCode == discovery_protocol::ResponseCode::WAIT) {
+            // Expected response when OM is not ready yet - wait and retry
+            logger.Info("BridgeControlPlane.cpp: Discovery Service responded with WAIT (OM not ready), retrying in 1 second...");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            continue;
+        } else {
+            // Other error codes are actual failures
+            logger.Error("BridgeControlPlane.cpp: Discovery Service registration failed: {}", 
+                        response.humanReadableMessage);
+            return false;
+        }
     }
     
     // Extract OM connection details from Discovery Service response
