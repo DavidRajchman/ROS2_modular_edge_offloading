@@ -54,6 +54,19 @@ message(STATUS "Finding TransportLib...")
 find_package(TransportLib REQUIRED)
 message(STATUS "TransportLib found successfully")
 
+# Logging configuration options
+set(BRIDGE_LOG_MODE "BINARY" CACHE STRING "Logging mode: BINARY or TEXT")
+set_property(CACHE BRIDGE_LOG_MODE PROPERTY STRINGS "BINARY" "TEXT")
+
+# Log level preset options (mutually exclusive with direct level)
+set(BRIDGE_LOG_LEVEL_PRESET "" CACHE STRING "Log level preset (NONE, FATAL, ERROR, WARN, INFO, DEBUG, ALL)")
+set(BRIDGE_LOG_LEVEL "" CACHE STRING "Direct log level hex mask (e.g., 0x9F)")
+
+# Validate logging mode
+if(NOT BRIDGE_LOG_MODE MATCHES "^(BINARY|TEXT)$")
+    message(FATAL_ERROR "BRIDGE_LOG_MODE must be either 'BINARY' or 'TEXT', got: ${BRIDGE_LOG_MODE}")
+endif()
+
 # Add the executable for your bridge application
 add_executable(bridge
     src/main.cpp
@@ -63,6 +76,7 @@ add_executable(bridge
     src/GlobalConfig.cpp
     src/RoutingTable.cpp
     src/TransportHandler.cpp
+    src/configure_logger.cpp
 )
 
 # Explicitly add include directories
@@ -81,6 +95,25 @@ target_compile_definitions(bridge
     VERSION_PATCH=${PROJECT_VERSION_PATCH}
     ACTIVE_LOG_LEVEL=LOG_LEVEL_WARN
 )
+
+# Set logging mode compile definitions
+if(BRIDGE_LOG_MODE STREQUAL "BINARY")
+    add_compile_definitions(BRIDGE_LOG_MODE_BINARY)
+elseif(BRIDGE_LOG_MODE STREQUAL "TEXT")
+    add_compile_definitions(BRIDGE_LOG_MODE_TEXT)
+endif()
+
+# Configure log level compile definitions
+if(BRIDGE_LOG_LEVEL_PRESET)
+    string(TOUPPER ${BRIDGE_LOG_LEVEL_PRESET} PRESET_UPPER)
+    target_compile_definitions(bridge PRIVATE BRIDGE_LOG_LEVEL_PRESET_${PRESET_UPPER})
+    message(STATUS "Configured log level preset: ${BRIDGE_LOG_LEVEL_PRESET}")
+elseif(BRIDGE_LOG_LEVEL)
+    target_compile_definitions(bridge PRIVATE BRIDGE_LOG_LEVEL=${BRIDGE_LOG_LEVEL})
+    message(STATUS "Configured direct log level: ${BRIDGE_LOG_LEVEL}")
+else()
+    message(STATUS "Using default log level: INFO (0x9F)")
+endif()
 
 # Find CppCommon library
 find_library(CPPCOMMON_LIBRARY

@@ -1,4 +1,5 @@
 #include "BridgeControlPlane.hpp"
+#include "configure_logger.hpp"
 #include "logging/logger.h"
 #include "logging/config.h"
 
@@ -14,20 +15,7 @@ std::atomic<bool> shutdown_requested(false);
 // Global Bridge Control Plane instance for signal handler access
 std::unique_ptr<BridgeControlPlane> bridge_cp;
 
-void configure_logger() {
-    // Create a binary layout processor for high-performance logging
-    auto sink = std::make_shared<CppLogging::AsyncWaitFreeProcessor>(std::make_shared<CppLogging::TextLayout>());
-    
-    // Add file appender for bridge logs
-    //sink->appenders().push_back(std::make_shared<CppLogging::FileAppender>("bridge_binary.log"));
-    sink->appenders().push_back(std::make_shared<CppLogging::ConsoleAppender>());
 
-    // Configure the bridge logger
-    CppLogging::Config::ConfigLogger("bridge", sink);
-    
-    // Startup the logging system
-    CppLogging::Config::Startup();
-}
 
 
 // Signal handler for graceful shutdown (SIGINT, SIGTERM)
@@ -48,7 +36,7 @@ void graceful_signal_handler(int signum) {
 // Signal handler for crash signals - flush logs before termination
 void crash_signal_handler(int signum) {
     // Force flush and shutdown logging system immediately
-    CppLogging::Config::Shutdown();
+    bridge::shutdown_logger();
     std::exit(signum);
 }
 
@@ -67,7 +55,7 @@ void install_signal_handlers() {
 int main(int argc, char* argv[]) {
     // Configure and start logging system
     try {
-        configure_logger();
+        bridge::configure_logger("bridge");
     } catch (const std::exception& e) {
         std::cerr << "FATAL: Failed to initialize logging system: " << e.what() << std::endl;
         return 1;
@@ -150,7 +138,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Shutdown logging system
-    CppLogging::Config::Shutdown();
+    bridge::shutdown_logger();
     
     return exit_code;
 }
