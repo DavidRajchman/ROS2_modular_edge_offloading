@@ -57,6 +57,32 @@ try:
 except ValueError:
     DISCOVERY_SERVICE_PORT = 9090
 
+# External data sources configuration
+# Configure HTTP API endpoints for algorithm data collection
+EXTERNAL_DATA_SOURCES = {
+    # Example configuration - modify as needed for your research
+    # "traffic_data": {
+    #     "url": "http://traffic-api.example.com/current",
+    #     "max_cache_size": 1000,
+    #     "update_interval": 30,
+    #     "timeout_seconds": 5,
+    #     "auto_update": True
+    # },
+    # "weather_data": {
+    #     "url": "http://weather-api.example.com/conditions",
+    #     "max_cache_size": 500,
+    #     "update_interval": 60,
+    #     "timeout_seconds": 3,
+    #     "auto_update": False
+    # }
+}
+
+# External data source global settings
+EXTERNAL_DATA_DEFAULT_TIMEOUT = 5.0  # Default HTTP timeout in seconds
+EXTERNAL_DATA_DEFAULT_MAX_CACHE_SIZE = 1000  # Default maximum cached data length
+EXTERNAL_DATA_DEFAULT_UPDATE_INTERVAL = 60  # Default auto-update interval in seconds
+EXTERNAL_DATA_ENABLE_BACKGROUND_UPDATES = True  # Enable background data updates
+
 # ===================================================================
 
 
@@ -67,6 +93,10 @@ class AlgorithmDecision:
     assigned_mec_id: Optional[str] = None
     reason: str = ""
     reason_code: int = 4001
+
+
+# Import external data source functionality from separate module
+from external_data_sources import DataSourceStatus, DataSourceHandler, ExternalDataManager
 
 
 class OffloadingAlgorithm:
@@ -91,6 +121,14 @@ class OffloadingAlgorithm:
         self.logger.info(f"Discovery service target: {DISCOVERY_SERVICE_HOST}:{DISCOVERY_SERVICE_PORT}")
         if DISCOVERY_SERVICE_HOST in ("localhost", "0.0.0.0") or DISCOVERY_SERVICE_HOST.startswith("127."):
             self.logger.warning("Configured Discovery Service host is loopback; remote components may fail to connect.")
+            
+        # Initialize external data manager for algorithm research
+        self.external_data = ExternalDataManager()
+        if self.external_data.get_source_names():
+            self.logger.info(f"External data sources available: {', '.join(self.external_data.get_source_names())}")
+        else:
+            self.logger.info("No external data sources configured")
+            
         # Algorithm statistics for research
         self.decisions_made = 0
         self.approvals = 0
@@ -223,3 +261,15 @@ class OffloadingAlgorithm:
                 "discovery_service_port": DISCOVERY_SERVICE_PORT
             }
         }
+    
+    def cleanup(self):
+        """
+        Clean up algorithm resources including external data sources.
+        
+        This method should be called when the algorithm is being shut down
+        to properly clean up background threads and resources.
+        """
+        self.logger.info("Cleaning up algorithm resources")
+        if hasattr(self, 'external_data'):
+            self.external_data.cleanup()
+        self.logger.info("Algorithm cleanup complete")
