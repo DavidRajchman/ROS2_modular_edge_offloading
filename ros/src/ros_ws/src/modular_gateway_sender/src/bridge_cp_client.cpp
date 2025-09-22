@@ -321,16 +321,24 @@ void BridgeCpClient::send_dp_info(const std::string& component_id, const std::st
     send_reliable_message(msg);
 }
 
-void BridgeCpClient::send_offload_request(const std::string& component_id, const std::string& request_id, const std::string& task_id, const std::string& task_name) {
+void BridgeCpClient::send_offload_request(const std::string& component_id, const std::string& request_id, const std::string& task_id, const std::string& task_name, const std::string& vhc_data) {
+    json payload = {
+        {"request_id", request_id},  // Convert to numeric upstream if required
+        {"task_id", std::stoi(task_id)},        // Convert to numeric for transport
+        {"task_name", task_name}
+    };
+    
+    // Only add vhc_data if it's not empty
+    if (!vhc_data.empty()) {
+        payload["vhc_data"] = vhc_data;
+        logger_.Info("bridge_cp_client.cpp: Including vhc_data in offload request: '{}'", vhc_data);
+    }
+    
     json msg = {
         {"component_id", component_id},
         {"message_code", 100},
         {"message_type", "OFFLOAD_REQUEST"},
-        {"payload", {
-            {"request_id", request_id},  // Convert to numeric upstream if required
-            {"task_id", std::stoi(task_id)},        // Convert to numeric for transport
-            {"task_name", task_name}
-        }}
+        {"payload", payload}
     };
     send_reliable_message(msg);
 }

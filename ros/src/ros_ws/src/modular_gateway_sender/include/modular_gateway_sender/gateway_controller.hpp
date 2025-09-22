@@ -29,6 +29,7 @@ namespace gateway {
 // Represents an incoming request from a ROS service call
 struct OffloadingRequestData {
     std::string task_id;
+    std::string vhc_data;
     // We can add the response promise here if we need to reply later
 };
 

@@ -141,15 +141,36 @@ class OffloadingAlgorithm:
                                mgwcp_component_id: str,
                                available_mecs: Set[str],
                                mec_assignments: Dict[str, Optional[str]],
-                               active_sessions: int) -> AlgorithmDecision:
+                               active_sessions: int,
+                               vhc_data: Optional[str] = None) -> AlgorithmDecision:
         """
         Make resource allocation decision for an offload request.
         
         This is the main algorithm entry point that can be completely rewritten
         for different allocation strategies.
+        
+        Args:
+            request_id: Unique identifier for this offload request
+            task_id: ID of the task to be offloaded
+            task_config: Configuration details for the task
+            mgwcp_component_id: ID of the requesting VHC component
+            available_mecs: Set of available MEC component IDs
+            mec_assignments: Current MEC to VHC assignments
+            active_sessions: Number of currently active sessions
+            vhc_data: Optional string data provided by the VHC (e.g., JSON context data)
+                     Scientists can parse this data to make informed allocation decisions
+        
+        Returns:
+            AlgorithmDecision with approval status, assigned MEC, and reasoning
         """
         
         self.decisions_made += 1
+        
+        # Log VHC data availability for research analysis
+        if vhc_data:
+            self.logger.debug(f"Request {request_id}: VHC provided {len(vhc_data)} characters of context data")
+        else:
+            self.logger.debug(f"Request {request_id}: No VHC context data provided")
         
         self.logger.info(f"[{ALGORITHM_NAME}] Processing request {request_id}")
         self.logger.info(f"  Task: {task_id} ({task_config['task_name']})")
@@ -161,13 +182,13 @@ class OffloadingAlgorithm:
         if AUTO_APPROVE_ALL_REQUESTS:
             return self._auto_approve_strategy(
                 request_id, task_id, mgwcp_component_id, 
-                available_mecs, mec_assignments
+                available_mecs, mec_assignments, vhc_data
             )
         else:
             # Placeholder for future sophisticated algorithms
             return self._sophisticated_strategy(
                 request_id, task_id, task_config, mgwcp_component_id,
-                available_mecs, mec_assignments, active_sessions
+                available_mecs, mec_assignments, active_sessions, vhc_data
             )
     
     def _auto_approve_strategy(self, 
@@ -175,9 +196,13 @@ class OffloadingAlgorithm:
                              task_id: int, 
                              mgwcp_component_id: str,
                              available_mecs: Set[str],
-                             mec_assignments: Dict[str, Optional[str]]) -> AlgorithmDecision:
+                             mec_assignments: Dict[str, Optional[str]],
+                             vhc_data: Optional[str] = None) -> AlgorithmDecision:
         """
         Simple auto-approve strategy: approve all requests with available MECs.
+        
+        Args:
+            vhc_data: Optional context data from VHC (available for algorithm extensions)
         """
         
         # Find available (unassigned) MECs
@@ -223,12 +248,19 @@ class OffloadingAlgorithm:
                               mgwcp_component_id: str,
                               available_mecs: Set[str],
                               mec_assignments: Dict[str, Optional[str]],
-                              active_sessions: int) -> AlgorithmDecision:
+                              active_sessions: int,
+                              vhc_data: Optional[str] = None) -> AlgorithmDecision:
         """
         Placeholder for future sophisticated allocation algorithms.
         
         This method can be implemented with:
         - Load balancing algorithms
+        - VHC context-aware decision making (using vhc_data parameter)
+        - External data integration
+        - Advanced resource optimization
+        
+        Args:
+            vhc_data: Optional context data from VHC for context-aware decisions
         - Latency optimization
         - Task affinity considerations
         - Machine learning-based decisions

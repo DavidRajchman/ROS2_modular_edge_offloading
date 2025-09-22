@@ -211,11 +211,15 @@ class OffloadingManagerServer:
         request_id = self._coerce_int(payload.get('request_id'), 'request_id')
         task_id = self._coerce_int(payload.get('task_id'), 'task_id')
         mgwcp_component_id = payload.get('mgwcp_component_id')
+        vhc_data = payload.get('vhc_data', None)  # Extract VHC data parameter
         
-        self.logger.info(f"Offload request {request_id}: task_id={task_id}, from={mgwcp_component_id}")
+        if vhc_data:
+            self.logger.info(f"Offload request {request_id}: task_id={task_id}, from={mgwcp_component_id}, vhc_data={vhc_data}")
+        else:
+            self.logger.info(f"Offload request {request_id}: task_id={task_id}, from={mgwcp_component_id}")
         
         # Use decision engine to make allocation decision
-        decision = self.decision_engine.make_decision(request_id, task_id, mgwcp_component_id)
+        decision = self.decision_engine.make_decision(request_id, task_id, mgwcp_component_id, vhc_data)
         
         if decision.approved:
             self.logger.info(f"APPROVED request {request_id}: assigned MEC {decision.assigned_mec_id}")

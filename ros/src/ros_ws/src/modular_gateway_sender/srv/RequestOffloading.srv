@@ -5,6 +5,11 @@
 # system's task database (e.g., "NAV_BASIC", "TEST_INPUT_ONLY").
 string task_id
 
+# Optional custom data string to be included in the offloading request.
+# This field allows VHC nodes to pass application-specific parameters
+# to the Offloading Manager (e.g., "priority=high,location=37.7749,-122.4194").
+string vhc_data
+
 ---
 # --- Response ---
 # A unique identifier for this specific offloading request/session.

@@ -196,10 +196,10 @@ void GatewayController::offloading_request_service_handler(
         return;
     }
 
-    logger_.Info("gateway_controller.cpp: Queuing offloading request for task_id: {}", request->task_id);
+    logger_.Info("gateway_controller.cpp: Queuing offloading request for task_id: {}, vhc_data: '{}'", request->task_id, request->vhc_data);
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        offloading_request_queue_.push({request->task_id});
+        offloading_request_queue_.push({request->task_id, request->vhc_data});
     }
     queue_cv_.notify_one();
 
@@ -378,8 +378,8 @@ void GatewayController::control_thread_func() {
                             
                             auto task_it = task_database_.find(req.task_id);
                             if (task_it != task_database_.end()) {
-                                bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name);
-                                logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}'", req.task_id, request_id);
+                                bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name, req.vhc_data);
+                                logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}', vhc_data: '{}'", req.task_id, request_id, req.vhc_data);
                             }
                             
                             lock.lock();

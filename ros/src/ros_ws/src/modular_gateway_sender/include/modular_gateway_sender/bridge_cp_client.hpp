@@ -52,7 +52,7 @@ public:
 
     // Public methods to send messages to the Bridge
     void send_dp_info(const std::string& component_id, const std::string& dp_host, int dp_port);
-    void send_offload_request(const std::string& component_id, const std::string& request_id, const std::string& task_id, const std::string& task_name);
+    void send_offload_request(const std::string& component_id, const std::string& request_id, const std::string& task_id, const std::string& task_name, const std::string& vhc_data = "");
     void send_session_keepalive(const std::string& component_id, const std::string& request_id);
     void send_session_terminate_request(const std::string& component_id, const std::string& request_id);
 

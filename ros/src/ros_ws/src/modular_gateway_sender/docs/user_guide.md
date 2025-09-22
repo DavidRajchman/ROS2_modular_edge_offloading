@@ -194,17 +194,64 @@ Troubleshooting Checklist:
 
 ---
 
-## 9. LOGGING & DIAGNOSTICS (INCLUDING BINARY LOG)
+## 9. CUSTOM VHC DATA IN OFFLOADING REQUESTS
+The MGW supports optional application-specific data in offloading requests via the `vhc_data` parameter.
+
+### 9.1 Service Interface
+The `RequestOffloading` service accepts an optional `vhc_data` string field:
+```cpp
+string task_id      # Required: task identifier  
+string vhc_data     # Optional: custom application data
+```
+
+### 9.2 Usage Examples
+**Python VHC node:**
+```python
+request = RequestOffloading.Request()
+request.task_id = "TASK_001"
+request.vhc_data = "priority=high,location=37.7749,-122.4194,app=video_streaming"
+```
+
+**C++ VHC node:**
+```cpp
+request->task_id = "TASK_001";
+request->vhc_data = "priority=high,location=37.7749,-122.4194,app=video_streaming";
+```
+
+### 9.3 JSON Payload to OM
+When `vhc_data` is provided, it appears in the OFFLOAD_REQUEST payload:
+```json
+{
+  "component_id": "bridge_001",
+  "message_code": 100,
+  "message_type": "OFFLOAD_REQUEST",
+  "payload": {
+    "request_id": 12345,
+    "task_id": 67890,
+    "task_name": "STRING_TEST_PIPELINE",
+    "vhc_data": "priority=high,location=37.7749,-122.4194,app=video_streaming"
+  }
+}
+```
+
+**Notes:**
+* Empty `vhc_data` values are omitted from JSON to keep messages clean.
+* Backward compatible: existing VHC nodes continue working unchanged.
+* Format: arbitrary string—structured data (CSV, JSON, key=value) recommended for parsing.
+
+---
+
+## 10. LOGGING & DIAGNOSTICS (INCLUDING BINARY LOG)
 This section describes EXACTLY what exists for logging, how binary records are laid out, and how researchers convert them to human‑readable text for analysis.
 
-### 9.1 Logging Framework In Use
+### 10.1 Logging Framework In Use
 * **Library**: CppLogging (external) – used via `logger_.Info/Warn/Error/Fatal/Debug`.
 * **Performance considerations**: Binary logging causes less than 5μs latency per message; text logging can cause up to 200μs per message. Binary is recommended for research runs; text for direct debugging only.
 * **Compilation mode selection**: MGW supports both binary and text logging modes, selectable at build time via CMake parameters (see section 9.6).
 * **Message structure**: Every emitted message string embeds the source file name prefix manually (e.g. `gateway_controller.cpp: Loaded 3 tasks ...`). This is deliberate so that after decoding we can filter by simple string matching without needing extra metadata.
 * **Log levels** (enum values): NONE(0x00), FATAL(0x1F), ERROR(0x3F), WARN(0x7F), INFO(0x9F), DEBUG(0xBF), ALL(0xFF). Typical research runs use INFO.
 
-### 9.2 Converting Binary Log To Text
+### 10.2 Converting Binary Log To Text
 **Tool**: `BinLogDecoder.py` (container workspace root). Uses known fmt library format specifiers to decode binary logs.
 
 **Important**: Multiple BinLogDecoder.py scripts exist in this repository  for different components. When updating format specifiers, modify all relevant decoders. In the MGW container, only this one is present.
@@ -228,7 +275,7 @@ Example (illustrative):
 2025-08-14T09:15:27.123456789Z [0x3A7F12] INFO  gateway - gateway_controller.cpp: Loaded 3 tasks from global config
 ```
 
-### 9.3 Interpreting Messages (Structure Within Text)
+### 10.3 Interpreting Messages (Structure Within Text)
 Our emitted message strings intentionally begin with `<file>.cpp:` or similar. Pattern examples:
 * `gateway_controller.cpp: STATE TRANSITION X->Y`
 * `gateway_controller.cpp: Loaded N tasks ...`
@@ -236,12 +283,12 @@ Our emitted message strings intentionally begin with `<file>.cpp:` or similar. P
 
 
 
-### 9.5 Failure Modes In Decoding
+### 10.5 Failure Modes In Decoding
 * **`Truncated record` / `Incomplete data block`**: Binary log corrupted or truncated mid-write; keep original, note corruption in metadata.
 * **`FORMAT_ERROR`**: Mismatch between placeholders `{}` count and parsed arguments (should be rare – indicates code/log format drift or decoder desync).
 * **Unknown `arg_type`**: Update `ARG_TYPES` mapping in `BinLogDecoder.py` if new CppLogging types were introduced.
 
-### 9.6 Logging Mode Configuration
+### 10.6 Logging Mode Configuration
 MGW supports compile-time selection between binary and text logging modes via CMake cache variables:
 
 **Available modes**:

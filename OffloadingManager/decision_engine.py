@@ -50,11 +50,25 @@ class DecisionEngine:
         
         self.logger.info("Decision engine initialized")
         
-    def make_decision(self, request_id: int, task_id: int, mgwcp_component_id: str) -> DecisionResult:
-        """Make offloading decision for incoming request"""
+    def make_decision(self, request_id: int, task_id: int, mgwcp_component_id: str, 
+                     vhc_data: Optional[str] = None) -> DecisionResult:
+        """
+        Make offloading decision for incoming request
+        
+        Args:
+            request_id: Unique identifier for this offload request
+            task_id: ID of the task to be offloaded
+            mgwcp_component_id: ID of the requesting VHC component
+            vhc_data: Optional context data provided by the VHC
+        
+        Returns:
+            DecisionResult with approval status and details
+        """
         start_time = time.time()
         
-        self.logger.info(f"Making decision for request {request_id}: task={task_id}, vhc={mgwcp_component_id}")
+        # Log VHC data presence for debugging
+        vhc_data_info = f", vhc_data={len(vhc_data)} chars" if vhc_data else ", no vhc_data"
+        self.logger.info(f"Making decision for request {request_id}: task={task_id}, vhc={mgwcp_component_id}{vhc_data_info}")
         
         try:
             # Check if task exists in configuration
@@ -86,7 +100,8 @@ class DecisionEngine:
                 mgwcp_component_id=mgwcp_component_id,
                 available_mecs=self.available_mecs.copy(),
                 mec_assignments=self.mec_assignments.copy(),
-                active_sessions=len(self.active_sessions)
+                active_sessions=len(self.active_sessions),
+                vhc_data=vhc_data
             )
             
             decision_time = time.time() - start_time
