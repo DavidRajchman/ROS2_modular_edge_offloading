@@ -87,7 +87,7 @@ Binary output location: `build/bin/bridge`
 ---
 
 ## 4. RUNTIME CONFIGURATION
-The Bridge uses compile-time constants for core configuration (defined in `BridgeControlPlane.hpp`):
+The Bridge uses compile-time constants for core configuration (defined in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp)):
 
 **Fixed Configuration:**
 * Component ID: `15:10` (BRIDGE_COMPONENT_ID)
@@ -105,7 +105,7 @@ The Bridge uses compile-time constants for core configuration (defined in `Bridg
 * OM host address (retrieved during Discovery registration)
 * OM port (if different from default)
 
-To modify configuration: Edit constants in `BridgeControlPlane.hpp` and rebuild.
+To modify configuration: Edit constants in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp) and rebuild.
 
 Future enhancement: Configuration file support for runtime parameter changes.
 
@@ -273,7 +273,7 @@ python3 BinLogDecoder.py bridge_binary.log | tail -100
 
 
 ## APPENDIX A: Configuration Constants
-Located in `src/BridgeControlPlane.hpp`:
+Located in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp):
 ```cpp
 const uint16_t OM_PORT = 8100;
 const std::string BRIDGE_COMPONENT_ID = "15:10";

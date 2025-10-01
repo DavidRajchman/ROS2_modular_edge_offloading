@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Offloading Manager (OM) is a central decision-making component in the modular gateway offloading system. It receives offloading requests from Bridge Control Planes and makes resource allocation decisions by assigning tasks to available MEC (Multi-access Edge Computing) components.
+The Offloading Manager (OM) is a central decision-making component in the modular gateway offloading system. It receives offloading requests from Bridge Control Planes and makes resource allocation decisions by assigning tasks to available MEC 
 
 ## Quick Start
 
@@ -33,6 +33,7 @@ python3 main.py --config /path/to/config.json --log-level DEBUG
 
 ### Configuration File (`config.json`)
 The OM uses a JSON configuration file that defines available tasks and system parameters:
+This global configuration is distributed to the entire offloading system via Discovery Service.
 
 ```json
 {
@@ -50,22 +51,19 @@ The OM uses a JSON configuration file that defines available tasks and system pa
 ```
 
 ### Algorithm Configuration (`algorithm.py`)
-The decision-making algorithm can be configured by modifying constants in `algorithm.py`:
-
-- `AUTO_APPROVE_ALL_REQUESTS`: Enable/disable automatic approval
-- `USE_RANDOM_MEC_SELECTION`: Random vs. deterministic MEC selection
-- `DISCOVERY_QUERY_INTERVAL_SECONDS`: How often to check for available MECs
+Algorithm file is the only python source file that should be modified while doing research. It contains all configuration variables and also the algorithm logic itself. Currently a placeholder algorithm is implemented that can be modified to implement custom logic.
 
 ## System Architecture
 
 ### Core Components
 
 1. **OM Server** (`om_server.py`): TCP server handling Bridge CP connections
-2. **Decision Engine** (`decision_engine.py`): Resource allocation logic
+2. **Decision Engine** (`decision_engine.py`): Resource allocation funcstions that algorithm calls
 3. **Algorithm** (`algorithm.py`): Pluggable decision-making algorithm
 4. **Discovery Client** (`discovery_client.py`): Interface to Discovery Service
-5. **Config Manager** (`config_manager.py`): Configuration handling
-
+5. **Config Manager** (`config_manager.py`): Global configuration handling
+6. **Logger** (`logger.py`): Structured logging system
+7. **External data source handler** (`external_data_sources.py`): Module for fetching data over HTTP using request - response mechanism. Can be configured to automatically refresh data periodically.
 ### Message Flow
 ```
 VHC → Bridge CP → OM Server → Decision Engine → Algorithm → MEC Assignment
@@ -134,7 +132,7 @@ VHC → Bridge CP → OM Server → Decision Engine → Algorithm → MEC Assign
 
 ## VHC Data Feature
 
-The OM supports optional VHC data parameters for context-aware decision making:
+The OM supports optional VHC data parameters for context-aware decision making which are included in offload requests.
 
 ### Usage in Requests
 VHCs can include contextual data in the `vhc_data` field:
@@ -156,45 +154,6 @@ def make_allocation_decision(request_id, task_id, mgwcp_component_id, vhc_data=N
 ### Log Files
 - **Console Output**: Real-time structured logging
 - **File Output**: `/home/ubuntu/OffloadingManager/om.log` (persistent)
-
-### Log Levels
-- `DEBUG`: Detailed message processing and algorithm decisions
-- `INFO`: Request handling and resource allocation (default)
-- `WARNING`: Configuration issues and recoverable errors
-- `ERROR`: Connection failures and critical errors
-
-### Key Log Messages
-```
-[2025-09-22 10:30:15.123] [INFO] [server] [_handle_offload_request] - Offload request 12345: task_id=67890, from=60:5
-[2025-09-22 10:30:15.125] [INFO] [algorithm] [make_allocation_decision] - APPROVED request 12345: assigned MEC 50:1
-[2025-09-22 10:30:15.127] [INFO] [server] [_send_session_approved] - Sent SESSION_APPROVED to connection 1
-```
-
-## Common Operations
-
-### Starting the OM
-```bash
-# Standard startup
-python3 main.py --config config.json --log-level INFO
-
-# Debug mode with verbose logging
-python3 main.py --log-level DEBUG
-
-# Background execution
-nohup python3 main.py > om.out 2>&1 &
-```
-
-### Monitoring Resource Allocation
-Watch the logs for decision patterns:
-```bash
-tail -f om.log | grep "allocation_decision"
-```
-
-### Checking Discovery Service Connection
-```bash
-# Look for registration and keepalive messages
-grep "discovery" om.log
-```
 
 ## Troubleshooting
 
@@ -219,48 +178,6 @@ grep "discovery" om.log
 - Verify MEC components are available for the task
 - Review algorithm decision logic in logs
 
-### Debug Commands
-```bash
-# Check OM process
-ps aux | grep python3 | grep main.py
-
-# Test port connectivity
-telnet <om_host> 8100
-
-# Validate configuration
-python3 -c "import json; print(json.load(open('config.json')))"
-
-# Check algorithm configuration
-python3 -c "from algorithm import *; print(f'Auto-approve: {AUTO_APPROVE_ALL_REQUESTS}')"
-```
-
-## Algorithm Customization
-
-### Modifying Decision Logic
-Edit `algorithm.py` to customize allocation behavior:
-
-1. **Simple Auto-Approve**: Set `AUTO_APPROVE_ALL_REQUESTS = True`
-2. **Custom MEC Selection**: Implement logic in `_sophisticated_strategy()`
-3. **VHC Data Processing**: Parse `vhc_data` parameter for context-aware decisions
-
-### Example Customization
-```python
-def make_allocation_decision(request_id, task_id, mgwcp_component_id, vhc_data=None):
-    # Parse VHC context data
-    if vhc_data and "priority=emergency" in vhc_data:
-        # Emergency requests get dedicated MEC
-        return AllocationDecision(approved=True, assigned_mec_id="emergency_mec")
-    
-    # Regular allocation logic
-    return _auto_approve_strategy(request_id, task_id, mgwcp_component_id)
-```
-
-## Configuration Reference
-
-### Required Configuration Fields
-- `available_tasks`: Array of task definitions
-- `default_session_timeout`: Session timeout in seconds
-- `max_concurrent_sessions`: Maximum concurrent sessions
 
 ### Task Definition
 ```json
@@ -272,28 +189,3 @@ def make_allocation_decision(request_id, task_id, mgwcp_component_id, vhc_data=N
 }
 ```
 
-### Algorithm Constants
-Located in `algorithm.py`:
-- `ALGORITHM_NAME`: Algorithm identifier
-- `AUTO_APPROVE_ALL_REQUESTS`: Approval behavior
-- `USE_RANDOM_MEC_SELECTION`: MEC selection strategy
-- `DISCOVERY_QUERY_INTERVAL_SECONDS`: Discovery update frequency
-
-## Integration Guidelines
-
-### Adding New MECs
-1. Register MEC components with Discovery Service
-2. OM will automatically discover and include them in allocation decisions
-3. No OM restart required
-
-### Adding New Tasks
-1. Update `config.json` with new task definition
-2. Restart OM to load new configuration
-3. Verify task appears in algorithm decision logic
-
-### Bridge CP Integration
-- OM listens on port 8100 for Bridge CP connections
-- Bridge CP should be configured with OM host/port
-- No authentication required (trusted network assumed)
-
-This user guide provides the essential information for deploying, configuring, and troubleshooting the Offloading Manager in the modular gateway system.

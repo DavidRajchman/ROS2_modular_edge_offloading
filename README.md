@@ -43,6 +43,9 @@ There are many .md files curently present in all components folders. THESE SHOUL
 ### list of reference documentation and user guides
 - VHC and MEC - [ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md)
 - Bridge - [bridge/docs/user_guide.md](./bridge/docs/user_guide.md)
+- Offloading Manager - [OffloadingManager/docs/user_guide.md](./OffloadingManager/docs/user_guide.md)
+- **protocol details** - [ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md)
+- **process flow diagrams** [ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md)
 - **NO OTHER GUIDES AND REFERENCES ARE CURRENTLY AVAILABLE.** 
 
 ## Requirements

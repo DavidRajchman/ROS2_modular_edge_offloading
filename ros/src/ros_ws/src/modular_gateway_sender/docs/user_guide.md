@@ -254,6 +254,7 @@ This section describes EXACTLY what exists for logging, how binary records are l
 ### 10.2 Converting Binary Log To Text
 **Tool**: `BinLogDecoder.py` (container workspace root). Uses known fmt library format specifiers to decode binary logs.
 
+
 **Important**: Multiple BinLogDecoder.py scripts exist in this repository  for different components. When updating format specifiers, modify all relevant decoders. In the MGW container, only this one is present.
 
 Basic usage (inside workspace root):

@@ -50,19 +50,66 @@ The system is fundamentally multi-threaded to ensure responsiveness and handle c
 *   **Control Logic Thread:** A dedicated thread within `GatewayController` running the main state machine. This is the "brain" of the control plane.
 *   **Network I/O Threads:** The existing sender/receiver threads within each `TransportLib` instance used by the `DiscoveryClient` and `BridgeControlClient`.
 
-### 1.5. Startup and Connection Sequence (CRITICAL)
+### 1.5. Startup and Connection Sequence (CRITICAL - Verified from Implementation)
 
 The startup sequence is a multi-stage, event-driven process orchestrated by the `GatewayController`'s state machine. The controller does not proceed linearly but transitions between states based on the successful completion of asynchronous operations, which are communicated via callbacks from its client helpers (`DiscoveryClient`, `BridgeCpClient`).
 
+**CRITICAL IMPLEMENTATION DETAIL:** The MGW sends `DP_INFO` as its **first message** immediately after establishing TCP connection to Bridge. This is not optional and must occur before any other control plane messages.
+
 The process is as follows:
 
-1.  **Initialization (`INITIALIZING` state):** The `GatewayController` is created. It immediately starts its data plane transport layer in listening mode (e.g., a `TcpServerTransport` waiting for the Bridge's data plane to connect). It then transitions to the `DISCOVERING` state.
-2.  **Discovery (`DISCOVERING` state):** The controller starts the `DiscoveryClient`. The client connects to the `DiscoveryService`, sends a registration request, and waits for a response. This is a blocking wait *within the state*, not blocking the entire application.
-3.  **Discovery Callback:** Upon receiving a successful registration response, the `DiscoveryClient` invokes the `on_discovery_success` callback in the `GatewayController`. This callback provides the host and port of the Bridge Control Plane. The controller stores this information and transitions to the `CONNECTING_TO_BRIDGE` state.
-4.  **Bridge Connection (`CONNECTING_TO_BRIDGE` state):** The controller uses the discovered address to start the `BridgeCpClient`. The client connects to the Bridge's control plane and immediately sends a `DP_INFO` message, advertising its own data plane listening address. The controller then transitions to the `WAITING_FOR_DP_CONNECTION` state.
-5.  **Data Plane Link-Up (Concurrent):** In parallel to the control plane setup, the Bridge's data plane connects to the listening socket of the `RosGateway`. The connection is accepted, but data processing does not begin yet.
-6.  **Confirmation Callback:** The Bridge Control Plane, having received the `DP_INFO` and confirmed the data plane connection, sends a `DP_CONNECTION_CONFIRMED` message back. The `BridgeCpClient` receives this and invokes the `on_dp_confirmed` callback in the `GatewayController`.
-7.  **Operational Transition:** The `on_dp_confirmed` callback is the final trigger. It calls `RosGateway::start_receiver()` to begin processing incoming data from the newly confirmed data plane connection. It then transitions the controller's state to `OPERATIONAL`. The gateway is now fully ready to handle offloading sessions.
+1.  **Initialization (`INITIALIZING` state):** 
+    - `GatewayController` is created and reads ROS2 parameters (discovery_service host/port, component identity, data_plane listen_port).
+    - Starts its data plane transport layer in listening mode (TCP server socket) on configured port.
+    - Creates the `RosGateway` data plane instance.
+    - Transitions to `DISCOVERING` state.
+
+2.  **Discovery (`DISCOVERING` state):** 
+    - Controller starts the `DiscoveryClient` with component registration request.
+    - Client connects to `DiscoveryService` via Discovery Protocol (see Appendix B).
+    - Sends registration request and waits for response with Bridge CP address and component's own public IP.
+    - This is a blocking wait *within the state*, not blocking the entire application.
+
+3.  **Discovery Callback:** 
+    - Upon receiving successful `DISC:ACK` response, `DiscoveryClient` invokes `on_discovery_success` callback in `GatewayController`.
+    - Callback provides: Bridge Control Plane host/port, component's auto-detected public IP address.
+    - Controller stores this information and transitions to `CONNECTING_TO_BRIDGE` state.
+
+4.  **Bridge Connection (`CONNECTING_TO_BRIDGE` state):** 
+    - Controller creates and starts `BridgeCpClient` with discovered Bridge CP address.
+    - Client establishes TCP connection to Bridge's control plane server.
+    - **Immediately** upon connection, sends `DP_INFO` (code 103) message containing MGW's data plane host and port.
+    - If data plane host was configured as "0.0.0.0", uses the auto-detected IP from Discovery response.
+    - Controller transitions to `WAITING_FOR_DP_CONNECTION` state and blocks waiting for confirmation.
+
+5.  **Data Plane Link-Up (Concurrent on Bridge side):** 
+    - Bridge receives `DP_INFO` message and extracts dp_host and dp_port.
+    - If dp_host is "0.0.0.0", Bridge substitutes the TCP connection's source IP address.
+    - Bridge's data plane initiates TCP connection to MGW's data plane at specified address/port.
+    - MGW's `RosGateway` listening socket accepts the connection.
+    - Connection is established but data processing does not begin yet (waiting for CP confirmation).
+
+6.  **Confirmation Callback:** 
+    - Bridge Control Plane confirms successful data plane connection internally.
+    - Bridge sends `DP_CONNECTION_CONFIRMED` (code 202) message to MGW via control plane.
+    - `BridgeCpClient` receives confirmation and invokes `on_dp_confirmed` callback in `GatewayController`.
+
+7.  **Operational Transition:** 
+    - `on_dp_confirmed` callback is the final trigger.
+    - Calls `RosGateway::start_receiver()` to begin processing incoming data from the confirmed data plane connection.
+    - Transitions controller state to `OPERATIONAL`.
+    - MGW is now fully ready to accept offloading requests from external ROS2 nodes.
+    - Begins sending SESSION_KEEPALIVE messages (~15s interval) for any active sessions.
+
+**State Machine Summary:**
+```
+INITIALIZING → DISCOVERING → CONNECTING_TO_BRIDGE → WAITING_FOR_DP_CONNECTION → OPERATIONAL
+```
+
+**Blocking Points:**
+- Discovery registration blocks in DISCOVERING state until DISC:ACK received.
+- DP confirmation blocks in WAITING_FOR_DP_CONNECTION state until DP_CONNECTION_CONFIRMED received.
+- All transitions are event-driven via callbacks, not polling.
 
 This sequence is visualized below:
 
@@ -215,11 +262,12 @@ This protocol is used for the initial connection to the `DiscoveryService` to re
 
 #### 2.2. Bridge Control Plane Protocol [Revised]
 
-This protocol is used for all communication with the Bridge after discovery is complete. It is a payload-centric design.
+This protocol is used for all communication with the Bridge after discovery is complete. It is a payload-centric design based on the actual implementation in the Bridge and Modular Gateway.
 
-*   **Transport:** Standard TCP connection, established using `TransportLib`.
-*   **Format:** JSON. Each message is a single JSON object.
-*   **Reliability:** Guaranteed delivery for critical messages is implemented via a sequence number and acknowledgment mechanism.
+*   **Transport:** Standard TCP connection, established using `TransportLib::TcpClientTransport` (from MGW) and `TcpServerTransport` (on Bridge).
+*   **Format:** JSON. Each message is a single JSON object sent as UTF-8 string.
+*   **Message Framing:** Length-prefixed or newline-delimited (implementation-specific; current Bridge uses raw TCP stream with buffer).
+*   **Reliability:** Hop-by-hop guaranteed delivery implemented via sequence number and ACK mechanism on the MGW-Bridge link only. The Bridge-OM link is assumed stable.
 
 ##### **Protocol Envelope**
 Every message exchanged on this channel MUST conform to the following universal JSON structure. All message-specific data is contained within the `payload` object.
@@ -238,26 +286,33 @@ Every message exchanged on this channel MUST conform to the following universal 
 }
 ```
 
-*   `component_id` (string, required): The unique identifier of the component sending the message, formatted as `group_id:id_in_group` (e.g., `10:12`).
-*   `message_code` (integer, required): The unique numeric identifier for the message's purpose. This is the primary field for machine parsing.
-*   `message_type` (string, required): A human-readable string corresponding to the code. Used for logging and diagnostics.
-*   `sequence_number` (integer, required): A unique, monotonically increasing number for each message sent. Used for the reliability mechanism.
-*   `payload` (object, required): A JSON object containing data specific to the `message_type`. The structure of this object varies.
+**Field Specifications:**
+*   `component_id` (string, required): The unique identifier of the component sending the message, formatted as `group_id:id_in_group` (e.g., `10:12`). Valid range: 0-255 for both group_id and id_in_group.
+*   `message_code` (integer, required): The unique numeric identifier for the message's purpose. This is the primary field for machine parsing. Must match one of the defined codes in the message table below.
+*   `message_type` (string, required): A human-readable string corresponding to the code. Used for logging and diagnostics. Must match the message_code.
+*   `sequence_number` (integer, required): A unique, monotonically increasing number for each message sent on a specific connection. Starts at 1 and increments for each new message. Used for the reliability mechanism.
+*   `payload` (object, required): A JSON object containing data specific to the `message_type`. The structure of this object varies. May be empty `{}` for some message types.
 
-##### **Updated Message Definitions & Payloads**
+##### **Complete Message Definitions & Payloads**
+
+Messages are categorized by code range:
+- **100-199**: MGW to Bridge (VHC/MEC → Bridge)
+- **200-299**: Bridge to MGW (Bridge → VHC/MEC)
+- **300-399**: Bridge to OM (Bridge → OM)
+- **900-999**: Reliability & Control (Bidirectional)
 
 | Code | Type | Direction | Purpose & Payload Content |
 | :--- | :--- | :--- | :--- |
-| 100 | `OFFLOAD_REQUEST` | VHC -> Bridge | A VHC requests to offload a task. Payload: `{"request_id": int, "task_id": int, "task_name": str}` |
-| 101 | `SESSION_KEEPALIVE` | VHC -> Bridge | The VHC periodically confirms the session is still active. Payload: `{"request_id": int}` |
-| 102 | `SESSION_TERMINATE_REQUEST` | VHC -> Bridge | VHC requests to terminate an active session. Payload: `{"request_id": int}` |
-| 103 | `DP_INFO` | VHC/MEC -> Bridge | Provides the address and port for the component's data plane. Payload: `{"dp_host": "str", "dp_port": int}`. |
-| 200 | `SESSION_APPROVED` | Bridge -> VHC | Informs the VHC its request was approved. Payload: `{"request_id": int}` |
-| 201 | `SESSION_DENIED` | Bridge -> VHC | Denies a request or terminates a session. Payload: `{"request_id": int, "reason_code": int, "reason_description": "str"}` |
-| 202 | `DP_CONNECTION_CONFIRMED` | Bridge -> VHC/MEC | Confirms the Bridge's DP has connected to the component's DP. Empty payload `{}`. |
-| 300 | `BRIDGE_STATUS_UPDATE` | Bridge -> OM | Bridge sends operational status. Payload specific to OM needs. |
-| 301 | `BRIDGE_DP_FAILURE` | Bridge -> OM | Bridge reports a data plane failure. Payload: `{"request_id": int, "reason": "str"}` |
-| 900 | `ACK` | Bidirectional | Acknowledges receipt of a message. Payload: `{"ack_sequence_number": int}`. |
+| 100 | `OFFLOAD_REQUEST` | MGW -> Bridge -> OM | MGW requests to offload a task. Bridge forwards to OM. Payload: `{"request_id": int\|string, "task_id": int, "task_name": string}`. The `request_id` is generated by the MGW and must be unique per component. |
+| 101 | `SESSION_KEEPALIVE` | MGW -> Bridge -> OM | MGW confirms an active session is still alive. Sent every ~15 seconds. Bridge forwards to OM. Payload: `{"request_id": int\|string}`. |
+| 102 | `SESSION_TERMINATE_REQUEST` | MGW -> Bridge -> OM | MGW requests graceful termination of an active session. Bridge forwards to OM. Payload: `{"request_id": int\|string}`. |
+| 103 | `DP_INFO` | MGW -> Bridge | **First message after TCP connection.** Provides the MGW's data plane listening address. Payload: `{"dp_host": string, "dp_port": int}`. If dp_host is "0.0.0.0", Bridge uses the TCP connection's source IP address. |
+| 200 | `SESSION_APPROVED` | OM -> Bridge -> MGW | OM approves an offloading request. Bridge forwards to originating MGW and initiates data plane connections. Payload: `{"request_id": int\|string, "assigned_mec_id": string}` (optional assigned_mec_id for VHC sessions). |
+| 201 | `SESSION_DENIED` | OM -> Bridge -> MGW | OM denies a request or terminates an existing session. Bridge forwards to MGW. Payload: `{"request_id": int\|string, "reason_code": int, "reason_description": string}`. See reason codes table below. |
+| 202 | `DP_CONNECTION_CONFIRMED` | Bridge -> MGW | Bridge confirms its data plane has successfully connected to the MGW's data plane. Sent after successful data plane handshake following DP_INFO. Payload: `{}` (empty). |
+| 300 | `BRIDGE_STATUS_UPDATE` | Bridge -> OM | (Future) Bridge sends periodic operational status. Payload TBD. |
+| 301 | `BRIDGE_DP_FAILURE` | Bridge -> OM | Bridge reports a data plane connection failure for an active session. Payload: `{"request_id": int\|string, "reason": string}`. |
+| 900 | `ACK` | Bidirectional (MGW ↔ Bridge) | Acknowledges receipt of any message. **Must be sent immediately** upon receiving any non-ACK message. Payload: `{"ack_sequence_number": int}` (matches the `sequence_number` of the acknowledged message). |
 
 ##### **Reason Codes**
 
@@ -271,15 +326,89 @@ For `SESSION_DENIED` (201) payload:
 | 4004 | INVALID_REQUEST | The request format or content is invalid |
 | 4005 | FINISHED_SESSION | Component requested to end the sesion |
 
-##### **Example Messages**
+##### **Complete Message Examples from Implementation**
 
-**SESSION_DENIED (Code 201):**
+**1. DP_INFO (103) - First Message from MGW:**
+This is **always** the first message sent by MGW after establishing TCP connection to Bridge.
 ```json
 {
-  "component_id": "0:1",
+  "component_id": "1:5",
+  "message_code": 103,
+  "message_type": "DP_INFO",
+  "sequence_number": 1,
+  "payload": {
+    "dp_host": "192.168.65.101",
+    "dp_port": 8100
+  }
+}
+```
+Note: If dp_host is "0.0.0.0", Bridge will use the TCP connection's source IP address automatically.
+
+**2. DP_CONNECTION_CONFIRMED (202) - Bridge Response:**
+Bridge sends this after successfully connecting its data plane to the MGW's data plane.
+```json
+{
+  "component_id": "15:10",
+  "message_code": 202,
+  "message_type": "DP_CONNECTION_CONFIRMED",
+  "sequence_number": 1,
+  "payload": {}
+}
+```
+
+**3. OFFLOAD_REQUEST (100) - MGW to Bridge to OM:**
+VHC requests to offload a computation task.
+```json
+{
+  "component_id": "1:5",
+  "message_code": 100,
+  "message_type": "OFFLOAD_REQUEST",
+  "sequence_number": 15,
+  "payload": {
+    "request_id": 12345,
+    "task_id": 31,
+    "task_name": "MAP_ROUTING"
+  }
+}
+```
+
+**4. SESSION_APPROVED (200) - OM to Bridge to MGW:**
+OM approves the offloading request and assigns a MEC.
+```json
+{
+  "component_id": "15:10",
+  "message_code": 200,
+  "message_type": "SESSION_APPROVED",
+  "sequence_number": 2,
+  "payload": {
+    "request_id": 12345,
+    "assigned_mec_id": "2:3"
+  }
+}
+```
+
+**5. SESSION_KEEPALIVE (101) - MGW to Bridge to OM:**
+VHC sends periodic keepalive to maintain active session (~15 second interval).
+```json
+{
+  "component_id": "1:5",
+  "message_code": 101,
+  "message_type": "SESSION_KEEPALIVE",
+  "sequence_number": 16,
+  "payload": {
+    "request_id": 12345
+  }
+}
+```
+
+**6. SESSION_DENIED (201) - OM to Bridge to MGW:**
+OM denies request or terminates session.
+```json
+{
+  "component_id": "15:10",
   "message_code": 201,
   "message_type": "SESSION_DENIED",
-  "sequence_number": 43,
+  "sequence_number": 3,
   "payload": {
     "request_id": 12345,
     "reason_code": 4001,
@@ -288,43 +417,183 @@ For `SESSION_DENIED` (201) payload:
 }
 ```
 
-**DP_INFO (Code 103):**
+**7. SESSION_TERMINATE_REQUEST (102) - MGW to Bridge to OM:**
+VHC requests graceful session termination.
 ```json
 {
   "component_id": "1:5",
-  "message_code": 103,
-  "message_type": "DP_INFO",
-  "sequence_number": 2,
+  "message_code": 102,
+  "message_type": "SESSION_TERMINATE_REQUEST",
+  "sequence_number": 17,
   "payload": {
-    "dp_host": "192.168.1.10",
-    "dp_port": 7401
+    "request_id": 12345
   }
 }
 ```
 
-##### **Guaranteed Delivery Mechanism (Hop-by-Hop)**
-This mechanism is implemented exclusively on the potentially unstable VHC-Bridge link to ensure message delivery in both directions. The Bridge-OM link is considered stable and does not use this mechanism.
+**8. ACK (900) - Bidirectional Reliability:**
+Acknowledges receipt of any message. Sent immediately by receiver.
+```json
+{
+  "component_id": "1:5",
+  "message_code": 900,
+  "message_type": "ACK",
+  "sequence_number": 0,
+  "payload": {
+    "ack_sequence_number": 15
+  }
+}
+```
+Note: ACK messages have sequence_number set to 0 and do not themselves require acknowledgment.
 
-**1. VHC to Bridge Transmission:**
-   a. **VHC (Sender):** Assigns a `sequence_number` to a message (e.g., `OFFLOAD_REQUEST`), stores it in a `pending_acks` map, and sends it to the Bridge. It then starts a timer.
-   b. **Bridge (Receiver):** Upon receiving any message from the VHC, it immediately constructs and sends an `ACK` message back. The `ack_sequence_number` in the `ACK` payload must match the `sequence_number` of the message being acknowledged.
-   c. **VHC (ACK Handling):** Upon receiving the `ACK`, the VHC extracts the `ack_sequence_number` from the payload, finds the matching sequence number in its `pending_acks` map, and removes it.
-   d. **VHC (Timeout/Retry):** If the VHC's timer expires before an `ACK` is received, it re-sends the original message from its map.
-   e. **Bridge (Forwarding):** After sending the `ACK`, the Bridge forwards the original, unmodified message to the OM.
+**9. BRIDGE_DP_FAILURE (301) - Bridge to OM:**
+Bridge reports data plane connection failure for an active session.
+```json
+{
+  "component_id": "15:10",
+  "message_code": 301,
+  "message_type": "BRIDGE_DP_FAILURE",
+  "sequence_number": 5,
+  "payload": {
+    "request_id": 12345,
+    "reason": "Data plane socket closed unexpectedly"
+  }
+}
+```
 
-**2. Bridge to VHC Transmission:**
-   a. **Bridge (Sender):** When the Bridge receives a message from the OM to be forwarded to the VHC (e.g., `SESSION_APPROVED`), it assigns its own `sequence_number`, stores it in a `pending_acks` map for that VHC, and sends it. It then starts a timer.
-   b. **VHC (Receiver):** Upon receiving any message from the Bridge, it immediately sends an `ACK` back to the Bridge.
-   c. **Bridge (ACK Handling):** Upon receiving the `ACK` from the VHC, the Bridge removes the corresponding entry from its `pending_acks` map.
-   d. **Bridge (Timeout/Retry):** If the Bridge's timer expires, it re-sends the message to the VHC.
-   e. **Bridge (Inspection):** The Bridge can inspect the message from the OM before forwarding it to trigger internal actions (e.g., configuring the data plane on `SESSION_APPROVED`).
+##### **Guaranteed Delivery Mechanism (Hop-by-Hop ACK/Retry)**
+This mechanism is implemented **exclusively** on the potentially unstable MGW-Bridge link to ensure message delivery in both directions. The Bridge-OM link is considered stable (high-bandwidth LAN) and does not use this mechanism.
 
-**3. End-to-End Message Flow**
-The hop-by-hop mechanism provides a reliable end-to-end communication channel between the VHC and the OM, mediated by the Bridge.
+**Implementation Details (from actual Bridge & MGW code):**
 
-*   **VHC to OM:** When a VHC sends a message, it receives an `ACK` from the Bridge, confirming the message has successfully crossed the unstable link. The VHC then relies on the stable Bridge-OM link for the message to reach the OM. The true end-to-end confirmation is the subsequent response message (e.g., `SESSION_APPROVED` or `SESSION_DENIED`) from the OM. If this response is not received within a higher-level timeout, the VHC can assume a failure in the Bridge-OM link or the OM itself and may retry the entire request.
+**Configuration Constants:**
+- ACK Timeout: 5 seconds
+- Max Retry Count: 3 attempts
+- Total max delivery time: ~15 seconds (3 retries × 5s timeout)
 
-*   **OM to VHC:** When the OM sends a message, the Bridge guarantees its delivery across the unstable link to the VHC using its own ACK-and-retry mechanism.
+**1. MGW to Bridge Transmission:**
+   a. **MGW (Sender - BridgeControlClient):** 
+      - Assigns a unique `sequence_number` to the message (monotonically increasing, starting from 1).
+      - Stores the complete message in a `pending_acks` map keyed by sequence_number with timestamp.
+      - Sends the message over TCP and starts a 5-second timeout timer.
+   
+   b. **Bridge (Receiver - MGWCPConnection):** 
+      - Upon receiving **any** non-ACK message, immediately constructs and sends an `ACK` message.
+      - The `ack_sequence_number` in the ACK payload must exactly match the received message's `sequence_number`.
+      - ACK is sent **before** any further processing or forwarding.
+   
+   c. **MGW (ACK Handler):** 
+      - Extracts `ack_sequence_number` from the ACK payload.
+      - Looks up and removes the corresponding entry from `pending_acks` map.
+      - Message delivery confirmed.
+   
+   d. **MGW (Timeout/Retry):** 
+      - If timeout (5s) expires without receiving ACK, re-sends the **same message** (same sequence_number).
+      - Increments retry counter.
+      - After 3 failed attempts, considers connection failed and logs error.
+   
+   e. **Bridge (Forwarding):** 
+      - After sending ACK, processes the message (validates component_id, updates session keepalive, etc.).
+      - Forwards the original message to OM (e.g., OFFLOAD_REQUEST, SESSION_KEEPALIVE).
+
+**2. Bridge to MGW Transmission:**
+   a. **Bridge (Sender - MGWCPConnection):** 
+      - When OM sends a response (e.g., `SESSION_APPROVED`), Bridge assigns **its own** `sequence_number` for the specific MGW connection.
+      - Stores message in connection-specific `pending_acks` map with timestamp and retry counter.
+      - Sends message and starts 5-second timeout timer.
+   
+   b. **MGW (Receiver - BridgeControlClient):** 
+      - Upon receiving any non-ACK message, immediately constructs and sends ACK.
+      - ACK contains `ack_sequence_number` matching the received `sequence_number`.
+   
+   c. **Bridge (ACK Handler):** 
+      - Removes corresponding entry from `pending_acks` map.
+      - Message delivery confirmed.
+   
+   d. **Bridge (Timeout/Retry):** 
+      - If timeout expires, re-sends message up to 3 times.
+      - After max retries, logs error and may close connection.
+   
+   e. **Bridge (State Triggers):** 
+      - Bridge inspects OM responses before forwarding (e.g., on `SESSION_APPROVED`, initiates data plane connection to assigned MEC).
+
+**3. End-to-End Message Flow Guarantees**
+The hop-by-hop mechanism provides a reliable communication channel between MGW and OM, mediated by the Bridge:
+
+*   **MGW to OM Flow:** 
+    1. MGW sends message → receives ACK from Bridge (confirms hop 1 delivery).
+    2. Bridge forwards to OM over stable LAN link (assumed reliable).
+    3. True end-to-end confirmation is the OM's response message (SESSION_APPROVED/DENIED).
+    4. If response not received within application-level timeout (~30s), MGW may retry entire operation.
+
+*   **OM to MGW Flow:** 
+    1. OM sends message to Bridge over stable link.
+    2. Bridge applies hop-by-hop reliability for Bridge→MGW transmission.
+    3. MGW sends ACK confirming receipt.
+    4. Bridge guarantees delivery or detects connection failure.
+
+**4. Sequence Number Management:**
+- **Per-Connection Sequences:** Each MGW connection has independent sequence number space.
+- **Sender Tracking:** Each side (MGW, Bridge) maintains its own monotonic sequence counter for messages it sends.
+- **No Global Sequence:** Sequence numbers are only meaningful within a single TCP connection direction.
+- **ACK Matching:** `ack_sequence_number` must exactly match the received message's `sequence_number`.
+
+### 2.3. Timing and Timeout Configuration (From Implementation)
+
+**Critical Timing Constants:**
+- **ACK Timeout:** 5 seconds (both MGW and Bridge)
+- **Max Retry Count:** 3 attempts
+- **Total Delivery Time:** ~15 seconds maximum (3 retries × 5s)
+- **SESSION_KEEPALIVE Interval:** 15 seconds (sent by VHC for active sessions)
+- **SESSION_TIMEOUT:** 20 seconds (Bridge/OM timeout for missing keepalives)
+- **Discovery Service Keepalive:** Implementation-specific (typically 30-60s)
+
+**Connection Timeouts:**
+- **TCP Connection Timeout:** OS default (~30-120s depending on system)
+- **Data Plane Connection:** Implementation-specific (Bridge attempts connection immediately after DP_INFO)
+- **Discovery Registration:** Blocking until DISC:ACK or connection failure
+
+**Operational Intervals:**
+- MGW sends SESSION_KEEPALIVE every 15 seconds for each active session
+- Bridge checks for session timeouts periodically (maintenance thread)
+- If no keepalive received for 20 seconds, session is expired and terminated
+
+### 2.4. Bridge Control Plane Behavior (Implementation Details)
+
+**Bridge Connection States per MGW:**
+Each MGW connection on the Bridge has independent state tracking:
+
+```cpp
+enum class MGWCPConnectionState {
+    CONNECTING,           // TCP connection established, waiting for DP_INFO
+    WAITING_FOR_DP,      // Received DP_INFO, attempting data plane connection
+    OPERATIONAL          // Data plane connected, ready for offloading requests
+};
+```
+
+**Bridge Message Processing Pipeline:**
+1. **Connection Accept:** Bridge TCP server accepts incoming MGW connection, creates `MGWCPConnection` instance.
+2. **First Message:** Expects DP_INFO (103) as first message, extracts component_id.
+3. **Component Registration:** Maps component_id → transport_client_id for response routing.
+4. **ACK Immediate:** Sends ACK for every received non-ACK message before processing.
+5. **Message Validation:** Validates JSON structure, component_id format, required payload fields.
+6. **State Check:** Verifies message is appropriate for current connection state.
+7. **Session Management:** Updates session keepalive timestamps, creates new sessions, removes expired sessions.
+8. **Forwarding:** Forwards MGW messages to OM with minimal modification.
+9. **Response Routing:** Routes OM responses back to originating MGW using request_id and component_id.
+
+**Bridge Session Management:**
+- Maintains `SessionManager` with all active sessions indexed by request_id.
+- Tracks: mgwcp_component_id, assigned_mec_id, task_id, last_keepalive_time.
+- Periodic maintenance thread checks for expired sessions (>20s since last keepalive).
+- On MGW disconnection, automatically cleans up all sessions for that component.
+
+**Bridge Data Plane Coordination:**
+- Upon receiving DP_INFO, Bridge initiates data plane connection to MGW.
+- Creates `TransportHandler` for each MGW data plane connection.
+- On SESSION_APPROVED, creates additional data plane connection to assigned MEC.
+- Establishes bidirectional forwarding between VHC ↔ Bridge ↔ MEC.
+- Monitors data plane health and reports failures via BRIDGE_DP_FAILURE (301).
 
   
 
