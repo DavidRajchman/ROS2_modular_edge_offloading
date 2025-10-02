@@ -14,24 +14,24 @@ The Offloading Manager (OM) is a central decision-making component in the modula
 ### Installation
 ```bash
 cd /home/ubuntu/OffloadingManager
-pip3 install -r requirements.txt
+pip3 install -r [requirements.txt](../requirements.txt)
 ```
 
 ### Basic Usage
 ```bash
 # Start with default configuration
-python3 main.py
+python3 [main.py](../main.py)
 
 # Start with custom configuration
-python3 main.py --config /path/to/config.json --log-level DEBUG
+python3 [main.py](../main.py) --config /path/to/[config.json](../config.json) --log-level DEBUG
 
 # Auto-start script
-./autostart_om.sh
+./[autostart_om.sh](../autostart_om.sh)
 ```
 
 ## Configuration
 
-### Configuration File (`config.json`)
+### Configuration File ([config.json](../config.json))
 The OM uses a JSON configuration file that defines available tasks and system parameters:
 This global configuration is distributed to the entire offloading system via Discovery Service.
 
@@ -50,20 +50,20 @@ This global configuration is distributed to the entire offloading system via Dis
 }
 ```
 
-### Algorithm Configuration (`algorithm.py`)
+### Algorithm Configuration ([algorithm.py](../algorithm.py))
 Algorithm file is the only python source file that should be modified while doing research. It contains all configuration variables and also the algorithm logic itself. Currently a placeholder algorithm is implemented that can be modified to implement custom logic.
 
 ## System Architecture
 
 ### Core Components
 
-1. **OM Server** (`om_server.py`): TCP server handling Bridge CP connections
-2. **Decision Engine** (`decision_engine.py`): Resource allocation funcstions that algorithm calls
-3. **Algorithm** (`algorithm.py`): Pluggable decision-making algorithm
-4. **Discovery Client** (`discovery_client.py`): Interface to Discovery Service
-5. **Config Manager** (`config_manager.py`): Global configuration handling
-6. **Logger** (`logger.py`): Structured logging system
-7. **External data source handler** (`external_data_sources.py`): Module for fetching data over HTTP using request - response mechanism. Can be configured to automatically refresh data periodically.
+1. **OM Server** ([om_server.py](../om_server.py)): TCP server handling Bridge CP connections
+2. **Decision Engine** ([decision_engine.py](../decision_engine.py)): Resource allocation funcstions that algorithm calls
+3. **Algorithm** ([algorithm.py](../algorithm.py)): Pluggable decision-making algorithm
+4. **Discovery Client** ([discovery_client.py](../discovery_client.py)): Interface to Discovery Service
+5. **Config Manager** ([config_manager.py](../config_manager.py)): Global configuration handling
+6. **Logger** ([logger_config.py](../logger_config.py)): Structured logging system
+7. **External data source handler** ([external_data_sources.py](../external_data_sources.py)): Module for fetching data over HTTP using request - response mechanism. Can be configured to automatically refresh data periodically.
 ### Message Flow
 ```
 VHC → Bridge CP → OM Server → Decision Engine → Algorithm → MEC Assignment

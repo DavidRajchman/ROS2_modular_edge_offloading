@@ -1,27 +1,5 @@
 ## 0. NAMING CONVENTION
-Core terms actually used in the codebase (see referenced files):
-* **component** – Any participating runtime (VHC, MEC, OM, Bridge, DiscoveryService).
-* **component_id** – Concatenation `group_id:id_in_group` (e.g. `60:5`) built in `gateway_controller.cpp` from parameters `identity.group_id` & `identity.id_in_group`.
-* **VHC** – Vehicle host component (identity.component_type="V"). Requests offloading via service `request_offloading`.
-* **MEC** – Mirror execution component (identity.component_type="M"). Receives unsolicited SESSION_APPROVED and processes data.
-* **OM** – Offloading Manager (external, not implemented here) that decides approvals.
-* **Bridge / BridgeCP / BridgeDP** – Bridge Control Plane (JSON session/control messages) & Data Plane (binary framed payload). The gateway connects CP via `BridgeCpClient` and DP via `TcpServerTransport`.
-* **DiscoveryService** – Entry point supplying `RegistrationResponse` with `configJson` consumed in `GatewayController::on_discovery_success`.
-* **DP** – Data Plane (binary framed messages; see `message_header.hpp`).
-* **CP** – Control Plane (session negotiation & keepalives; see `bridge_cp_client.cpp`).
-* **MGW** – Modular Gateway node (`gateway_controller` executable for VHC; `mec_gateway` for MEC) orchestrating handlers + transports.
-* **task** – Offloadable unit defined in global config JSON (fields: `task_id`, `task_name`, `input_message_types`, `output_message_types`). Parsed into internal TaskDetails in `gateway_controller.cpp`.
-* **request** – OFFLOAD_REQUEST initiated by VHC (see `BridgeCpClient::send_offload_request`). Identified by `request_id` (local monotonic counter) + component_id.
-* **session** – Active offloaded task lifecycle between VHC & MEC. Internally tracked in `active_sessions_` keyed by `request_id` (no separate session ID on the wire).
-* **MessageType** – Numeric enumeration (`message_header.hpp`) used for both global config and binary header type byte.
-* **handler** – Concrete subclass of `MessageHandlerBase` bridging a ROS 2 topic to the MGW DP (e.g. `StringTestInputHandler`).
-* **handler mode** – One of SUBSCRIBER_ONLY / PUBLISHER_ONLY / BOTH (see `message_handler_base.hpp`, configured per role in `on_session_approved`).
-* **task database** – In-memory map `<task_id, TaskDetails>` populated once from `configJson` (see `load_global_config_from_json`).
-* **global configuration JSON** – Distributed once via Discovery; authoritative catalog of tasks.
-* **binary log** – Persistent logging output (CppLogging format) including per-source file prefixes; used for diagnostics and research analysis.
-* **keepalive** – CP ping/pong for session liveness (Discovery keepalive) & session-level keepalives (Bridge CP).
-* **ACK** – Control-plane acknowledgement for reliable message sequences (managed in `BridgeCpClient`).
-
+See [Appendix B in README.md](../../../../../../README.md#appendix-b---naming-convention-wip).
 ---
 
 ## 1. INTRODUCTION & SCOPE
@@ -77,7 +55,7 @@ Node names:
 ## 4. RUNTIME CONFIGURATION
 Parameters (declared in `gateway_controller.cpp`):
 * `discovery_service.host` / `discovery_service.port`
-* `identity.component_type` ("V" or "M")
+* `identity.component_type` ("V" or "M" for VHC/MEC)
 * `identity.component_name`
 * `identity.group_id`, `identity.id_in_group`
 * `data_plane.listen_port`
@@ -252,10 +230,10 @@ This section describes EXACTLY what exists for logging, how binary records are l
 * **Log levels** (enum values): NONE(0x00), FATAL(0x1F), ERROR(0x3F), WARN(0x7F), INFO(0x9F), DEBUG(0xBF), ALL(0xFF). Typical research runs use INFO.
 
 ### 10.2 Converting Binary Log To Text
-**Tool**: `BinLogDecoder.py` (container workspace root). Uses known fmt library format specifiers to decode binary logs.
+**Tool**: [BinLogDecoder.py](../../../../BinLogDecoder.py) (container workspace root). Uses known fmt library format specifiers to decode binary logs.
 
 
-**Important**: Multiple BinLogDecoder.py scripts exist in this repository  for different components. When updating format specifiers, modify all relevant decoders. In the MGW container, only this one is present.
+**Important**: Multiple [BinLogDecoder.py](../../../../BinLogDecoder.py) scripts exist in this repository  for different components. When updating format specifiers, modify all relevant decoders. In the MGW container, only this one is present.
 
 Basic usage (inside workspace root):
 ```bash

@@ -47,6 +47,7 @@ Message flow (VHC offloading request):
 3. OM responds with SESSION_APPROVED/SESSION_DENIED → Bridge forwards to VHC
 4. On approval: Bridge creates routing rules for VHC↔MEC data plane communication
 5. Data plane messages flow through Bridge routing table to appropriate destinations
+- **process flow diagrams** [../../ros/src/ros_ws/src/modular_gateway_sender/docs/proces_flow_diagrams.md](../../ros/src/ros_ws/src/modular_gateway_sender/docs/proces_flow_diagrams.md)
 
 Key components & files:
 * Main coordinator: `src/BridgeControlPlane.cpp` / `src/BridgeControlPlane.hpp`
@@ -87,7 +88,7 @@ Binary output location: `build/bin/bridge`
 ---
 
 ## 4. RUNTIME CONFIGURATION
-The Bridge uses compile-time constants for core configuration (defined in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp)):
+The Bridge uses compile-time constants for core configuration (defined in [../src/BridgeControlPlane.hpp](../src/BridgeControlPlane.hpp)):
 
 **Fixed Configuration:**
 * Component ID: `15:10` (BRIDGE_COMPONENT_ID)
@@ -105,7 +106,7 @@ The Bridge uses compile-time constants for core configuration (defined in [bridg
 * OM host address (retrieved during Discovery registration)
 * OM port (if different from default)
 
-To modify configuration: Edit constants in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp) and rebuild.
+To modify configuration: Edit constants in [../src/BridgeControlPlane.hpp](../src/BridgeControlPlane.hpp) and rebuild.
 
 Future enhancement: Configuration file support for runtime parameter changes.
 
@@ -198,7 +199,7 @@ Example:
 ```
 
 ### 8.4 Converting Binary Logs to Text
-**Tool**: `BinLogDecoder.py` (workspace root)
+**Tool**: [BinLogDecoder.py](../../BinLogDecoder.py) (workspace root)
 
 Usage:
 ```bash
@@ -273,7 +274,7 @@ python3 BinLogDecoder.py bridge_binary.log | tail -100
 
 
 ## APPENDIX A: Configuration Constants
-Located in [bridge/src/BridgeControlPlane.hpp](bridge/src/BridgeControlPlane.hpp):
+Located in [../src/BridgeControlPlane.hpp](../src/BridgeControlPlane.hpp):
 ```cpp
 const uint16_t OM_PORT = 8100;
 const std::string BRIDGE_COMPONENT_ID = "15:10";

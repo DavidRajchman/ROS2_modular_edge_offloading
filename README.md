@@ -18,15 +18,15 @@ The current design of all components requires that the Bridge, DISC and OM compo
 If using multiple computers is needed for testing the offloading in a realworld scenario, the simplest solution is to use dedicated HW for those 3 restricted components. However an untested solution using macvlan has beed implemented and is able to launch (but there were isues with network routing, likely unrelated to the macvlan itself.) See [docker-compose.macvlan.override.yml](./docker-compose.macvlan.override.yml) for more information on how to setup the macvlan
 
 Here is a list of containers that need to be started and a brief description of their functionality
-- [offloading-manager](./bridge/Dockerfile) image runs the offloading manager for the offloading system. It is responsible for coordinating the offloading process and making decisions about which tasks to offload. It contains the [global configuration](./OffloadingManager/config.json) for the offloading system. Which list all configurable experiments. It also contains the [algorithm](./OffloadingManager/algorithm.py) which is the only file that should be edited during research. It contains OM configuration as well as the actual offloading algorithm (single persistent thread). Curently an autoaproove placeholder is present.
-- [discovery](./bridge/Dockerfile) image runs the discovery service for the offloading system. It is responsible for service registration and discovery. It also distributes the global configuration to other components.
-- [bridge](./bridge/Dockerfile) image acts as a mobile edge based data router. It is responsible for routing data between the VHC and MEC containers.
-- [ros2_vhc](./ros/Dockerfile) image runs the ROS2 environment for the autonomous vehicle.
-- [ros2_mec](./ros/Dockerfile) image runs the ROS2 environment for the virtual copy of the VHC. It waits for offloading requests to be accepted. Utilizes the same dockerfile as VHC
+- **offloading-manager** image runs the offloading manager for the offloading system. It is responsible for coordinating the offloading process and making decisions about which tasks to offload. It contains the global configuration ([OffloadingManager/config.json](./OffloadingManager/config.json)) for the offloading system which lists all configurable experiments. It also contains the algorithm ([OffloadingManager/algorithm.py](./OffloadingManager/algorithm.py)) which is the only file that should be edited during research. It contains OM configuration as well as the actual offloading algorithm (single persistent thread). Currently an autoapprove placeholder is present. Dockerfile: [bridge/Dockerfile](./bridge/Dockerfile)
+- **discovery** image runs the discovery service for the offloading system. It is responsible for service registration and discovery. It also distributes the global configuration to other components. Dockerfile: [DiscoveryService/Dockerfile](./DiscoveryService/Dockerfile)
+- **bridge** image acts as a mobile edge based data router. It is responsible for routing data between the VHC and MEC containers. Dockerfile: [bridge/Dockerfile](./bridge/Dockerfile)
+- **ros2_vhc** image runs the ROS2 environment for the autonomous vehicle. Dockerfile: [ros/Dockerfile](./ros/Dockerfile)
+- **ros2_mec** image runs the ROS2 environment for the virtual copy of the VHC. It waits for offloading requests to be accepted. Utilizes the same dockerfile as VHC. Dockerfile: [ros/Dockerfile](./ros/Dockerfile)
 
 ## Network architecture
 The entire system is connected through the bridge component (except for the discovery service and its direct connection to all components). There are 2 separeted parts of every aplication on diferent sockets - data plane and control plane. Data plane is solely reserved for data transfer, while control plane is used for signaling comunication between the components. The bridge routes both planes independantly. For ease of implementation it was selected for the bridge to act as a control plane TCP server, but it is a data plane **TCP client**, this must be taken into account when creating the network firewall and routing rules.
-Pictures showing the network topology can be found in the [docs/network_topology.pdf](docs/network_topology.pdf).
+Pictures showing the network topology can be found in the [docs/network_topology.pdf](./docs/network_topology.pdf).
 
 ## How to access logs
 ### C++ logging 
@@ -73,13 +73,13 @@ to run the overide options use the following command:
 docker compose -f docker-compose.yml -f <overide file> up <container names (optional)> -d
 ```
 
-- [docker-compose.devmode.yml](./docker-compose.devmode.yml) - this file disables the autostart script off all components, allowing for development containers to be launched.
+- **[docker-compose.devmode.yml](./docker-compose.devmode.yml)** - this file disables the autostart script off all components, allowing for development containers to be launched.
 
-- [docker-compose.macvlan.yml](./docker-compose.macvlan.override.yml) - this file launches the DISC, OM and Bridge components on a macvlan network. With dedicated IP addresses for each component. This allows those 3 components to be launched on a single computer with a single network interface. **MACVLAN setup required on the host computer; details are in the .mcvlan file comments**
+- **[docker-compose.macvlan.override.yml](./docker-compose.macvlan.override.yml)** - this file launches the DISC, OM and Bridge components on a macvlan network. With dedicated IP addresses for each component. This allows those 3 components to be launched on a single computer with a single network interface. **MACVLAN setup required on the host computer; details are in the file comments**
 
-- [docker-compose.mec.yml](./docker-compose.mec.override.yml) - this file launches only the MEC component using an autostart script. It is useful for runing the MEC container on a dedicated computer.
+- **[docker-compose.mec.yml](./docker-compose.mec.yml)** - this file launches only the MEC component using an autostart script. It is useful for runing the MEC container on a dedicated computer.
 
-- [docker-compose.vhc.yml](./docker-compose.vhc.override.yml) - this file launches only the VHC component using an autostart script. It is useful for runing the VHC container on a dedicated computer.
+- **[docker-compose.vhc.yml](./docker-compose.vhc.yml)** - this file launches only the VHC component using an autostart script. It is useful for runing the VHC container on a dedicated computer.
 
 ## APPENDIX A - Discovery Service IP/Port Change Locations
 
@@ -92,26 +92,67 @@ Change the Discovery Service IP (and if needed the port) in ALL of the following
 5. Docker macvlan override: [docker-compose.macvlan.override.yml](docker-compose.macvlan.override.yml) -> discovery_service: ipv4_address: 192.168.50.114
 6. Discovery Service port (only if changing port): [DiscoveryService/CMakeLists.txt](DiscoveryService/CMakeLists.txt) -> DISCOVERY_SERVICE_PORT=9090
 
-## APPENDIX B - NAMING CONVENTION *WIP*
-Core terms actually used in the codebase (see referenced files):
-* **component** – Any participating runtime (VHC, MEC, OM, Bridge, DiscoveryService).
-* **component_id** – Concatenation `group_id:id_in_group` (e.g. `60:5`) built in `gateway_controller.cpp` from parameters `identity.group_id` & `identity.id_in_group`.
-* **VHC** – Vehicle host component (identity.component_type="V"). Requests offloading via service `request_offloading`.
-* **MEC** – Mirror execution component (identity.component_type="M"). Receives unsolicited SESSION_APPROVED and processes data.
-* **OM** – Offloading Manager (external, not implemented here) that decides approvals.
-* **Bridge / BridgeCP / BridgeDP** – Bridge Control Plane (JSON session/control messages) & Data Plane (binary framed payload). The gateway connects CP via `BridgeCpClient` and DP via `TcpServerTransport`.
-* **DiscoveryService** – Entry point supplying `RegistrationResponse` with `configJson` consumed in `GatewayController::on_discovery_success`.
-* **DP** – Data Plane (binary framed messages; see `message_header.hpp`).
-* **CP** – Control Plane (session negotiation & keepalives; see `bridge_cp_client.cpp`).
-* **MGW** – Modular Gateway node (`gateway_controller` executable for VHC; `mec_gateway` for MEC) orchestrating handlers + transports.
-* **task** – Offloadable unit defined in global config JSON (fields: `task_id`, `task_name`, `input_message_types`, `output_message_types`). Parsed into internal TaskDetails in `gateway_controller.cpp`.
-* **request** – OFFLOAD_REQUEST initiated by VHC (see `BridgeCpClient::send_offload_request`). Identified by `request_id` (local monotonic counter) + component_id.
-* **session** – Active offloaded task lifecycle between VHC & MEC. Internally tracked in `active_sessions_` keyed by `request_id` (no separate session ID on the wire).
-* **MessageType** – Numeric enumeration (`message_header.hpp`) used for both global config and binary header type byte.
-* **handler** – Concrete subclass of `MessageHandlerBase` bridging a ROS 2 topic to the MGW DP (e.g. `StringTestInputHandler`).
-* **handler mode** – One of SUBSCRIBER_ONLY / PUBLISHER_ONLY / BOTH (see `message_handler_base.hpp`, configured per role in `on_session_approved`).
-* **task database** – In-memory map `<task_id, TaskDetails>` populated once from `configJson` (see `load_global_config_from_json`).
-* **global configuration JSON** – Distributed once via Discovery; authoritative catalog of tasks.
-* **binary log** – Persistent logging output (CppLogging format) including per-source file prefixes; used for diagnostics and research analysis.
-* **keepalive** – CP ping/pong for session liveness (Discovery keepalive) & session-level keepalives (Bridge CP).
-* **ACK** – Control-plane acknowledgement for reliable message sequences (managed in `BridgeCpClient`).
+## APPENDIX B - NAMING CONVENTION
+
+This section defines terminology used consistently across all components of the offloading system. For component-specific implementation details, refer to individual component user guides.
+
+### System Components
+* **component** – Any participating service in the offloading system (VHC, MEC, OM, Bridge, DiscoveryService).
+* **component_id** – Unique identifier in format `group_id:id_in_group` (e.g., `60:5` or `15:10`). Both parts are 8-bit integers (0-255).
+* **VHC** – Vehicle Host Component. Physical or simulated vehicle system that requests task offloading. Runs ROS2 environment and MGW software. Component type: "V".
+* **MEC** – Mirror Execution Component. Virtual copy of the VHC running on a Mobile Edge Computing server. Processes offloaded tasks. Runs same ROS2 environment as VHC. Component type: "M".
+* **OM** – Offloading Manager. Central decision-making service that approves or denies offloading requests based on resource availability and allocation algorithms. Written in Python. Component ID: `1:1`.
+* **Bridge / BridgeCP / BridgeDP** – Central routing hub with two planes: Control Plane (BridgeCP) handles session management via JSON messages; Data Plane (BridgeDP) forwards binary ROS2 data between VHC and MEC. Written in C++. Component ID: `15:10`.
+* **DiscoveryService / DISC** – Service registration and discovery system. Only component with fixed IP address. Distributes global configuration and provides component addresses to all participants. Port: 9090.
+* **MGW** – Modular Gateway. Software layer on VHC/MEC that interfaces between ROS2 topics and the offloading system's data/control planes.
+
+### Network Architecture
+* **CP** – Control Plane. Communication channel for session negotiation, keepalives, and management messages. Uses JSON over TCP.
+* **DP** – Data Plane. Communication channel for actual ROS2 message transmission. Uses binary protocol over TCP with custom framing.
+* **MGWCP** – Modular Gateway Control Plane protocol. JSON-based protocol for session management between MGW (VHC/MEC) and Bridge.
+* **MGWDP** – Modular Gateway Data Plane protocol. Binary protocol for ROS2 message encapsulation and transmission.
+
+### Offloading Concepts
+* **task** – Offloadable computational unit defined in global configuration. Specifies which ROS2 message types are inputs/outputs. Identified by `task_id` and `task_name`.
+* **request** – Single offloading request initiated by VHC. Identified by unique `request_id` generated by VHC and the VHC's `component_id`.
+* **session** – Active offloading session between specific VHC and MEC for one task. Maintained by periodic keepalives. Lifetime: from SESSION_APPROVED until termination or timeout.
+* **global configuration JSON** – Authoritative catalog of available tasks and system parameters. Created by OM, distributed by DiscoveryService to all components at registration.
+* **vhc_data** – Optional application-specific context data (string) included in offloading requests for algorithm decision-making.
+
+### Protocol Elements  
+* **message_code** – Numeric identifier for control plane message types (100-199: MGW→Bridge, 200-299: Bridge→MGW, 300-399: Bridge→OM, 900-999: Control).
+* **message_type** – Human-readable string corresponding to message_code (e.g., "OFFLOAD_REQUEST", "SESSION_APPROVED").
+* **MessageType** – Numeric enumeration for data plane message types identifying ROS2 message format in binary headers (e.g., 201=STRING_TEST_INPUT).
+* **sequence_number** – Monotonically increasing counter per TCP connection for message ordering and ACK matching. Starts at 1.
+* **ACK** – Acknowledgement message confirming receipt. Used for hop-by-hop reliability on MGW-Bridge link (5s timeout, 3 retries).
+* **keepalive** – Periodic heartbeat messages maintaining connection/session liveness. Two types: Discovery keepalive (5s interval) and session keepalive (15s interval, 20s timeout).
+
+### Routing & Session Management
+* **routing_table** – Bridge's internal data structure mapping `(source_id, message_type)` tuples to destination transport handlers for message forwarding.
+* **transport_handler** – Bridge component managing TCP connections and message queuing for specific destinations (VHC/MEC gateways).
+* **handler** – MGW component that bridges ROS2 topics to the data plane. Subscribes to topics, serializes messages, and publishes received data.
+* **handler mode** – Direction configuration: SUBSCRIBER_ONLY (sends data), PUBLISHER_ONLY (receives data), or BOTH (bidirectional).
+
+### Configuration & Logging
+* **group_id** – First part of component_id. Identifies component category (e.g., 1=system, 10=VHC-manual, 20=VHC-auto, 50=MEC).
+* **id_in_group** – Second part of component_id. Unique identifier within a group_id category.
+* **binary log** – High-performance logging format (CppLogging library) requiring decoder. Used by C++ components (Bridge, MGW). ~5μs latency per message.
+* **text log** – Human-readable logging format. Used by Python components (OM) or C++ debug builds. ~200μs latency per message.
+* **BinLogDecoder.py** – Python tool for converting binary logs to human-readable text format. Located in component directories.
+
+### Common Message Types (Control Plane)
+* **OFFLOAD_REQUEST (100)** – VHC initiates offloading for specific task.
+* **SESSION_APPROVED (200)** – OM approves request and assigns MEC.
+* **SESSION_DENIED (201)** – OM denies request with reason code.
+* **SESSION_KEEPALIVE (101)** – VHC maintains active session.
+* **SESSION_TERMINATE_REQUEST (102)** – VHC requests graceful session end.
+* **DP_INFO (103)** – MGW provides data plane connection details to Bridge (first message after TCP connect).
+* **DP_CONNECTION_CONFIRMED (202)** – Bridge confirms data plane connection established.
+* **BRIDGE_DP_FAILURE (301)** – Bridge reports data plane connection failure to OM.
+
+### Reason Codes (for SESSION_DENIED)
+* **4001 - INSUFFICIENT_RESOURCES** – No available MEC capacity for request.
+* **4002 - TASK_NOT_FOUND** – Requested task_id not in global configuration.
+* **4003 - SESSION_TIMEOUT** – Session expired due to missing keepalives (>20s).
+* **4004 - INVALID_REQUEST** – Malformed request message.
+* **4005 - FINISHED_SESSION** – Graceful termination requested by component.
