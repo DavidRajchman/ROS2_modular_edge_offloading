@@ -7,7 +7,9 @@
 
 namespace gateway {
 
-    bool GatewayController::message_type_from_id(uint32_t id, MessageType& out) {
+// Convert numeric message type ID from config JSON to MessageType enum
+// Returns false if ID is unknown
+bool GatewayController::message_type_from_id(uint32_t id, MessageType& out) {
     switch (id) {
         case 1: out = MessageType::STRING; return true;
         case 2: out = MessageType::INT32; return true;
@@ -20,6 +22,9 @@ namespace gateway {
     }
 }
 
+// Parse global configuration JSON received from DiscoveryService
+// Populates task database with available tasks and their message types
+// Returns true if at least one task was successfully loaded
 bool GatewayController::load_global_config_from_json(const std::string& config_json) {
     logger_.Info("gateway_controller.cpp: Parsing global config JSON ({} bytes)", config_json.size());
     nlohmann::json doc;
@@ -30,9 +35,10 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
         return false;
     }
 
-    // Reset current DB
+    // Clear existing task database before loading new config
     task_database_.clear();
 
+    // Extract system-wide session parameters
     if (doc.contains("default_session_timeout")) {
         default_session_timeout_ = doc["default_session_timeout"].get<int>();
     }
@@ -40,11 +46,13 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
         max_concurrent_sessions_ = doc["max_concurrent_sessions"].get<int>();
     }
 
+    // Validate that tasks array exists in config
     if (!doc.contains("available_tasks") || !doc["available_tasks"].is_array()) {
         logger_.Error("gateway_controller.cpp: Global config missing 'available_tasks' array");
         return false;
     }
 
+    // Parse each task definition from the config
     int loaded = 0;
     for (const auto& t : doc["available_tasks"]) {
         if (!t.contains("task_id") || !t.contains("task_name")) {
@@ -55,6 +63,7 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
         TaskDetails details;
         details.task_name = t["task_name"].get<std::string>();
 
+        // Lambda to parse message type ID arrays and convert to MessageType enums
         auto parse_types = [&](const char* field, std::vector<MessageType>& outv){
             if (!t.contains(field)) return; 
             for (const auto& val : t[field]) {
@@ -68,6 +77,7 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
             }
         };
 
+        // Parse input and output message types for this task
         parse_types("input_message_types", details.input_types);
         parse_types("output_message_types", details.output_types);
 
@@ -80,13 +90,15 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
     return loaded > 0;
 }
 
+// Constructor: Set up ROS2 node with parameters and services
+// Note: Cannot use shared_from_this() here - call initialize() after construction
 GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   : rclcpp::Node("gateway_controller", options),
     logger_(CppLogging::Logger("gateway"))
 {
   logger_.Info("gateway_controller.cpp: Constructing GatewayController...");
 
-  // Declare and load all required parameters
+  // Declare ROS parameters with defaults (can be overridden by launch files)
   this->declare_parameter<std::string>("discovery_service.host", "192.168.65.10");
   this->declare_parameter<int>("discovery_service.port", 9090);
   this->declare_parameter<std::string>("identity.component_type", "V");
@@ -104,9 +116,10 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   data_plane_listen_port_ = this->get_parameter("data_plane.listen_port").as_int();
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
-    // No mock task DB: will be populated from DiscoveryService global config JSON after successful registration
+  // Task database will be populated from DiscoveryService global config after registration
 
-  // Create the ROS 2 services only for VHC components
+  // Create ROS services only for VHC (Vehicle) components to request/terminate offloading
+  // MEC (Edge) components don't need these services as they receive unsolicited SESSION_APPROVED
   if (component_type_ == "V") {
     offloading_service_ = this->create_service<modular_gateway_sender::srv::RequestOffloading>(
       "request_offloading",
@@ -126,20 +139,21 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   logger_.Info("gateway_controller.cpp: GatewayController basic construction completed. Call initialize() to complete setup.");
 }
 
+// Complete initialization after construction (required for shared_from_this())
+// Creates data plane transport, gateway, handler factory, and starts control thread
 void GatewayController::initialize() 
 {
   logger_.Info("gateway_controller.cpp: Initializing GatewayController components that require shared_from_this()...");
 
-  // Now we can safely call shared_from_this() since the object is fully constructed
-  // Create the data plane transport and the RosGateway instance
+  // Create TCP server transport for binary data plane on configured port
   auto data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
   gateway_ = std::make_unique<RosGateway>(this->shared_from_this(), std::move(data_plane_transport));
   gateway_->set_identity(static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_));
 
-  // Create the handler factory
+  // Create factory for message handlers (bridges ROS topics to data plane)
   handler_factory_ = std::make_unique<HandlerFactory>(gateway_.get(), this->shared_from_this());
 
-  // Start the main control logic thread
+  // Launch state machine thread for discovery, bridge connection, and session management
   running_ = true;
   control_thread_ = std::thread(&GatewayController::control_thread_func, this);
   
@@ -175,10 +189,14 @@ GatewayController::~GatewayController()
   logger_.Info("gateway_controller.cpp: GatewayController shut down.");
 }
 
+// ROS service handler: VHC application requests task offloading
+// Validates task exists and gateway is ready, then queues request for control thread
+// Returns immediately with request_id (actual approval happens asynchronously)
 void GatewayController::offloading_request_service_handler(
   const std::shared_ptr<modular_gateway_sender::srv::RequestOffloading::Request> request,
   std::shared_ptr<modular_gateway_sender::srv::RequestOffloading::Response> response)
 {
+    // Reject if not fully connected to Bridge and operational
     if (state_.load() != State::OPERATIONAL) {
         logger_.Warn("gateway_controller.cpp: Offloading request for task '{}' received, but controller is not operational. Rejecting.", request->task_id);
         response->success = false;
@@ -187,7 +205,7 @@ void GatewayController::offloading_request_service_handler(
         return;
     }
 
-    // Check if the requested task exists in our database
+    // Validate task_id exists in global configuration
     if (task_database_.find(request->task_id) == task_database_.end()) {
         logger_.Error("gateway_controller.cpp: Offloading request for unknown task_id '{}'. Rejecting.", request->task_id);
         response->success = false;
@@ -201,17 +219,19 @@ void GatewayController::offloading_request_service_handler(
         std::lock_guard<std::mutex> lock(queue_mutex_);
         offloading_request_queue_.push({request->task_id, request->vhc_data});
     }
-    queue_cv_.notify_one();
+    queue_cv_.notify_one();  // Wake control thread to process request
 
-    // Generate a unique request_id for this session
+    // Generate unique request_id for tracking this session
     std::string new_request_id = std::to_string(request_id_counter_++);
     
-    // For now, we reply immediately. In a real system, we might wait for a future/promise.
+    // Return immediately - actual approval happens asynchronously via Bridge/OM
     response->success = true;
     response->request_id = new_request_id;
     response->message = "Request queued for processing by the bridge.";
 }
 
+// ROS service handler: VHC application requests graceful session termination
+// Queues termination request for control thread to send to Bridge/OM
 void GatewayController::terminate_offloading_service_handler(
   const std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Request> request,
   std::shared_ptr<modular_gateway_sender::srv::TerminateOffloading::Response> response)
@@ -228,16 +248,17 @@ void GatewayController::terminate_offloading_service_handler(
         std::lock_guard<std::mutex> lock(queue_mutex_);
         termination_request_queue_.push(request->request_id);
     }
-    queue_cv_.notify_one();
+    queue_cv_.notify_one();  // Wake control thread to process termination
 
     response->success = true;
     response->message = "Termination request queued.";
 }
 
+// Main state machine thread: manages lifecycle from discovery through operational state
+// Handles: Discovery → Bridge connection → DP confirmation → Session management
 void GatewayController::control_thread_func() {
-    // Define keepalive interval
-    const auto keepalive_interval = std::chrono::seconds(15);
-    const auto discovery_retry_delay = std::chrono::seconds(10);
+    const auto keepalive_interval = std::chrono::seconds(15);      // Send session keepalives every 15s
+    const auto discovery_retry_delay = std::chrono::seconds(10);   // Retry discovery every 10s on failure
 
     while(running_) {
         State current_state = state_.load();
@@ -246,15 +267,15 @@ void GatewayController::control_thread_func() {
         switch(current_state) {
             case State::INITIALIZING:
             {
-                // Start the data plane server listening for connections
+                // Start listening for Bridge DP connections on configured port
                 auto transport = dynamic_cast<TcpServerTransport*>(gateway_->get_transport());
                 if (transport && transport->connect()) {
                     logger_.Info("gateway_controller.cpp: Data plane transport started listening on port {}", data_plane_listen_port_);
                     
-                    // Start the data plane connection monitoring thread
+                    // Launch thread to accept incoming Bridge DP connections
                     data_plane_connection_thread_ = std::thread(&GatewayController::data_plane_connection_thread_func, this);
                     
-                    state_ = State::DISCOVERING;
+                    state_ = State::DISCOVERING;  // Move to discovery phase
                 } else {
                     logger_.Error("gateway_controller.cpp: Failed to start data plane transport. Retrying in 5s.");
                     std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -263,8 +284,10 @@ void GatewayController::control_thread_func() {
             }
             case State::DISCOVERING:
             {
+                // Register with DiscoveryService to get Bridge address and global config
                 logger_.Info("gateway_controller.cpp: Starting discovery client for component type: {}", component_type_);
                 
+                // Convert string component type ("V" or "M") to protocol enum
                 discovery_protocol::ComponentType comp_type;
                 try {
                     logger_.Info("gateway_controller.cpp: Converting component_type '{}' to enum", component_type_);
@@ -457,6 +480,8 @@ void GatewayController::data_plane_connection_thread_func()
   }
 }
 
+// Clean up session: deactivate handlers and remove from active session map
+// Called on termination request or session denial
 void GatewayController::handle_session_teardown(const std::string& request_id) {
     std::lock_guard<std::mutex> lock(session_mutex_);
     auto session_it = active_sessions_.find(request_id);
@@ -469,8 +494,9 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
     auto task_it = task_database_.find(task_id);
     if (task_it != task_database_.end()) {
         const auto& td = task_it->second;
-        // Prefer deactivation by MessageType if present
+        // Deactivate all handlers associated with this task
         if (!td.input_types.empty() || !td.output_types.empty()) {
+            // Modern path: deactivate by MessageType enum
             auto deactivate = [&](const std::vector<MessageType>& list){
                 for (auto mt : list) {
                     auto handler = handler_factory_->get_or_create(mt);
@@ -483,6 +509,8 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
             deactivate(td.input_types);
             deactivate(td.output_types);
         } else {
+            // Legacy path: deactivate by handler type string
+
             const auto& required_handlers = td.required_handlers;
             logger_.Info("gateway_controller.cpp: Deactivating {} legacy handlers for session '{}'", required_handlers.size(), request_id);
             for (const auto& handler_type : required_handlers) {
@@ -501,14 +529,16 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
     logger_.Info("gateway_controller.cpp: Session '{}' removed.", request_id);
 }
 
-// --- Callback Implementations ---
+// --- Discovery and Bridge Connection Callbacks ---
 
+// Called by DiscoveryClient when registration succeeds
+// Receives Bridge address and global configuration JSON
 void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port, const std::string& config_json) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (state_ == State::DISCOVERING) {
         bridge_cp_host_ = bridge_host;
         bridge_cp_port_ = bridge_port;
-        // Parse and load global config JSON before moving forward
+        // Load task database from global config before connecting to Bridge
         if (!config_json.empty()) {
             bool ok = load_global_config_from_json(config_json);
             if (!ok) {
@@ -529,21 +559,24 @@ void GatewayController::on_discovery_success(const std::string& bridge_host, int
     state_cv_.notify_one();
 }
 
+// Called by DiscoveryClient when registration fails
+// Does not change state - lets control thread retry with backoff
 void GatewayController::on_discovery_failure(const std::string& error_message) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     logger_.Error("gateway_controller.cpp: Discovery failed: {}", error_message);
-    // Do not change state here - let the control thread handle the retry logic
-    // Just notify the condition variable to wake up the control thread
+    // Keep state in DISCOVERING - control thread will retry after delay
     state_cv_.notify_one();
 }
 
+// Called by BridgeCpClient when Bridge confirms data plane connection established
+// Transitions to OPERATIONAL state and starts receiving binary messages
 void GatewayController::on_dp_confirmed() {
     std::lock_guard<std::mutex> lock(state_mutex_);
     logger_.Info("gateway_controller.cpp: Received DP_CONNECTION_CONFIRMED from Bridge CP");
     
     if (state_ == State::WAITING_FOR_DP_CONNECTION) {
         logger_.Info("gateway_controller.cpp: State transition: WAITING_FOR_DP_CONNECTION -> OPERATIONAL");
-        gateway_->start_receiver();
+        gateway_->start_receiver();  // Begin processing data plane messages
         state_ = State::OPERATIONAL;
         logger_.Info("gateway_controller.cpp: Data plane confirmed. Gateway is now OPERATIONAL and ready to handle sessions.");
     } else {
@@ -553,8 +586,11 @@ void GatewayController::on_dp_confirmed() {
     state_cv_.notify_one();
 }
 
+// Called by BridgeCpClient when OM approves offloading session
+// VHC: activates subscribers (send data) and publishers (receive results)
+// MEC: activates publishers (receive data) and subscribers (send results)
 void GatewayController::on_session_approved(const nlohmann::json& payload) {
-    // Extract request_id for logging and potential session lookup
+    // Extract request_id from approval message
     std::string request_id;
     if (payload.contains("request_id")) {
         request_id = payload["request_id"];
@@ -568,7 +604,7 @@ void GatewayController::on_session_approved(const nlohmann::json& payload) {
     
     std::string task_id;
     
-    // Check if this is a VHC case (local session exists) or MEC case (unsolicited SESSION_APPROVED)
+    // Determine task_id: VHC has local session, MEC receives unsolicited approval
     auto session_it = active_sessions_.find(request_id);
     if (session_it != active_sessions_.end()) {
         // VHC case: Look up task_id from local session map
@@ -596,13 +632,13 @@ void GatewayController::on_session_approved(const nlohmann::json& payload) {
 
     const auto& task_details = task_it->second;
     
-    // Determine which handlers to create and their modes
-    // Prefer JSON-driven message type vectors if available; else fallback to legacy required_handlers
+    // Activate handlers based on component role (VHC vs MEC)
+    // Modern path uses MessageType enums; legacy path uses handler type strings
     if (!task_details.input_types.empty() || !task_details.output_types.empty()) {
         logger_.Info("gateway_controller.cpp: Processing JSON-driven task '{}' with {} input types and {} output types",
                      task_id, task_details.input_types.size(), task_details.output_types.size());
 
-        // Activate handlers by MessageType using the factory
+        // Lambda to create and configure handlers for given message types
         auto activate = [&](const std::vector<MessageType>& list, HandlerMode mode){
             for (auto mt : list) {
                 auto handler = handler_factory_->get_or_create(mt);
@@ -617,6 +653,8 @@ void GatewayController::on_session_approved(const nlohmann::json& payload) {
             }
         };
 
+        // VHC: subscribe to inputs (send), publish outputs (receive)
+        // MEC: publish inputs (receive), subscribe to outputs (send)
         if (component_type_ == "V") {
             activate(task_details.input_types, HandlerMode::SUBSCRIBER_ONLY);
             activate(task_details.output_types, HandlerMode::PUBLISHER_ONLY);
@@ -652,6 +690,8 @@ void GatewayController::on_session_approved(const nlohmann::json& payload) {
     }
 }
 
+// Called by BridgeCpClient when OM denies offloading session
+// Cleans up any pending session state
 void GatewayController::on_session_denied(const std::string& request_id, const std::string& reason) {
     logger_.Warn("gateway_controller.cpp: Session with request_id '{}' denied by Bridge: {}", request_id, reason);
     handle_session_teardown(request_id);
