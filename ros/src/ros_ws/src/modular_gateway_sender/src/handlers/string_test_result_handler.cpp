@@ -3,12 +3,17 @@
 
 namespace gateway {
 
+// Constructor: Initialize handler for test result messages (MessageType::STRING_TEST_RESULT = 202)
+// Test handler for MEC→VHC result return in offloading experiments
 StringTestResultHandler::StringTestResultHandler(RosGateway* gateway, rclcpp::Node::SharedPtr node)
   : MessageHandlerBase(gateway, node, "string_test_result_handler"),
     logger_(CppLogging::Logger("gateway"))
 {
 }
 
+// Initialize ROS subscription for local test result messages
+// Called by controller after handler creation
+// Used on MEC side to send processing results back to VHC
 void StringTestResultHandler::initialize()
 {
   node_->declare_parameter("string_test_result_handler.topic", "test_result_topic"); 
@@ -16,13 +21,15 @@ void StringTestResultHandler::initialize()
   
   subscription_ = node_->create_subscription<std_msgs::msg::String>(
     topic_name_, 10,
-    [this](const std_msgs::msg::String::SharedPtr msg) {
+    [this](const std::string::msg::String::SharedPtr msg) {
       this->handle_message(topic_name_, msg);
     }
   );
   logger_.Info("string_test_result_handler.cpp: Initialized for topic: {}", topic_name_);
 }
 
+// Clean up subscriptions and publishers
+// Called during session termination or handler deactivation
 void StringTestResultHandler::shutdown()
 {
   subscription_.reset();
@@ -31,6 +38,9 @@ void StringTestResultHandler::shutdown()
   logger_.Info("string_test_result_handler.cpp: For topic {} shut down", topic_name_);
 }
 
+// Handle incoming ROS string message from local result topic
+// Called by ROS subscriber callback when MEC publishes processing result
+// Sends result data back to VHC via data plane
 void StringTestResultHandler::handle_message(const std::string& topic, 
                                   const std_msgs::msg::String::SharedPtr msg)
 {
@@ -38,11 +48,15 @@ void StringTestResultHandler::handle_message(const std::string& topic,
   
   logger_.Info("string_test_result_handler.cpp: Received on topic '{}': {}", topic, msg->data);
 
-  MessageOptions options;
+  MessageOptions options;  // serialized=false for raw string data
   
   send_message(topic, MessageType::STRING_TEST_RESULT, msg->data.c_str(), msg->data.size(), options);
 }
 
+// Process received data plane message and publish to local ROS topic
+// Called by RosGateway when data plane frame arrives with MessageType::STRING_TEST_RESULT
+// Used on VHC side to receive processing result from MEC
+// Creates publisher on-demand if not already exists for topic
 bool StringTestResultHandler::process_and_publish_received_msg(
   const std::string& topic,
   MessageType type,
@@ -54,6 +68,7 @@ bool StringTestResultHandler::process_and_publish_received_msg(
     return false;
   }
 
+  // Create publisher for this topic if first time receiving on it
   auto it = publishers_.find(topic);
   if (it == publishers_.end()) {
     auto publisher = node_->create_publisher<std_msgs::msg::String>(topic, 10);
@@ -65,6 +80,7 @@ bool StringTestResultHandler::process_and_publish_received_msg(
     logger_.Error("string_test_result_handler.cpp: Serialized messages are not supported for processing");
   }
   else {
+    // Convert raw char buffer to std_msgs::msg::String and publish
     std_msgs::msg::String msg;
     msg.data = std::string(static_cast<const char*>(data), size);
     it->second->publish(msg);
