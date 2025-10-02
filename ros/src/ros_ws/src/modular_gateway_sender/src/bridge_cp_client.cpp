@@ -6,17 +6,23 @@
 
 namespace gateway {
 
+// Constructor: Initialize Bridge Control Plane client
+// Handles JSON-based session management protocol with Bridge
 BridgeCpClient::BridgeCpClient() 
     : logger_(CppLogging::Logger("gateway")) 
 {
     logger_.Info("bridge_cp_client.cpp: BridgeCpClient constructed.");
 }
 
+// Destructor: Ensure clean shutdown of client thread and transport
 BridgeCpClient::~BridgeCpClient() {
     logger_.Info("bridge_cp_client.cpp: BridgeCpClient destructed.");
     stop();
 }
 
+// Connect to Bridge Control Plane and register callbacks
+// Called by controller after discovery provides Bridge address
+// Returns false if TCP connection fails
 bool BridgeCpClient::start(
     const std::string& host, 
     int port,
@@ -29,22 +35,27 @@ bool BridgeCpClient::start(
         return true;
     }
 
+    // Store callbacks for async message handling
     on_dp_confirmed_ = dp_confirmed_cb;
     on_session_approved_ = session_approved_cb;
     on_session_denied_ = session_denied_cb;
 
+    // Establish TCP connection to Bridge CP server
     transport_ = std::make_unique<TcpClientTransport>(host, port);
     if (!transport_->connect()) {
         logger_.Error("bridge_cp_client.cpp: Failed to connect to Bridge Control Plane at {}:{}", host, port);
         return false;
     }
 
+    // Launch message receiver and ACK/retry handler thread
     running_ = true;
     client_thread_ = std::thread(&BridgeCpClient::client_thread_func, this);
     logger_.Info("bridge_cp_client.cpp: Bridge CP client started and connected to {}:{}", host, port);
     return true;
 }
 
+// Stop client thread and disconnect from Bridge
+// Called during shutdown or when reconnection needed
 void BridgeCpClient::stop() {
     running_ = false;
     if (client_thread_.joinable()) {
@@ -56,16 +67,19 @@ void BridgeCpClient::stop() {
     logger_.Info("bridge_cp_client.cpp: Bridge CP client stopped.");
 }
 
+// Main client thread: receive JSON messages and handle ACK/retry logic
+// Polls for incoming messages with 1s timeout, checks for ACK timeouts after each poll
 void BridgeCpClient::client_thread_func() {
     while (running_) {
         bool received_data = false;
         
-        if (transport_ && transport_->is_connected() && transport_->data_available(1000)) { // Check for data with a 1s timeout
-            std::vector<uint8_t> buffer(4096); // Buffer for incoming data
+        // Poll for incoming JSON messages with 1 second timeout
+        if (transport_ && transport_->is_connected() && transport_->data_available(1000)) {
+            std::vector<uint8_t> buffer(4096);
             int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
 
             if (bytes_received > 0) {
-                buffer[bytes_received] = '\0'; // Null-terminate the received data
+                buffer[bytes_received] = '\0';  // Null-terminate for string conversion
                 std::string json_str(reinterpret_cast<char*>(buffer.data()));
                 try {
                     json msg = json::parse(json_str);
@@ -75,22 +89,22 @@ void BridgeCpClient::client_thread_func() {
                     logger_.Error("bridge_cp_client.cpp: JSON parse error: {}. Received data: {}", e.what(), json_str);
                 }
             } else if (bytes_received < 0) {
-                // An error occurred, or the connection was closed. The transport handles logging this.
-                // The loop will continue, and is_connected() will eventually be false.
+                // Connection error - transport logs details, is_connected() will become false
             }
         }
         
-        // Periodically check for messages that need to be re-sent
+        // Check for messages awaiting ACK that have timed out (5s default)
         check_for_timeouts();
         
-        // If we didn't receive any data and transport is not connected, add a small delay
-        // to prevent tight looping when connection is lost
+        // Avoid busy-waiting when disconnected
         if (!received_data && (!transport_ || !transport_->is_connected())) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 }
 
+// Parse incoming JSON message and dispatch to appropriate callback
+// Automatically sends ACK for all non-ACK messages (hop-by-hop reliability)
 void BridgeCpClient::handle_received_message(const json& msg) {
     logger_.Info("bridge_cp_client.cpp: Received message: {}", msg.dump());
 
@@ -103,13 +117,13 @@ void BridgeCpClient::handle_received_message(const json& msg) {
     std::string component_id = msg["component_id"];
     int seq_num = msg.value("sequence_number", 0);
 
-    // Always send an ACK for any message that is not itself an ACK
+    // Send immediate ACK for reliable delivery (except for ACKs themselves)
     if (code != 900) {
         send_ack(seq_num, component_id);
     }
 
     switch (code) {
-        case 200: // SESSION_APPROVED
+        case 200: // SESSION_APPROVED - OM approved offloading request
             if (on_session_approved_ && msg.contains("payload")) {
                 json payload_copy = msg["payload"]; // make a mutable copy we can normalize
 
@@ -159,7 +173,7 @@ void BridgeCpClient::handle_received_message(const json& msg) {
                 logger_.Error("bridge_cp_client.cpp: Malformed SESSION_APPROVED message.");
             }
             break;
-        case 201: // SESSION_DENIED
+        case 201: // SESSION_DENIED - OM rejected offloading request
             if (on_session_denied_ && msg.contains("payload") && msg["payload"].contains("request_id") && msg["payload"].contains("reason_description")) {
                 try {
                     std::string request_id_str;
@@ -175,16 +189,17 @@ void BridgeCpClient::handle_received_message(const json& msg) {
                 logger_.Error("bridge_cp_client.cpp: Malformed SESSION_DENIED message.");
             }
             break;
-        case 202: // DP_CONNECTION_CONFIRMED
+        case 202: // DP_CONNECTION_CONFIRMED - Bridge established data plane connection
             if (on_dp_confirmed_) {
                 on_dp_confirmed_();
             }
             break;
-        case 900: // ACK
+        case 900: // ACK - Acknowledgement from Bridge
         {
             if (msg.contains("payload") && msg["payload"].contains("ack_sequence_number")) {
                 int ack_seq_num = msg["payload"]["ack_sequence_number"];
                 std::lock_guard<std::mutex> lock(pending_acks_mutex_);
+                // Remove from pending map - message successfully delivered
                 if (pending_acks_.erase(ack_seq_num)) {
                     logger_.Info("bridge_cp_client.cpp: Received ACK for sequence number {}", ack_seq_num);
                 }
@@ -199,13 +214,16 @@ void BridgeCpClient::handle_received_message(const json& msg) {
     }
 }
 
+// Check for messages that haven't received ACK within timeout (default 5s)
+// Retransmits messages with same sequence number (up to max retry count)
 void BridgeCpClient::check_for_timeouts() {
     std::lock_guard<std::mutex> lock(pending_acks_mutex_);
     auto now = std::chrono::steady_clock::now();
-    std::vector<std::pair<uint64_t, json>> messages_to_resend; // Store seq_num with message for debugging
+    std::vector<std::pair<uint64_t, json>> messages_to_resend;
 
     //logger_.Debug("bridge_cp_client.cpp: Checking timeouts for {} pending messages", pending_acks_.size());
     
+    // Identify timed-out messages
     for (auto const& [seq_num, pending] : pending_acks_) {
         auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - pending.time_sent);
         logger_.Debug("bridge_cp_client.cpp: Sequence {} elapsed time: {}s, timeout: {}s", 
@@ -219,7 +237,7 @@ void BridgeCpClient::check_for_timeouts() {
 
     //logger_.Debug("bridge_cp_client.cpp: Found {} messages to resend", messages_to_resend.size());
 
-    // Resend outside the loop to avoid iterator invalidation issues if we were modifying the map
+    // Retransmit timed-out messages (done outside loop to avoid map modification during iteration)
     for (const auto& [seq_num, msg] : messages_to_resend) {
         logger_.Info("bridge_cp_client.cpp: Attempting to resend sequence number {}", seq_num);
         std::string msg_str = msg.dump();
@@ -227,7 +245,7 @@ void BridgeCpClient::check_for_timeouts() {
         TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
         
         if (result == TransportAsyncSendResult::SUCCESS) {
-            // Only update the time_sent if the resend was successful
+            // Update timestamp to start new timeout window
             auto it = pending_acks_.find(seq_num);
             if (it != pending_acks_.end()) {
                 it->second.time_sent = std::chrono::steady_clock::now();
@@ -243,17 +261,20 @@ void BridgeCpClient::check_for_timeouts() {
                 default: break;
             }
             logger_.Error("bridge_cp_client.cpp: Failed to resend message with sequence number {}: {}", seq_num, error_str);
-            // Do NOT update time_sent so it will be retried again next timeout check
+            // Keep old timestamp - will retry again on next timeout check
         }
     }
 }
 
+// Send JSON message with ACK/retry mechanism
+// Message is tracked until ACK received or max retries exceeded
 void BridgeCpClient::send_reliable_message(json& msg) {
     if (!running_ || !transport_ || !transport_->is_connected()) {
         logger_.Error("bridge_cp_client.cpp: Cannot send message, client not running or connected.");
         return;
     }
 
+    // Assign monotonically increasing sequence number
     uint64_t seq_num = sequence_number_++;
     msg["sequence_number"] = seq_num;
 
@@ -263,7 +284,7 @@ void BridgeCpClient::send_reliable_message(json& msg) {
     TransportAsyncSendResult result = transport_->async_send_data(std::move(data));
     
     if (result == TransportAsyncSendResult::SUCCESS) {
-        // Only add to pending_acks if the send was successful
+        // Track message for ACK verification and potential retransmission
         std::lock_guard<std::mutex> lock(pending_acks_mutex_);
         pending_acks_[seq_num] = {msg, std::chrono::steady_clock::now()};
         logger_.Debug("bridge_cp_client.cpp: Message with sequence number {} queued for ACK tracking", seq_num);
@@ -277,16 +298,18 @@ void BridgeCpClient::send_reliable_message(json& msg) {
             default: break;
         }
         logger_.Error("bridge_cp_client.cpp: Failed to send message with sequence number {}: {}", seq_num, error_str);
-        // Do not add to pending_acks since the message was not actually sent
+        // Not tracked for ACK since initial send failed
     }
 }
 
+// Send ACK message to Bridge for received message
+// ACKs use sequence_number 0 and are not themselves tracked for reliability
 void BridgeCpClient::send_ack(int ack_sequence_number, const std::string& component_id) {
     json ack_msg = {
         {"component_id", component_id},
         {"message_code", 900},
         {"message_type", "ACK"},
-        {"sequence_number", 0}, // ACKs don't need their own sequence number for reliability
+        {"sequence_number", 0},  // ACKs don't require acknowledgement
         {"payload", {
             {"ack_sequence_number", ack_sequence_number}
         }}
@@ -308,6 +331,9 @@ void BridgeCpClient::send_ack(int ack_sequence_number, const std::string& compon
     }
 }
 
+// Send DP_INFO (103): Inform Bridge of data plane listen address/port
+// Sent immediately after TCP connection established (first CP message)
+// dp_host "0.0.0.0" signals Bridge to use source IP from TCP connection
 void BridgeCpClient::send_dp_info(const std::string& component_id, const std::string& dp_host, int dp_port) {
     json msg = {
         {"component_id", component_id},
@@ -321,14 +347,17 @@ void BridgeCpClient::send_dp_info(const std::string& component_id, const std::st
     send_reliable_message(msg);
 }
 
+// Send OFFLOAD_REQUEST (100): VHC requests task offloading to MEC
+// Forwarded by Bridge to OM for approval decision
+// Optional vhc_data field provides context for OM algorithm
 void BridgeCpClient::send_offload_request(const std::string& component_id, const std::string& request_id, const std::string& task_id, const std::string& task_name, const std::string& vhc_data) {
     json payload = {
-        {"request_id", request_id},  // Convert to numeric upstream if required
-        {"task_id", std::stoi(task_id)},        // Convert to numeric for transport
+        {"request_id", request_id},
+        {"task_id", std::stoi(task_id)},  // Convert task_id string to integer
         {"task_name", task_name}
     };
     
-    // Only add vhc_data if it's not empty
+    // Include optional application context data for OM algorithm
     if (!vhc_data.empty()) {
         payload["vhc_data"] = vhc_data;
         logger_.Info("bridge_cp_client.cpp: Including vhc_data in offload request: '{}'", vhc_data);
@@ -343,25 +372,29 @@ void BridgeCpClient::send_offload_request(const std::string& component_id, const
     send_reliable_message(msg);
 }
 
+// Send SESSION_KEEPALIVE (101): Maintain active session liveness
+// Sent every 15 seconds for approved sessions to prevent timeout (20s default)
 void BridgeCpClient::send_session_keepalive(const std::string& component_id, const std::string& request_id) {
     json msg = {
         {"component_id", component_id},
         {"message_code", 101},
         {"message_type", "SESSION_KEEPALIVE"},
         {"payload", {
-            {"request_id", request_id}  // Convert to numeric upstream if required
+            {"request_id", request_id}
         }}
     };
     send_reliable_message(msg);
 }
 
+// Send SESSION_TERMINATE_REQUEST (102): Gracefully end active session
+// Triggers handler deactivation and session cleanup on both sides
 void BridgeCpClient::send_session_terminate_request(const std::string& component_id, const std::string& request_id) {
     json msg = {
         {"component_id", component_id},
         {"message_code", 102},
         {"message_type", "SESSION_TERMINATE_REQUEST"},
         {"payload", {
-            {"request_id", request_id}  // Convert to numeric upstream if required
+            {"request_id", request_id}
         }}
     };
     send_reliable_message(msg);

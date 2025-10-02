@@ -5,17 +5,23 @@
 
 namespace gateway {
 
+// Constructor: Initialize Discovery Service client
+// Handles registration to obtain Bridge address and global configuration
 DiscoveryClient::DiscoveryClient()
     : logger_(CppLogging::Logger("gateway"))
 {
     logger_.Info("discovery_client.cpp: DiscoveryClient constructed.");
 }
 
+// Destructor: Ensure clean shutdown of client thread and transport
 DiscoveryClient::~DiscoveryClient() {
     logger_.Info("discovery_client.cpp: DiscoveryClient destructed.");
     stop();
 }
 
+// Start Discovery Service registration and keepalive process
+// Called by controller during DISCOVERING state
+// Launches thread that registers, waits for response, then maintains keepalive
 bool DiscoveryClient::start(
     const std::string& host,
     int port,
@@ -32,6 +38,7 @@ bool DiscoveryClient::start(
         return true;
     }
 
+    // Store parameters for registration request
     host_ = host;
     port_ = port;
     component_type_ = component_type;
@@ -42,12 +49,15 @@ bool DiscoveryClient::start(
     success_cb_ = success_cb;
     failure_cb_ = failure_cb;
 
+    // Launch registration and keepalive thread
     running_ = true;
     registered_ = false;
     client_thread_ = std::thread(&DiscoveryClient::client_thread_func, this);
     return true;
 }
 
+// Stop client thread and disconnect from Discovery Service
+// Called during shutdown or when re-registration needed
 void DiscoveryClient::stop() {
     running_ = false;
     if (client_thread_.joinable()) {
@@ -59,9 +69,14 @@ void DiscoveryClient::stop() {
     logger_.Info("discovery_client.cpp: Discovery client stopped.");
 }
 
+// Main client thread: register with Discovery Service, then maintain keepalive
+// Phase 1: Send REGISTRATION_REQUEST with component identity and DP port
+// Phase 2: Wait for REGISTRATION_RESPONSE with Bridge address and global config
+// Phase 3: Send periodic KEEPALIVE_PING messages to maintain registration
 void DiscoveryClient::client_thread_func() {
     transport_ = std::make_unique<TcpClientTransport>(host_, port_);
     
+    // Connect to Discovery Service (only component with fixed IP address)
     if (!transport_->connect()) {
         logger_.Error("discovery_client.cpp: Failed to connect to DiscoveryService at {}:{}", host_, port_);
         if (failure_cb_) failure_cb_("Could not connect to DiscoveryService.");
@@ -70,18 +85,20 @@ void DiscoveryClient::client_thread_func() {
 
     logger_.Info("discovery_client.cpp: Connected to DiscoveryService. Sending registration for component type '{}'.", discovery_protocol::component_type_to_string(component_type_));
     
+    // Build registration request using discovery protocol format (DISC: prefixed messages)
     discovery_protocol::RegistrationRequest request_payload;
     request_payload.componentType = component_type_;
-    request_payload.idRequestType = discovery_protocol::IdRequestType::STATIC;
+    request_payload.idRequestType = discovery_protocol::IdRequestType::STATIC;  // Use provided ID, not auto-assigned
     request_payload.groupId = group_id_;
     request_payload.idInGroup = id_in_group_;
     request_payload.componentName = component_name_;
-    request_payload.listenAddress = "0.0.0.0";
+    request_payload.listenAddress = "0.0.0.0";  // Data plane listen address
     request_payload.listenPort = std::to_string(data_plane_port_);
     request_payload.humanReadableMessage = "registration request from MGW";
 
     discovery_protocol::Message reg_msg(request_payload);
 
+    // Encode to discovery protocol text format (semicolon-delimited fields)
     std::string encoded_msg;
     if (discovery_protocol::encode_message(reg_msg, encoded_msg) != discovery_protocol::ProtocolStatus::OK) {
         logger_.Error("discovery_client.cpp: Failed to encode registration message.");
@@ -95,13 +112,13 @@ void DiscoveryClient::client_thread_func() {
         return;
     }
 
+    // Send registration request
     logger_.Info("discovery_client.cpp: Sending encoded registration message ({} bytes)", encoded_msg.size());
-    
     std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
     transport_->async_send_data(std::move(reg_data));
 
-    // Wait for the registration response
-    if (transport_->data_available(5000)) { // 5 second timeout
+    // Wait for registration response with 5 second timeout
+    if (transport_->data_available(5000)) {
         std::vector<uint8_t> buffer(4096);
         int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
         if (bytes_received > 0) {
@@ -109,26 +126,29 @@ void DiscoveryClient::client_thread_func() {
             std::string response_str(reinterpret_cast<char*>(buffer.data()));
             logger_.Info("discovery_client.cpp: Received raw response from DiscoveryService: '{}'", response_str);
 
+            // Decode REGISTRATION_RESPONSE message
             discovery_protocol::Message response_msg;
             if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
                 logger_.Info("discovery_client.cpp: Successfully decoded message with type: {}", static_cast<int>(response_msg.type));
                 if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
                     auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
                     if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
+                        // Registration approved - extract Bridge CP address and global config JSON
                         logger_.Info("discovery_client.cpp: Discovery successful. Bridge target at {}:{}", resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
                         try {
                             int bridge_port = std::stoi(resp_payload.connectionTargetPort);
                             registered_ = true;
                             if (success_cb_) {
+                                // Callback triggers state transition to CONNECTING_TO_BRIDGE
                                 success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
                             }
-                            // Optionally update interval if provided via config JSON (future enhancement)
                         } catch (const std::invalid_argument& e) {
                             logger_.Error("discovery_client.cpp: Invalid port number received from DiscoveryService: '{}'", resp_payload.connectionTargetPort);
                             if (failure_cb_) failure_cb_("Invalid port number from DiscoveryService.");
                             return;
                         }
                     } else {
+                        // Registration denied (e.g., OM not registered yet, bridge unavailable)
                         logger_.Error("discovery_client.cpp: Registration denied by DiscoveryService: {}", resp_payload.humanReadableMessage);
                         if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);
                         return;
@@ -154,13 +174,16 @@ void DiscoveryClient::client_thread_func() {
         return;
     }
 
-    // Keepalive loop: send ping if no data received within interval
+    // Phase 3: Keepalive loop - maintain registration with periodic pings
+    // Default interval 30s, can be updated via KEEPALIVE_RESPONSE
     logger_.Info("discovery_client.cpp: Entering keepalive loop (interval {} ms)", keepalive_interval_ms_.count());
     auto last_ping_sent = std::chrono::steady_clock::now();
 
     while (running_ && registered_) {
         auto now = std::chrono::steady_clock::now();
         int wait_ms = static_cast<int>(keepalive_interval_ms_.count());
+        
+        // Wait for KEEPALIVE_RESPONSE or timeout
         if (transport_->data_available(wait_ms)) {
             std::vector<uint8_t> buffer(4096);
             int bytes = transport_->receive_data(buffer.data(), buffer.size() - 1);
@@ -172,10 +195,11 @@ void DiscoveryClient::client_thread_func() {
                     if (incoming.type == discovery_protocol::MessageType::KEEPALIVE_RESPONSE) {
                         auto& pong = std::get<discovery_protocol::KeepaliveResponse>(incoming.data);
                         logger_.Info("discovery_client.cpp: Received keepalive response: '{}' nextIntervalMs={}", pong.humanReadableMessage, pong.nextIntervalMs);
+                        // Discovery Service can dynamically adjust keepalive interval
                         if (pong.nextIntervalMs > 0) {
                             keepalive_interval_ms_ = std::chrono::milliseconds(pong.nextIntervalMs);
                         }
-                        last_ping_sent = now; // reset timer
+                        last_ping_sent = now;  // Reset timer after receiving pong
                     } else {
                         logger_.Info("discovery_client.cpp: Ignoring non-keepalive message type {} during keepalive phase", static_cast<int>(incoming.type));
                     }
@@ -184,9 +208,9 @@ void DiscoveryClient::client_thread_func() {
                 }
             }
         } else {
-            // Timeout -> send keepalive ping
+            // Timeout reached - send KEEPALIVE_PING
             discovery_protocol::KeepalivePing ping_payload;
-            //component id should be groupID.IDingroup (there is no function to format this in discovery_protocol)
+            // Format component_id as "group_id.id_in_group" (note: uses dot, not colon)
             std::string component_id = std::to_string(group_id_) + "." + std::to_string(id_in_group_);
             ping_payload.componentId = component_id;
             ping_payload.status = "OK";
