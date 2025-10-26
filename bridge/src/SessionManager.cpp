@@ -2,6 +2,8 @@
 #include "logging/logger.h"
 #include <algorithm>
 
+//SESSION MANAGER CURRENTLY DISABLED
+
 bool SessionManager::create_session(const std::string& request_id,
                                    const std::string& mgwcp_component_id,
                                    uint32_t task_id,

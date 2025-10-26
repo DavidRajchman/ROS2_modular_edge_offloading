@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <sstream>
 
+// Constructor: Initialize Bridge with core components
+// Creates global config, session manager, and routing table (1000 route capacity)
 BridgeControlPlane::BridgeControlPlane()
     : global_config_(std::make_shared<GlobalConfig>()),
       session_manager_(std::make_shared<SessionManager>()),
@@ -19,12 +21,19 @@ BridgeControlPlane::BridgeControlPlane()
     logger.Info("BridgeControlPlane.cpp: Bridge Control Plane constructed");
 }
 
+// Destructor: Ensure clean shutdown before destruction
 BridgeControlPlane::~BridgeControlPlane() {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: Bridge Control Plane destructor called");
     stop();
 }
 
+// Start Bridge Control Plane - Four-phase initialization sequence
+// Phase 1: Register with Discovery Service (get OM address and global config)
+// Phase 2: Connect to OM (using address from Discovery)
+// Phase 3: Start MGWCP server (accept VHC/MEC connections on port 7000)
+// Phase 4: Start periodic maintenance tasks
+// Returns false if any phase fails
 bool BridgeControlPlane::start() {
     CppLogging::Logger logger("bridge");
     
@@ -61,6 +70,8 @@ bool BridgeControlPlane::start() {
     return true;
 }
 
+// Stop Bridge Control Plane - Graceful shutdown of all components
+// Sequence: MGWCP server → MGWCP connections → Transport handlers → OM → Discovery → Threads
 void BridgeControlPlane::stop() {
     CppLogging::Logger logger("bridge");
     
@@ -126,6 +137,10 @@ void BridgeControlPlane::stop() {
     logger.Info("BridgeControlPlane.cpp: Bridge Control Plane stopped");
 }
 
+// Register with Discovery Service to obtain OM address and global configuration
+// Connects to Discovery Service (only component with fixed IP address in system)
+// Performs registration with retry on WAIT response (OM not ready yet)
+// Launches keepalive thread to maintain registration
 bool BridgeControlPlane::register_with_discovery_service() {
     CppLogging::Logger logger("bridge");
     
@@ -156,6 +171,10 @@ bool BridgeControlPlane::register_with_discovery_service() {
     return true;
 }
 
+// Perform Discovery Service registration with retry on WAIT response
+// Sends REGISTRATION_REQUEST with Bridge component ID (15:10)
+// Handles WAIT response (OM not registered yet) by retrying after 1 second
+// Extracts OM connection details and global config from SUCCESS response
 bool BridgeControlPlane::perform_discovery_registration() {
     CppLogging::Logger logger("bridge");
     
@@ -181,7 +200,7 @@ bool BridgeControlPlane::perform_discovery_registration() {
     // Declare response variable outside loop so it's accessible after loop ends
     discovery_protocol::RegistrationResponse response;
     
-    // Retry loop for registration
+    // Retry loop for registration (handles WAIT response when OM not ready)
     while (true) {
         // Send registration request
         if (!discovery_transport_->send_data(encoded_message.data(), encoded_message.size())) {
@@ -234,6 +253,7 @@ bool BridgeControlPlane::perform_discovery_registration() {
     }
     
     // Extract OM connection details from Discovery Service response
+    // This is critical - Bridge cannot operate without OM address
     if (!response.connectionTargetAddress.empty() && !response.connectionTargetPort.empty()) {
         om_host_ = response.connectionTargetAddress;
         try {
@@ -249,7 +269,7 @@ bool BridgeControlPlane::perform_discovery_registration() {
         return false;
     }
     
-    // Parse global configuration
+    // Parse global configuration (task database with input/output message types)
     if (!response.configJson.empty()) {
         try {
             nlohmann::json config_json = nlohmann::json::parse(response.configJson);
@@ -272,6 +292,9 @@ bool BridgeControlPlane::perform_discovery_registration() {
     return true;
 }
 
+// Discovery Service keepalive thread - Maintain registration
+// Sends KEEPALIVE_PING every 5 seconds to prevent deregistration
+// Runs until shutdown or connection loss
 void BridgeControlPlane::discovery_keepalive_thread_func() {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: Discovery Service keepalive thread started");
@@ -285,7 +308,7 @@ void BridgeControlPlane::discovery_keepalive_thread_func() {
         
         // Send keepalive ping
         discovery_protocol::KeepalivePing ping;
-        ping.componentId = "5.1";  // Bridge component ID
+        ping.componentId = "5.1";  // Bridge component ID (note: dot notation, not colon)
         ping.status = "OK";
         ping.humanReadableMessage = "Bridge CP keepalive";
         
@@ -307,6 +330,9 @@ void BridgeControlPlane::discovery_keepalive_thread_func() {
     logger.Info("BridgeControlPlane.cpp: Discovery Service keepalive thread stopped");
 }
 
+// Connect to OM using address obtained from Discovery Service
+// OM address is dynamic - obtained during Discovery registration
+// Launches OM message receiver thread
 bool BridgeControlPlane::connect_to_om() {
     CppLogging::Logger logger("bridge");
     
@@ -335,6 +361,9 @@ bool BridgeControlPlane::connect_to_om() {
     return true;
 }
 
+// OM message receiver thread - Handle OM responses
+// Receives JSON messages from OM (SESSION_APPROVED/DENIED)
+// Runs until shutdown or connection loss
 void BridgeControlPlane::om_connection_thread_func() {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: OM connection thread started");
@@ -365,6 +394,9 @@ void BridgeControlPlane::om_connection_thread_func() {
     logger.Info("BridgeControlPlane.cpp: OM connection thread stopped");
 }
 
+// Handle OM message by dispatching based on message code
+// 200: SESSION_APPROVED - Create routing rules, forward to VHC/MEC
+// 201: SESSION_DENIED - Forward denial to VHC
 void BridgeControlPlane::handle_om_message(const nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
@@ -389,6 +421,8 @@ void BridgeControlPlane::handle_om_message(const nlohmann::json& message) {
     }
 }
 
+// Send JSON message to OM with mutex protection
+// Used to forward VHC requests (OFFLOAD_REQUEST, KEEPALIVE, TERMINATE)
 void BridgeControlPlane::send_om_message(const nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
@@ -410,6 +444,9 @@ void BridgeControlPlane::send_om_message(const nlohmann::json& message) {
     }
 }
 
+// Start MGWCP server to accept VHC/MEC control plane connections
+// Listens on port 7000, accepts up to 50 concurrent connections
+// Launches server event processing thread
 bool BridgeControlPlane::start_mgwcp_server() {
     CppLogging::Logger logger("bridge");
     
@@ -418,7 +455,7 @@ bool BridgeControlPlane::start_mgwcp_server() {
     // Create MGWCP server as shared_ptr
     mgwcp_server_ = std::make_shared<gateway::TcpServerTransport>(MGWCP_SERVER_PORT, true, MAX_MGWCP_CONNECTIONS);
     
-    // Set up callbacks
+    // Set up callbacks for new connections and disconnections
     mgwcp_server_->set_connect_callback([this](uint32_t client_id, const std::string& ip, int port) {
         handle_new_mgwcp_connection(client_id, ip);
     });
@@ -439,6 +476,9 @@ bool BridgeControlPlane::start_mgwcp_server() {
     return true;
 }
 
+// MGWCP server event processing thread
+// Handles new connection and disconnection events
+// Runs until shutdown
 void BridgeControlPlane::mgwcp_server_thread_func() {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: MGWCP server thread started");
@@ -450,13 +490,17 @@ void BridgeControlPlane::mgwcp_server_thread_func() {
     logger.Info("BridgeControlPlane.cpp: MGWCP server thread stopped");
 }
 
+// Handle new MGWCP connection from VHC or MEC gateway
+// Creates MGWCPConnection with callbacks for message forwarding and data plane setup
+// Registers component_id→transport_id mapping for message routing
+// Starts MGWCPConnection thread to handle protocol messages
 void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_id, const std::string& client_ip) {
     CppLogging::Logger logger("bridge");
     
     logger.Info("BridgeControlPlane.cpp: New MGWCP connection from {} (transport ID: {})", 
                client_ip, transport_client_id);
     
-    // Now we can pass the shared_ptr directly without fake conversion
+    // Create MGWCPConnection with callbacks
     auto mgwcp_connection = std::make_unique<MGWCPConnection>(
         next_mgwcp_connection_id_++,
         mgwcp_server_,  // Pass shared_ptr directly
@@ -464,12 +508,12 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
         client_ip,
         session_manager_,
         [this](const std::string& mgwcp_id, const nlohmann::json& msg) {
-            forward_message_to_om(mgwcp_id, msg);
+            forward_message_to_om(mgwcp_id, msg);  // Forward OFFLOAD_REQUEST to OM
         },
         [this](const std::string& mgwcp_id, const std::string& host, int port) {
-            return establish_mgwcp_data_plane_connection(mgwcp_id, host, port);
+            return establish_mgwcp_data_plane_connection(mgwcp_id, host, port);  // Create data plane transport handler
         },
-        // component registration callback
+        // Component registration callback - maps component_id to transport_id
         [this](const std::string& component_id, uint32_t transport_id) {
             CppLogging::Logger logger("bridge");
             std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);
@@ -493,6 +537,8 @@ void BridgeControlPlane::handle_new_mgwcp_connection(uint32_t transport_client_i
                connection_id, transport_client_id);
 }
 
+// Handle MGWCP disconnection (VHC or MEC gateway disconnected)
+// Stops MGWCPConnection, removes component_id mapping, cleans up state
 void BridgeControlPlane::handle_mgwcp_disconnection(uint32_t transport_client_id) {
     CppLogging::Logger logger("bridge");
     
@@ -521,6 +567,9 @@ void BridgeControlPlane::handle_mgwcp_disconnection(uint32_t transport_client_id
     }
 }
 
+// Forward VHC message to OM (OFFLOAD_REQUEST, KEEPALIVE, TERMINATE)
+// Creates session for OFFLOAD_REQUEST (request_id, task_id, task_name)
+// Preserves VHC component_id so OM knows true source, adds bridge_component_id as metadata
 void BridgeControlPlane::forward_message_to_om(const std::string& mgwcp_component_id, const nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
@@ -540,15 +589,12 @@ void BridgeControlPlane::forward_message_to_om(const std::string& mgwcp_componen
         }
     }
     
-    // Forward message to OM WITHOUT overwriting original component_id (bug fix)
-    // Preserve the sender's component_id so OM sees the true source (e.g., '60:5').
-    // Add bridge identity separately if OM needs to know which bridge forwarded it.
+    // Forward message to OM preserving original component_id (VHC source)
+    // Add bridge_component_id as metadata if not already present
     nlohmann::json forward_message = message;
     if (!forward_message.contains("bridge_component_id")) {
-        forward_message["bridge_component_id"] = BRIDGE_COMPONENT_ID; // metadata
+        forward_message["bridge_component_id"] = BRIDGE_COMPONENT_ID; // Bridge identity metadata
     }
-    // Remove any accidental previous overwrite (not needed, just ensuring clarity)
-    // (Do NOT set forward_message["component_id"] = BRIDGE_COMPONENT_ID;)
 
     logger.Debug("BridgeControlPlane.cpp: Forward payload to OM (source component_id='{}', bridge_component_id='{}')", 
                  forward_message.value("component_id", "<missing>"), 
@@ -557,6 +603,9 @@ void BridgeControlPlane::forward_message_to_om(const std::string& mgwcp_componen
     send_om_message(forward_message);
 }
 
+// Establish data plane connection to VHC/MEC gateway
+// Called by MGWCPConnection after receiving DP_INFO message
+// Creates TransportHandler for bidirectional data plane message routing
 bool BridgeControlPlane::establish_mgwcp_data_plane_connection(const std::string& mgwcp_component_id, 
                                                               const std::string& dp_host, int dp_port) {
     CppLogging::Logger logger("bridge");
@@ -567,6 +616,9 @@ bool BridgeControlPlane::establish_mgwcp_data_plane_connection(const std::string
     return create_transport_handler_for_mgwdp(mgwcp_component_id, dp_host, dp_port);
 }
 
+// Handle SESSION_APPROVED from OM
+// Updates session with MEC assignment, creates routing rules for VHC↔MEC data plane
+// Forwards SESSION_APPROVED to both VHC and MEC via MGWCP
 void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_response) {
     CppLogging::Logger logger("bridge");
     
@@ -601,7 +653,7 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
         logger.Info("BridgeControlPlane.cpp: Session '{}' assigned to MEC '{}'", request_id, mec_id);
     }
     
-    // Create routing rules
+    // Create routing rules (VHC→MEC for input types, MEC→VHC for output types)
     create_routing_rules_for_session(request_id);
     
     // Forward SESSION_APPROVED to VHC
@@ -637,6 +689,8 @@ void BridgeControlPlane::handle_session_approved(const nlohmann::json& om_respon
     }
 }
 
+// Handle SESSION_DENIED from OM
+// Removes session and forwards denial reason to VHC via MGWCP
 void BridgeControlPlane::handle_session_denied(const nlohmann::json& om_response) {
     CppLogging::Logger logger("bridge");
     
@@ -682,6 +736,10 @@ void BridgeControlPlane::handle_session_denied(const nlohmann::json& om_response
     }
 }
 
+// Create routing rules for approved session
+// VHC→MEC routes: For each input message type, route (VHC_id, msg_type) → MEC input queue
+// MEC→VHC routes: For each output message type, route (MEC_id, msg_type) → VHC input queue
+// Uses task config from global_config_ to get input/output message type lists
 void BridgeControlPlane::create_routing_rules_for_session(const std::string& request_id) {
     CppLogging::Logger logger("bridge");
     
@@ -762,6 +820,9 @@ void BridgeControlPlane::create_routing_rules_for_session(const std::string& req
     }
 }
 
+// Remove routing rules for terminated session
+// Removes both VHC→MEC and MEC→VHC routes from routing table
+// Called on session termination or timeout
 void BridgeControlPlane::remove_routing_rules_for_session(const std::string& request_id) {
     CppLogging::Logger logger("bridge");
     
@@ -816,6 +877,10 @@ void BridgeControlPlane::remove_routing_rules_for_session(const std::string& req
     }
 }
 
+// Create data plane transport handler for VHC/MEC gateway
+// Creates TransportHandler with MPSC input queue and routing table reference
+// Handler connects to gateway's data plane port and processes binary messages
+// Returns false if handler already exists (reuses existing handler)
 bool BridgeControlPlane::create_transport_handler_for_mgwdp(const std::string& mgwcp_component_id, 
                                                            const std::string& host, int port) {
     CppLogging::Logger logger("bridge");
@@ -853,6 +918,8 @@ bool BridgeControlPlane::create_transport_handler_for_mgwdp(const std::string& m
     return true;
 }
 
+// Create data plane transport handler for MEC (if needed separately)
+// Same as create_transport_handler_for_mgwdp but for MEC-specific connections
 bool BridgeControlPlane::create_transport_handler_for_mec(const std::string& mec_component_id, 
                                                          const std::string& host, int port) {
     CppLogging::Logger logger("bridge");
@@ -890,6 +957,8 @@ bool BridgeControlPlane::create_transport_handler_for_mec(const std::string& mec
     return true;
 }
 
+// Start periodic maintenance tasks
+// Launches maintenance thread for session timeout checking and cleanup
 void BridgeControlPlane::start_periodic_tasks() {
     CppLogging::Logger logger("bridge");
     
@@ -899,6 +968,9 @@ void BridgeControlPlane::start_periodic_tasks() {
     logger.Info("BridgeControlPlane.cpp: Started periodic maintenance tasks");
 }
 
+// Maintenance thread - Periodic session cleanup
+// Runs every 10 seconds to check for expired sessions
+// Currently disabled: Sessions are not deleted on timeout
 void BridgeControlPlane::maintenance_thread_func() {
     CppLogging::Logger logger("bridge");
     logger.Info("BridgeControlPlane.cpp: Maintenance thread started");
@@ -910,7 +982,7 @@ void BridgeControlPlane::maintenance_thread_func() {
             break;
         }
         
-        // Check session timeouts
+        // Check session timeouts (currently disabled - sessions not deleted)
         check_session_timeouts();
         
         // Cleanup expired sessions
@@ -920,6 +992,9 @@ void BridgeControlPlane::maintenance_thread_func() {
     logger.Info("BridgeControlPlane.cpp: Maintenance thread stopped");
 }
 
+// Check for expired sessions and remove routing rules
+// Session timeout is 20 seconds since last keepalive
+// NOTE: Currently disabled - expired sessions are found but NOT deleted
 void BridgeControlPlane::check_session_timeouts() {
     std::vector<std::string> expired_sessions = session_manager_->find_expired_sessions(SESSION_TIMEOUT_);
     
@@ -933,17 +1008,21 @@ void BridgeControlPlane::check_session_timeouts() {
             // Remove routing rules
             remove_routing_rules_for_session(request_id);
             
-            // Remove session
+            // Remove session (currently disabled by SessionManager - sessions not deleted)
             session_manager_->remove_session(request_id);
         }
     }
 }
 
+// Additional cleanup logic placeholder
+// Reserved for future cleanup strategies beyond timeout checking
 void BridgeControlPlane::cleanup_expired_sessions() {
     // Additional cleanup logic if needed
     // This is separate from timeout checking to allow for different cleanup strategies
 }
 
+// Get active MGWCP connection count
+// Returns number of active VHC/MEC connections
 size_t BridgeControlPlane::get_mgwcp_connection_count() const {
     std::lock_guard<std::mutex> lock(mgwcp_connections_mutex_);
     return mgwcp_connections_.size();

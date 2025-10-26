@@ -2,6 +2,9 @@
 #include "logging/logger.h"
 #include <algorithm>
 
+// Constructor - Initialize per-gateway connection handler
+// Starts in CONNECTING state, awaiting DP_INFO message
+// Callbacks: message_forwarder (VHC→OM), dp_connect_callback (create TransportHandler), component_registration_callback (map component_id)
 MGWCPConnection::MGWCPConnection(uint32_t connection_id,
                                std::shared_ptr<gateway::TcpServerTransport> server_transport,
                                uint32_t transport_client_id,
@@ -27,12 +30,17 @@ MGWCPConnection::MGWCPConnection(uint32_t connection_id,
     logger.Info("MGWCPConnection.cpp: Created connection {} for client {}", connection_id_, client_ip_);
 }
 
+// Destructor - Cleanup connection and associated sessions
+// Calls stop() to gracefully shutdown threads and clean up resources
 MGWCPConnection::~MGWCPConnection() {
     CppLogging::Logger logger("bridge");
     logger.Info("MGWCPConnection.cpp: Destroying connection {}", connection_id_);
     stop();
 }
 
+// Start connection thread
+// Launches message receiver thread for this VHC/MEC gateway connection
+// Thread handles MGWCP protocol messages and ACK/retry logic
 void MGWCPConnection::start() {
     CppLogging::Logger logger("bridge");
     
@@ -52,6 +60,9 @@ void MGWCPConnection::start() {
     logger.Info("MGWCPConnection.cpp: Started connection thread for connection {}", connection_id_);
 }
 
+// Stop connection thread and cleanup sessions
+// Disconnects client from MGWCP server, waits for thread to join (5s timeout)
+// Cleans up all sessions associated with this gateway's component_id
 void MGWCPConnection::stop() {
     CppLogging::Logger logger("bridge");
     
@@ -111,6 +122,10 @@ void MGWCPConnection::stop() {
     logger.Info("MGWCPConnection.cpp: Stopped connection {}", connection_id_);
 }
 
+// Connection message receiver thread
+// Receives JSON messages from VHC/MEC gateway via MGWCP server
+// Handles protocol messages (DP_INFO, OFFLOAD_REQUEST, KEEPALIVE, TERMINATE, ACK)
+// Checks for ACK timeouts and retries messages every loop iteration
 void MGWCPConnection::connection_thread_func() {
     CppLogging::Logger logger("bridge");
     logger.Info("MGWCPConnection.cpp: Connection thread started for connection {}", connection_id_);
@@ -156,6 +171,10 @@ void MGWCPConnection::connection_thread_func() {
     logger.Info("MGWCPConnection.cpp: Connection thread finished for connection {}", connection_id_);
 }
 
+// Handle received MGWCP message
+// Validates structure, extracts component_id on first message, sends ACK for non-ACK messages
+// Routes to specific handlers: DP_INFO(103), OFFLOAD_REQUEST(100), SESSION_KEEPALIVE(101), SESSION_TERMINATE_REQUEST(102), ACK(900)
+// Invokes component_registration_callback on first message to map component_id→transport_id
 void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
@@ -228,6 +247,11 @@ void MGWCPConnection::handle_received_message(const nlohmann::json& message) {
     }
 }
 
+// Handle DP_INFO message (message code 103)
+// Receives gateway's data plane host and port, creates TransportHandler via dp_connect_callback
+// Auto-detects client IP if dp_host is 0.0.0.0 (same pattern as Discovery Service)
+// On success: CONNECTING→OPERATIONAL, sends DP_CONNECTION_CONFIRMED(202)
+// On failure: CONNECTING→WAITING_FOR_DP
 void MGWCPConnection::handle_dp_info(const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -267,6 +291,10 @@ void MGWCPConnection::handle_dp_info(const nlohmann::json& payload) {
     }
 }
 
+// Handle OFFLOAD_REQUEST message (message code 100)
+// Received from VHC requesting task offloading to MEC
+// Requires OPERATIONAL state (data plane must be connected first)
+// Forwards to OM via message_forwarder_ callback, preserving VHC's component_id
 void MGWCPConnection::handle_offload_request(const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -298,6 +326,9 @@ void MGWCPConnection::handle_offload_request(const nlohmann::json& payload) {
     message_forwarder_(component_id_, forward_message);
 }
 
+// Handle SESSION_KEEPALIVE message (message code 101)
+// Updates session's last_keepalive timestamp in SessionManager
+// Forwards keepalive to OM to prevent session timeout on OM side
 void MGWCPConnection::handle_session_keepalive(const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -326,6 +357,9 @@ void MGWCPConnection::handle_session_keepalive(const nlohmann::json& payload) {
     message_forwarder_(component_id_, forward_message);
 }
 
+// Handle SESSION_TERMINATE_REQUEST message (message code 102)
+// VHC/MEC requests session termination, forwarded to OM
+// OM will decide whether to approve termination and send response
 void MGWCPConnection::handle_session_terminate_request(const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -348,6 +382,9 @@ void MGWCPConnection::handle_session_terminate_request(const nlohmann::json& pay
     message_forwarder_(component_id_, forward_message);
 }
 
+// Handle ACK message (message code 900)
+// Removes acknowledged message from pending_acks_ map to stop retries
+// ACK confirms gateway received message successfully
 void MGWCPConnection::handle_ack(const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -366,6 +403,10 @@ void MGWCPConnection::handle_ack(const nlohmann::json& payload) {
     }
 }
 
+// Send SESSION_APPROVED to VHC/MEC (message code 200)
+// Called by BridgeControlPlane when OM approves offload request
+// Payload contains assigned_mec_id and task configuration
+// Uses reliable messaging (ACK/retry with 5s timeout, max 3 retries)
 bool MGWCPConnection::send_session_approved(const std::string& request_id, const nlohmann::json& payload) {
     CppLogging::Logger logger("bridge");
     
@@ -381,6 +422,10 @@ bool MGWCPConnection::send_session_approved(const std::string& request_id, const
     return true;
 }
 
+// Send SESSION_DENIED to VHC (message code 201)
+// Called by BridgeControlPlane when OM denies offload request
+// Includes reason_description explaining why request was denied
+// Uses reliable messaging (ACK/retry)
 bool MGWCPConnection::send_session_denied(const std::string& request_id, const std::string& reason) {
     CppLogging::Logger logger("bridge");
     
@@ -399,6 +444,10 @@ bool MGWCPConnection::send_session_denied(const std::string& request_id, const s
     return true;
 }
 
+// Send DP_CONNECTION_CONFIRMED to VHC/MEC (message code 202)
+// Sent after TransportHandler successfully connects to gateway's data plane
+// Signals gateway can now send/receive binary data plane messages
+// Uses reliable messaging (ACK/retry)
 bool MGWCPConnection::send_dp_connection_confirmed() {
     CppLogging::Logger logger("bridge");
     
@@ -414,6 +463,10 @@ bool MGWCPConnection::send_dp_connection_confirmed() {
     return true;
 }
 
+// Send message with ACK/retry reliability
+// Assigns sequence number, stores in pending_acks_ map for retry tracking
+// Timeout: 5 seconds, Max retries: 3
+// check_for_timeouts() handles retry logic in connection thread
 void MGWCPConnection::send_reliable_message(nlohmann::json& message) {
     CppLogging::Logger logger("bridge");
     
@@ -442,6 +495,10 @@ void MGWCPConnection::send_reliable_message(nlohmann::json& message) {
     }
 }
 
+// Send ACK for received message
+// ACK messages have code 900, use component_id of sender (not Bridge's 15:10)
+// ACKs themselves don't get sequence numbers (sequence_number=0)
+// Not stored in pending_acks_ - ACKs are fire-and-forget
 void MGWCPConnection::send_ack(uint64_t ack_sequence_number) {
     CppLogging::Logger logger("bridge");
     
@@ -470,6 +527,10 @@ void MGWCPConnection::send_ack(uint64_t ack_sequence_number) {
     }
 }
 
+// Check for ACK timeouts and retry messages
+// Called every loop iteration in connection_thread_func
+// Timeout: 5 seconds (ACK_TIMEOUT_), Max retries: 3 (MAX_RETRY_COUNT)
+// Messages exceeding max retries are removed and logged as failed
 void MGWCPConnection::check_for_timeouts() {
     std::lock_guard<std::mutex> lock(pending_acks_mutex_);
     auto now = std::chrono::steady_clock::now();
@@ -515,6 +576,9 @@ void MGWCPConnection::check_for_timeouts() {
     }
 }
 
+// Validate MGWCP message structure
+// Required fields: component_id, message_code, message_type, sequence_number, payload
+// Returns false if any required field is missing
 bool MGWCPConnection::validate_message_structure(const nlohmann::json& message) {
     return message.contains("component_id") && 
            message.contains("message_code") && 
@@ -523,6 +587,9 @@ bool MGWCPConnection::validate_message_structure(const nlohmann::json& message) 
            message.contains("payload");
 }
 
+// Validate component_id format
+// Must be "group_id:id_in_group" where both are 0-255
+// Example: "60:5" for VHC, "70:1" for MEC, "15:10" for Bridge
 bool MGWCPConnection::is_valid_component_id(const std::string& component_id) {
     // Component ID should be in format "group_id:id_in_group"
     size_t colon_pos = component_id.find(':');
@@ -543,6 +610,9 @@ bool MGWCPConnection::is_valid_component_id(const std::string& component_id) {
     }
 }
 
+// Update connection state
+// States: CONNECTING (awaiting DP_INFO) → WAITING_FOR_DP (DP connection failed) or OPERATIONAL (DP connected)
+// OPERATIONAL state required for OFFLOAD_REQUEST messages
 void MGWCPConnection::set_state(MGWCPConnectionState new_state) {
     CppLogging::Logger logger("bridge");
     MGWCPConnectionState old_state = state_.exchange(new_state);
