@@ -1,6 +1,10 @@
 #include "GlobalConfig.hpp"
 #include "logging/logger.h" // For CppLogging
 
+// Parse global configuration from Discovery Service JSON response
+// Extracts available_tasks array with task_id, task_name, input_message_types, output_message_types
+// Parses optional default_session_timeout and max_concurrent_sessions
+// Returns false on parse error, true on success
 bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
     CppLogging::Logger logger("bridge");
     
@@ -67,6 +71,9 @@ bool GlobalConfig::parse_from_json(const nlohmann::json& config_json) {
     }
 }
 
+// Get task configuration by task_id
+// Fast O(1) lookup using task_id_to_index_ map
+// Returns nullptr if task_id not found
 const TaskConfig* GlobalConfig::get_task_config(uint32_t task_id) const {
     auto it = task_id_to_index_.find(task_id);
     if (it != task_id_to_index_.end()) {

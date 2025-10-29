@@ -2,12 +2,17 @@
 #include "logging/logger.h" // For CppLogging
 #include <algorithm> // For std::remove
 
+// Constructor - Initialize routing table with capacity reservation
+// Pre-allocates map space for max_expected_routes (default 1000 in BridgeControlPlane)
 RoutingTable::RoutingTable(size_t max_expected_routes)
     : max_expected_routes_config_(max_expected_routes), logger_("bridge") {
     actual_map_.reserve(max_expected_routes_config_);
     logger_.Info("RoutingTable: Initialized and reserved space for {} potential key entries.", max_expected_routes_config_);
 }
 
+// Get destination queues for routing key
+// Thread-safe read with shared lock, returns vector of MPSC queues for (source_id, message_type)
+// Returns empty vector if no route found
 std::vector<std::shared_ptr<MPSCQueueType>> RoutingTable::get_destinations(const RoutingKey& key) const {
     std::shared_lock<std::shared_mutex> lock(map_mutex_); // Acquire shared lock for reading
     auto it = actual_map_.find(key);
@@ -17,6 +22,9 @@ std::vector<std::shared_ptr<MPSCQueueType>> RoutingTable::get_destinations(const
     return {}; // Return an empty vector if no route found
 }
 
+// Add route to routing table
+// Thread-safe write with exclusive lock, adds destination queue to (source_id, message_type) key
+// Multiple destinations can exist for same key (multicast)
 void RoutingTable::add_route(const RoutingKey& key, std::shared_ptr<MPSCQueueType> destination_queue) {
     if (!destination_queue) {
         logger_.Warn("RoutingTable: Attempted to add a null destination queue for SourceID: {}, MsgType: {}. Ignoring.",
@@ -29,6 +37,9 @@ void RoutingTable::add_route(const RoutingKey& key, std::shared_ptr<MPSCQueueTyp
              key.source_id, (key.source_id >> 8), (key.source_id & 0xFF), key.message_type);
 }
 
+// Remove all routes for routing key
+// Thread-safe write with exclusive lock, removes all destination queues for (source_id, message_type)
+// Called when session terminates to cleanup VHC↔MEC routes
 void RoutingTable::remove_routes_for_key(const RoutingKey& key) {
     std::unique_lock<std::shared_mutex> lock(map_mutex_); // Acquire exclusive lock for writing
     auto it = actual_map_.find(key);

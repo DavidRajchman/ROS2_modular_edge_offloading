@@ -4,12 +4,9 @@
 #include <vector> // For std::vector used in receive buffer operations
 #include "logging/logger.h" // For CppLogging
 
-// Define handshake constants if not already in header or a common place
-// For this example, assuming they are in the header as static constexpr char[]
-// const char* TransportHandler::HANDSHAKE_MSG_BRIDGE_HELLO = "BRIDGE_HELLO_V1";
-// const char* TransportHandler::HANDSHAKE_MSG_GW_ACK = "GW_ACK_V1";
-
-
+// Constructor - Initialize data plane connection handler
+// Creates TCP client, input queue for outgoing messages, routing table for incoming messages
+// Validates all parameters and pre-allocates receive buffer (default 8KB)
 TransportHandler::TransportHandler(
     std::string gateway_id,
     std::string target_ip,
@@ -62,6 +59,8 @@ TransportHandler::TransportHandler(
     logger_.Info("TransportHandler [{}]: Initialized for {}:{}.", gateway_id_, target_ip_, target_port_);
 }
 
+// Destructor - Cleanup and ensure graceful shutdown
+// Calls stop() to disconnect and join thread if not already done
 TransportHandler::~TransportHandler() {
     logger_.Info("TransportHandler [{}]: Destructor called. Ensuring shutdown.", gateway_id_);
     if (!shutdown_requested_.load()) {
@@ -70,6 +69,9 @@ TransportHandler::~TransportHandler() {
     // Thread should have been joined in stop()
 }
 
+// Start handler thread
+// Spawns run_internal() thread for connection management and message processing
+// Thread handles connection attempts, incoming/outgoing messages, and reconnection logic
 void TransportHandler::start() {
     if (handler_thread_.joinable()) {
         logger_.Warn("TransportHandler [{}]: Start called but thread is already running.", gateway_id_);
@@ -81,21 +83,17 @@ void TransportHandler::start() {
     logger_.Info("TransportHandler [{}]: Started and spawned processing thread.", gateway_id_);
 }
 
+// Stop handler thread and disconnect
+// Sets shutdown flag, disconnects TCP to unblock socket operations, waits for thread to join
 void TransportHandler::stop() {
     logger_.Info("TransportHandler [{}]: Stop requested.", gateway_id_);
     shutdown_requested_.store(true);
 
-    // Optional: If there's a blocking call in run_internal (like a blocking receive or queue read),
-    // you might need to interrupt it. For TCP, closing the socket from this thread
-    // will typically cause blocking socket calls in the handler_thread_ to return with an error.
+    // Disconnect TCP to unblock any blocking socket calls in handler thread
     if (tcp_client_ && tcp_client_->is_connected()) {
         logger_.Info("TransportHandler [{}]: Disconnecting client to unblock thread.", gateway_id_);
-        tcp_client_->disconnect(); // This can help unblock socket operations in run_internal
+        tcp_client_->disconnect();
     }
-    
-    // Optional: If input_queue_ supports a way to signal consumers (e.g. special shutdown message), use it.
-    // For moodycamel::ConcurrentQueue, it doesn't have a built-in blocking dequeue with timeout that
-    // can be easily interrupted other than by the shutdown_requested_ flag check.
 
     if (handler_thread_.joinable()) {
         logger_.Info("TransportHandler [{}]: Waiting for processing thread to join.", gateway_id_);
@@ -108,7 +106,7 @@ void TransportHandler::stop() {
     } else {
         logger_.Info("TransportHandler [{}]: Processing thread was not joinable (already joined or not started).", gateway_id_);
     }
-    connected_status_.store(false); // Ensure status is updated
+    connected_status_.store(false);
 }
 
 std::string TransportHandler::get_gateway_id() const {
@@ -123,8 +121,11 @@ std::shared_ptr<MPSCQueueType> TransportHandler::get_input_queue() const {
     return input_queue_;
 }
 
-// --- Private Methods ---
-
+// Main handler thread loop
+// Connection management: Attempts connection with retry logic, gives up after max_connect_cycles failures
+// Message processing: Receives binary messages from gateway, routes via (source_id, msg_type) lookup
+// Outgoing: Dequeues messages from input_queue_, sends to gateway via TCP
+// Sleeps minimum_sleep_time_us (default 200us) when no work done
 void TransportHandler::run_internal() {
     logger_.Info("TransportHandler [{}]: Thread started execution.", gateway_id_);
     receive_buffer_watermark_ = 0; // Reset watermark
@@ -194,6 +195,10 @@ void TransportHandler::run_internal() {
     logger_.Info("TransportHandler [{}]: Thread finished execution.", gateway_id_);
 }
 
+// Attempt TCP connection to gateway data plane
+// Retries connect_max_retries_ times with connect_retry_delay_ms_ between attempts
+// Calls perform_handshake() after TCP connection (currently no-op)
+// Returns false after max retries, triggers permanent failure tracking in run_internal
 bool TransportHandler::attempt_connection() {
     if (!tcp_client_) {
         logger_.Error("TransportHandler [{}]: TCP client is null, cannot attempt connection.", gateway_id_);
@@ -228,6 +233,9 @@ bool TransportHandler::attempt_connection() {
     return false;
 }
 
+// Perform handshake after TCP connection
+// Currently no application-level handshake implemented, always succeeds
+// Placeholder for future BRIDGE_HELLO/GW_ACK protocol
 bool TransportHandler::perform_handshake() {
     // No explicit application-level handshake for now.
     // This function is called after TCP connection is established.
@@ -236,6 +244,10 @@ bool TransportHandler::perform_handshake() {
     return true; // Always succeed as there's no handshake to fail
 }
 
+// Handle incoming binary messages from gateway
+// Reads TCP data into receive_buffer_, parses binary frames: [Magic|Flags|Type|GroupID|IdInGroup|Size|TopicLen|Topic|Payload]
+// Routes complete messages via routing_table_ lookup by (source_id, message_type)
+// Handles partial frames (buffering), buffer overflow, connection errors, and graceful disconnection
 void TransportHandler::handle_incoming_data() {
     if (!tcp_client_ || !tcp_client_->is_connected()) {
         logger_.Warn("TransportHandler [{}]: Attempted to handle incoming data but not connected.", gateway_id_);
@@ -343,6 +355,10 @@ void TransportHandler::handle_incoming_data() {
     }
 }
 
+// Handle outgoing messages from input_queue_
+// Non-blocking dequeue from MPSC queue, sends binary message via TCP to gateway
+// Returns true if message was processed (even if send failed), false if queue empty
+// Disconnects on send error
 bool TransportHandler::handle_outgoing_messages() {
     if (!tcp_client_ || !tcp_client_->is_connected()) {
         // Don't attempt to send if not connected
@@ -374,8 +390,8 @@ bool TransportHandler::handle_outgoing_messages() {
     return work_has_been_done;
 }
 
-
-// --- Placeholder Notification Methods ---
+// Notify observer of successful connection (placeholder)
+// Observer callback for control plane notification, currently not implemented
 void TransportHandler::notify_observer_connected() {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerConnected(gateway_id_); // Uncomment when ready
@@ -383,6 +399,8 @@ void TransportHandler::notify_observer_connected() {
     }
 }
 
+// Notify observer of disconnection (placeholder)
+// Observer callback for control plane notification, currently not implemented
 void TransportHandler::notify_observer_disconnected(const std::string& reason) {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerDisconnected(gateway_id_, reason); // Uncomment when ready
@@ -390,6 +408,8 @@ void TransportHandler::notify_observer_disconnected(const std::string& reason) {
     }
 }
 
+// Notify observer of critical error (placeholder)
+// Observer callback for control plane notification, currently not implemented
 void TransportHandler::notify_observer_critical_error(const std::string& error_message) {
     if (auto observer = cp_observer_weak_.lock()) {
         // observer->onHandlerCriticalError(gateway_id_, error_message); // Uncomment when ready

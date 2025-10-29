@@ -2,8 +2,11 @@
 #include "logging/logger.h"
 #include <algorithm>
 
-//SESSION MANAGER CURRENTLY DISABLED
+//SESSION MANAGER CURRENTLY DISABLED (timeout deletion not active)
 
+// Create new offloading session
+// Looks up task config from global_config to get input/output message types
+// Initializes keepalive timestamp, returns false if session already exists or task not found
 bool SessionManager::create_session(const std::string& request_id,
                                    const std::string& mgwcp_component_id,
                                    uint32_t task_id,
@@ -46,6 +49,8 @@ bool SessionManager::create_session(const std::string& request_id,
     return true;
 }
 
+// Remove session from active sessions map
+// Called on SESSION_DENIED or explicit termination, returns false if session not found
 bool SessionManager::remove_session(const std::string& request_id) {
     CppLogging::Logger logger("bridge");
     
@@ -62,16 +67,20 @@ bool SessionManager::remove_session(const std::string& request_id) {
     return true;
 }
 
+// Get mutable session by request_id, returns nullptr if not found
 ActiveSession* SessionManager::get_session(const std::string& request_id) {
     auto it = sessions_.find(request_id);
     return (it != sessions_.end()) ? &it->second : nullptr;
 }
 
+// Get const session by request_id, returns nullptr if not found
 const ActiveSession* SessionManager::get_session(const std::string& request_id) const {
     auto it = sessions_.find(request_id);
     return (it != sessions_.end()) ? &it->second : nullptr;
 }
 
+// Get all sessions for specific VHC/MEC component_id
+// Returns vector of pointers to sessions matching mgwcp_component_id
 std::vector<ActiveSession*> SessionManager::get_sessions_for_mgwcp(const std::string& mgwcp_component_id) {
     std::vector<ActiveSession*> result;
     
@@ -84,6 +93,8 @@ std::vector<ActiveSession*> SessionManager::get_sessions_for_mgwcp(const std::st
     return result;
 }
 
+// Update session keepalive timestamp
+// Called when SESSION_KEEPALIVE received from VHC, returns false if session not found
 bool SessionManager::update_keepalive(const std::string& request_id) {
     CppLogging::Logger logger("bridge");
     
@@ -98,6 +109,9 @@ bool SessionManager::update_keepalive(const std::string& request_id) {
     return true;
 }
 
+// Find sessions with expired keepalive
+// Checks last_keepalive against timeout_duration (default 20 seconds)
+// NOTE: Currently disabled - expired sessions NOT added to return vector (commented out)
 std::vector<std::string> SessionManager::find_expired_sessions(std::chrono::seconds timeout_duration) const {
     CppLogging::Logger logger("bridge");
     std::vector<std::string> expired_sessions;
@@ -108,7 +122,7 @@ std::vector<std::string> SessionManager::find_expired_sessions(std::chrono::seco
         auto time_since_keepalive = now - session.last_keepalive;
         
         if (time_since_keepalive > timeout_duration) {
-            //expired_sessions.push_back(session.request_id);
+            //expired_sessions.push_back(session.request_id);  // DISABLED: Sessions not deleted on timeout
             logger.Debug("SessionManager.cpp: Found expired session '{}' (last keepalive {} seconds ago)",
                 session.request_id, 
                 std::chrono::duration_cast<std::chrono::seconds>(time_since_keepalive).count());
@@ -118,6 +132,8 @@ std::vector<std::string> SessionManager::find_expired_sessions(std::chrono::seco
     return expired_sessions;
 }
 
+// Set assigned MEC component_id for session
+// Called when SESSION_APPROVED received from OM with assigned_mec_id
 bool SessionManager::set_assigned_mec(const std::string& request_id, const std::string& mec_id) {
     CppLogging::Logger logger("bridge");
     
@@ -132,6 +148,8 @@ bool SessionManager::set_assigned_mec(const std::string& request_id, const std::
     return true;
 }
 
+// Set VHC data plane connection status
+// Tracks whether TransportHandler connected to VHC's data plane
 bool SessionManager::set_vhc_dp_connected(const std::string& request_id, bool connected) {
     CppLogging::Logger logger("bridge");
     
@@ -147,6 +165,8 @@ bool SessionManager::set_vhc_dp_connected(const std::string& request_id, bool co
     return true;
 }
 
+// Set MEC data plane connection status
+// Tracks whether TransportHandler connected to MEC's data plane
 bool SessionManager::set_mec_dp_connected(const std::string& request_id, bool connected) {
     CppLogging::Logger logger("bridge");
     
@@ -162,6 +182,8 @@ bool SessionManager::set_mec_dp_connected(const std::string& request_id, bool co
     return true;
 }
 
+// Set routing rules created status
+// Tracks whether VHC↔MEC bidirectional routes added to RoutingTable
 bool SessionManager::set_routing_rules_created(const std::string& request_id, bool created) {
     CppLogging::Logger logger("bridge");
     
@@ -177,6 +199,8 @@ bool SessionManager::set_routing_rules_created(const std::string& request_id, bo
     return true;
 }
 
+// Get all active session request_ids
+// Returns vector of all request_ids currently in sessions map
 std::vector<std::string> SessionManager::get_all_request_ids() const {
     std::vector<std::string> request_ids;
     request_ids.reserve(sessions_.size());
@@ -188,6 +212,9 @@ std::vector<std::string> SessionManager::get_all_request_ids() const {
     return request_ids;
 }
 
+// Cleanup all sessions for disconnected VHC/MEC
+// Called by MGWCPConnection::stop() to remove sessions when gateway disconnects
+// Returns count of sessions removed
 size_t SessionManager::cleanup_sessions_for_mgwcp(const std::string& mgwcp_component_id) {
     CppLogging::Logger logger("bridge");
     size_t removed_count = 0;
