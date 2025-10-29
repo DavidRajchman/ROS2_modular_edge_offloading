@@ -11,29 +11,19 @@
 
 class RoutingTable {
 public:
-    // Constructor, takes the maximum expected routes to pre-reserve capacity.
     explicit RoutingTable(size_t max_expected_routes);
-
-    // Method for Data Plane to get destination queues for a given key.
-    // Returns a vector of shared_ptrs to MPSC queues.
-    // The vector might be empty if no route is found.
-    // This method is const and thread-safe for concurrent reads.
     std::vector<std::shared_ptr<MPSCQueueType>> get_destinations(const RoutingKey& key) const;
-
-    // --- Methods for Control Plane ---
-
-    // Adds a route from the given key to the specified destination queue.
-    // If the key already exists, the queue is added to the list of destinations.
     void add_route(const RoutingKey& key, std::shared_ptr<MPSCQueueType> destination_queue);
-
-    // Removes all routes associated with the given key.
     void remove_routes_for_key(const RoutingKey& key);
 
-    
 private:
+    // Map: (source_id, message_type) → list of destination queues
     std::unordered_map<RoutingKey, std::vector<std::shared_ptr<MPSCQueueType>>> actual_map_;
-    mutable std::shared_mutex map_mutex_; 
+    // Read-write lock for thread-safe concurrent access
+    mutable std::shared_mutex map_mutex_;
+    // Capacity reservation hint (default 1000 in BridgeControlPlane)
     size_t max_expected_routes_config_;
+    // Logger instance
     CppLogging::Logger logger_;
 };
 

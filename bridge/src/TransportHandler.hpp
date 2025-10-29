@@ -53,54 +53,60 @@ public:
     std::shared_ptr<MPSCQueueType> get_input_queue() const;
 
 private:
-    // Core logic executed in the dedicated thread
     void run_internal();
-
-    // Connection attempt logic, including handshake
     bool attempt_connection();
-    bool perform_handshake(); // Placeholder for handshake logic
-
-    // Message handling logic
-    void handle_incoming_data(); // Reads from socket, parses, routes
-    bool handle_outgoing_messages(); // Reads from input_queue_, sends to socket
-
-    // Helper to safely notify observer (will be used more when observer logic is added)
+    bool perform_handshake();
+    void handle_incoming_data();
+    bool handle_outgoing_messages();
     void notify_observer_connected();
     void notify_observer_disconnected(const std::string& reason);
     void notify_observer_critical_error(const std::string& error_message);
 
-
-    // --- Member Variables ---
+    // Gateway component_id this handler connects to (e.g., "60:5" or "70:1")
     std::string gateway_id_;
+    // Target gateway IP address
     std::string target_ip_;
+    // Target gateway data plane port
     int target_port_;
 
-    std::shared_ptr<MPSCQueueType> input_queue_; // Consume from this queue to send to GW
-    std::shared_ptr<RoutingTable> routing_table_; // Use this to route messages received from GW
-    std::weak_ptr<ITransportHandlerObserver> cp_observer_weak_; // Stored for future use
+    // MPSC queue: Bridge→Gateway (outgoing binary messages)
+    std::shared_ptr<MPSCQueueType> input_queue_;
+    // Routing table for incoming messages: routes (source_id, msg_type) to destination queues
+    std::shared_ptr<RoutingTable> routing_table_;
+    // Observer for connection events (future use)
+    std::weak_ptr<ITransportHandlerObserver> cp_observer_weak_;
 
-    // Transport layer
+    // TCP client for data plane connection
     std::unique_ptr<gateway::TcpClientTransport> tcp_client_;
-    std::vector<unsigned char> receive_buffer_; // Buffer for accumulating data from socket
-    size_t receive_buffer_watermark_; // How much valid data is in receive_buffer_
+    // Accumulator for partial binary frames from socket
+    std::vector<unsigned char> receive_buffer_;
+    // Number of valid bytes in receive_buffer_
+    size_t receive_buffer_watermark_;
 
-    // Threading and state
+    // Handler thread for send/receive loop
     std::thread handler_thread_;
+    // Shutdown signal flag
     std::atomic<bool> shutdown_requested_;
-    std::atomic<bool> connected_status_; // Reflects TCP + handshake status
+    // Connected status (TCP + handshake complete)
+    std::atomic<bool> connected_status_;
 
-    // Configuration
+    // Max retries per connection attempt
     int connect_max_retries_;
+    // Delay between connection retries (milliseconds)
     int connect_retry_delay_ms_;
-    const size_t MAX_RECEIVE_BUFFER_SIZE; // Max size for receive_buffer_
+    // Maximum receive buffer size (default 8KB)
+    const size_t MAX_RECEIVE_BUFFER_SIZE;
+    // Sleep time when no messages (microseconds, default 200us)
     const int minimum_sleep_time_us_;
-    int max_connect_cycles_;              // New: maximum number of connection cycles allowed
-    int failed_connect_cycles_;           // New: number of failed cycles so far
+    // Maximum full connection cycles before permanent failure
+    int max_connect_cycles_;
+    // Number of failed connection cycles so far
+    int failed_connect_cycles_;
 
-    // Logging
+    // Logger instance
     CppLogging::Logger logger_;
 
-    // Constants for handshake (example, to be defined)
+    // Handshake protocol messages
     static constexpr char HANDSHAKE_MSG_BRIDGE_HELLO[] = "BRIDGE_HELLO_V1";
     static constexpr char HANDSHAKE_MSG_GW_ACK[] = "GW_ACK_V1";
 };
