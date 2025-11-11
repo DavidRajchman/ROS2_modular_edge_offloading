@@ -41,11 +41,14 @@ Python based components utilize the built-in logging library for logging. The lo
 ## More detailed documentation for all components *WIP*. 
 There are many .md files curently present in all components folders. THESE SHOULD NOT BE CONSIDERED DOCUMENTATION. Only files listed bellow can be used for reference. The other files were mainly used to guide asisted coding tools like github copilot and are not meant for human reading.
 ### list of reference documentation and user guides
-- VHC and MEC - [ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide.md)
-- Bridge - [bridge/docs/user_guide.md](./bridge/docs/user_guide.md)
-- Offloading Manager - [OffloadingManager/docs/user_guide.md](./OffloadingManager/docs/user_guide.md)
+- VHC and MEC - [ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide_MGW.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/user_guide_MGW.md)
+- Bridge - [bridge/docs/user_guide_BRIDGE.md](./bridge/docs/user_guide_BRIDGE.md)
+- Offloading Manager - [OffloadingManager/docs/user_guide_OM.md](./OffloadingManager/docs/user_guide_OM.md)
+- Discovery Service - [DiscoveryService/docs/user_guide_DISC.md](./DiscoveryService/docs/user_guide_DISC.md)
+- Testing Component - [ros/src/ros_ws/src/offloading_latency_test_loopback/docs/user_guide_TEST.md](./ros/src/ros_ws/src/offloading_latency_test_loopback/docs/user_guide_TEST.md)
 - **protocol details** - [ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md)
 - **process flow diagrams** [ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md)
+- **network topology pictures** [docs/network_topology.pdf](./docs/network_topology.pdf).
 - **NO OTHER GUIDES AND REFERENCES ARE CURRENTLY AVAILABLE.** 
 
 ## Requirements

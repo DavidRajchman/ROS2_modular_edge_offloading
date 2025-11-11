@@ -1,5 +1,5 @@
 ## 0. NAMING CONVENTION
-See [Appendix B in README.md](../../../../../../README.md#appendix-b---naming-convention-wip).
+See [README.md](./README.md#appendix-b---naming-convention-wip).
 ---
 
 ## 1. INTRODUCTION & SCOPE
