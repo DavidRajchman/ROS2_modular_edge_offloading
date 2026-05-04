@@ -1,3 +1,0 @@
-float64 center_gravity_x
-float64 center_gravity_y
-float64 radius
