@@ -116,7 +116,11 @@ private:
 
   // Parse and load global config JSON received from DiscoveryService
   bool load_global_config_from_json(const std::string& config_json);
+  bool load_local_config(const std::string& path);
   static bool message_type_from_id(uint32_t id, MessageType& out);
+
+  // P2P/P2P_DS auto-activation
+  void activate_all_p2p_sessions();
 
   // Core Components
   std::unique_ptr<RosGateway> gateway_;
@@ -142,9 +146,13 @@ private:
   std::string component_id_;
   std::string component_type_;
   std::string component_name_;
+  std::string operation_mode_;
   int id_group_;
   int identifier_in_group_;
   int data_plane_listen_port_;
+  std::string p2p_peer_host_;
+  int p2p_peer_port_;
+  std::string local_config_path_;
   std::string discovery_host_;
   int discovery_port_;
 

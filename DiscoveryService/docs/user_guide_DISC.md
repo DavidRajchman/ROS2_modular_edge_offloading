@@ -173,6 +173,9 @@ The Discovery Service uses compile-time constants for core configuration (define
 * Global configuration JSON (stored in `global_configuration_` member)
 * Available tasks, session limits, message type definitions
 
+**Command-Line Flags:**
+* `--p2p`: Runs the Discovery Service in P2P_DS mode. In this mode, the service bypasses all OM/Bridge requirements and solely performs matchmaking between VHCs and MECs based on matching `group_id` and `id_in_group`.
+
 To modify configuration: Edit constants in [DiscoveryService/CMakeLists.txt](../CMakeLists.txt) or [DiscoveryService/src/discovery_service.hpp](../src/discovery_service.hpp) and rebuild.
 
 ---
@@ -206,6 +209,9 @@ The Discovery Service enforces strict ordering to ensure system integrity:
 3. Bridge
 4. VHC and MEC components (any order)
 ```
+
+**P2P_DS Mode Exception:**
+When the Discovery Service is launched with the `--p2p` flag, all ordering restrictions are lifted. OM and Bridge dependencies are bypassed, and VHC/MEC can register immediately to match with each other.
 
 ### 6.2 Critical Failure Handling
 **OM Disconnection:**

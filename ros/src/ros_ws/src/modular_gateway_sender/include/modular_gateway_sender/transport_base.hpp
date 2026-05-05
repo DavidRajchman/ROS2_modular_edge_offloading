@@ -82,6 +82,7 @@ public:
 
   bool connect() override;
   void disconnect() override;
+  void set_target(const std::string& host, int port);
   bool is_connected() const override;
   TransportAsyncSendResult async_send_data(std::vector<uint8_t>&& data) override;
   bool data_available(int timeout_ms = 0) override;

@@ -4,6 +4,8 @@
 #include "modular_gateway_sender/handler_factory.hpp"
 #include "modular_gateway_sender/transport_base.hpp"
 #include <nlohmann/json.hpp>
+#include <fstream>
+#include <sstream>
 
 namespace gateway {
 
@@ -90,6 +92,44 @@ bool GatewayController::load_global_config_from_json(const std::string& config_j
     return loaded > 0;
 }
 
+bool GatewayController::load_local_config(const std::string& path) {
+    logger_.Info("gateway_controller.cpp: Loading local P2P config from '{}'", path);
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        logger_.Error("gateway_controller.cpp: Failed to open local config file '{}'", path);
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string config_json = buffer.str();
+    
+    if (!load_global_config_from_json(config_json)) {
+        logger_.Error("gateway_controller.cpp: Failed to parse local config JSON from '{}'", path);
+        return false;
+    }
+    return true;
+}
+
+void GatewayController::activate_all_p2p_sessions() {
+    logger_.Info("gateway_controller.cpp: Auto-activating all tasks from local config for P2P mode.");
+    for (const auto& [task_id, details] : task_database_) {
+        std::string request_id = "p2p_session_" + task_id;
+        
+        {
+            std::lock_guard<std::mutex> session_lock(session_mutex_);
+            active_sessions_[request_id] = {request_id, task_id, std::chrono::steady_clock::now()};
+        }
+        
+        nlohmann::json mock_payload = {
+            {"request_id", request_id},
+            {"task_id", task_id}
+        };
+        logger_.Info("gateway_controller.cpp: [P2P] Manually approving auto-session '{}' for task '{}'", request_id, task_id);
+        on_session_approved(mock_payload);
+    }
+}
+
 // Constructor: Set up ROS2 node with parameters and services
 // Note: Cannot use shared_from_this() here - call initialize() after construction
 GatewayController::GatewayController(const rclcpp::NodeOptions& options)
@@ -106,6 +146,10 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   this->declare_parameter<int>("identity.group_id", 60);
   this->declare_parameter<int>("identity.id_in_group", 5);
   this->declare_parameter<int>("data_plane.listen_port", 7401);
+  this->declare_parameter<std::string>("operation_mode", "networked");
+  this->declare_parameter<std::string>("p2p.peer_host", "127.0.0.1");
+  this->declare_parameter<int>("p2p.peer_port", 7401);
+  this->declare_parameter<std::string>("p2p.local_config_path", "");
 
   discovery_host_ = this->get_parameter("discovery_service.host").as_string();
   discovery_port_ = this->get_parameter("discovery_service.port").as_int();
@@ -114,6 +158,10 @@ GatewayController::GatewayController(const rclcpp::NodeOptions& options)
   id_group_ = this->get_parameter("identity.group_id").as_int();
   identifier_in_group_ = this->get_parameter("identity.id_in_group").as_int();
   data_plane_listen_port_ = this->get_parameter("data_plane.listen_port").as_int();
+  operation_mode_ = this->get_parameter("operation_mode").as_string();
+  p2p_peer_host_ = this->get_parameter("p2p.peer_host").as_string();
+  p2p_peer_port_ = this->get_parameter("p2p.peer_port").as_int();
+  local_config_path_ = this->get_parameter("p2p.local_config_path").as_string();
   component_id_ = std::to_string(id_group_) + ":" + std::to_string(identifier_in_group_);
 
   // Task database will be populated from DiscoveryService global config after registration
@@ -145,8 +193,31 @@ void GatewayController::initialize()
 {
   logger_.Info("gateway_controller.cpp: Initializing GatewayController components that require shared_from_this()...");
 
-  // Create TCP server transport for binary data plane on configured port
-  auto data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
+  // Create Data Plane Transport based on operation mode
+  std::unique_ptr<TransportBase> data_plane_transport;
+
+  if (operation_mode_ == "networked") {
+      // Traditional networked mode: Always a TCP server (Bridge connects to us)
+      logger_.Info("gateway_controller.cpp: mode=networked. Creating TcpServerTransport on port {}", data_plane_listen_port_);
+      data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
+  } else {
+      // P2P or P2P_DS mode: MEC is Server, VHC is Client
+      if (component_type_ == "M") {
+          logger_.Info("gateway_controller.cpp: mode={}. MEC role: Creating TcpServerTransport on port {}", 
+                       operation_mode_, data_plane_listen_port_);
+          data_plane_transport = std::make_unique<TcpServerTransport>(data_plane_listen_port_, 1);
+      } else {
+          // VHC or other: TCP Client
+          // In 'p2p' mode, host/port are static. In 'p2p_ds', they will be updated after discovery.
+          std::string target_host = (operation_mode_ == "p2p") ? p2p_peer_host_ : "0.0.0.0";
+          int target_port = (operation_mode_ == "p2p") ? p2p_peer_port_ : 0;
+          
+          logger_.Info("gateway_controller.cpp: mode={}. VHC role: Creating TcpClientTransport (target {}:{})", 
+                       operation_mode_, target_host, target_port);
+          data_plane_transport = std::make_unique<TcpClientTransport>(target_host, target_port);
+      }
+  }
+
   gateway_ = std::make_unique<RosGateway>(this->shared_from_this(), std::move(data_plane_transport));
   gateway_->set_identity(static_cast<uint8_t>(id_group_), static_cast<uint8_t>(identifier_in_group_));
 
@@ -267,39 +338,64 @@ void GatewayController::control_thread_func() {
         switch(current_state) {
             case State::INITIALIZING:
             {
-                // Start listening for Bridge DP connections on configured port
-                auto transport = dynamic_cast<TcpServerTransport*>(gateway_->get_transport());
-                if (transport && transport->connect()) {
-                    logger_.Info("gateway_controller.cpp: Data plane transport started listening on port {}", data_plane_listen_port_);
-                    
-                    // Launch thread to accept incoming Bridge DP connections
-                    data_plane_connection_thread_ = std::thread(&GatewayController::data_plane_connection_thread_func, this);
-                    
-                    state_ = State::DISCOVERING;  // Move to discovery phase
+                // Load local configuration for P2P modes
+                if (operation_mode_ != "networked") {
+                    if (!local_config_path_.empty()) {
+                        if (!load_local_config(local_config_path_)) {
+                            RCLCPP_FATAL(this->get_logger(), "Failed to load required P2P configuration. Exiting.");
+                            state_ = State::FAILED;
+                            break;
+                        }
+                    } else {
+                        RCLCPP_FATAL(this->get_logger(), "No local_config_path provided for P2P mode. Exiting.");
+                        state_ = State::FAILED;
+                        break;
+                    }
+                }
+
+                // Setup transport connection/listening
+                if (operation_mode_ == "networked" || component_type_ == "M") {
+                    // TCP Server path (Networked Bridge connection or MEC P2P listener)
+                    auto transport = dynamic_cast<TcpServerTransport*>(gateway_->get_transport());
+                    if (transport && transport->connect()) {
+                        logger_.Info("gateway_controller.cpp: Server transport started on port {}", data_plane_listen_port_);
+                        data_plane_connection_thread_ = std::thread(&GatewayController::data_plane_connection_thread_func, this);
+                        
+                        if (operation_mode_ == "networked") {
+                            state_ = State::DISCOVERING;
+                        } else {
+                            // MEC P2P: No discovery needed, skip to waiting for peer connection
+                            state_ = State::WAITING_FOR_DP_CONNECTION;
+                        }
+                    } else {
+                        logger_.Error("gateway_controller.cpp: Failed to start server transport. Retrying in 5s.");
+                        std::this_thread::sleep_for(std::chrono::seconds(5));
+                    }
                 } else {
-                    logger_.Error("gateway_controller.cpp: Failed to start data plane transport. Retrying in 5s.");
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                    // VHC P2P path (TCP Client)
+                    if (operation_mode_ == "p2p_ds") {
+                        state_ = State::DISCOVERING; // Resolve MEC IP first
+                    } else {
+                        // Static P2P: Go straight to connection attempts
+                        state_ = State::WAITING_FOR_DP_CONNECTION;
+                    }
                 }
                 break;
             }
             case State::DISCOVERING:
             {
-                // Register with DiscoveryService to get Bridge address and global config
+                // Only Networked or P2P_DS modes reach here
                 logger_.Info("gateway_controller.cpp: Starting discovery client for component type: {}", component_type_);
                 
-                // Convert string component type ("V" or "M") to protocol enum
                 discovery_protocol::ComponentType comp_type;
                 try {
-                    logger_.Info("gateway_controller.cpp: Converting component_type '{}' to enum", component_type_);
                     comp_type = discovery_protocol::string_to_component_type(component_type_);
-                    logger_.Info("gateway_controller.cpp: Converted to enum value: {}", static_cast<int>(comp_type));
                 } catch (const std::exception& e) {
                     logger_.Error("gateway_controller.cpp: Invalid component type '{}': {}", component_type_, e.what());
                     state_ = State::FAILED;
                     break;
                 }
                 
-                // Clean up previous discovery client if it exists
                 if (discovery_client_) {
                     discovery_client_->stop();
                     discovery_client_.reset();
@@ -314,17 +410,13 @@ void GatewayController::control_thread_func() {
                     
                     logger_.Info("gateway_controller.cpp: Discovery client started. Waiting for response...");
                     
-                    // Wait for discovery result or timeout
                     std::unique_lock<std::mutex> lock(state_mutex_);
                     if (state_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return state_ != State::DISCOVERING || !running_; })) {
-                        // State changed (success or failure handled by callbacks)
                         if (state_ == State::DISCOVERING && running_) {
-                            // Still in DISCOVERING state after callback - this means failure occurred
                             logger_.Info("gateway_controller.cpp: Discovery attempt failed. Retrying in {}s...", discovery_retry_delay.count());
                             std::this_thread::sleep_for(discovery_retry_delay);
                         }
                     } else {
-                        // Timeout occurred
                         logger_.Warn("gateway_controller.cpp: Discovery attempt timed out. Retrying in {}s...", discovery_retry_delay.count());
                         std::this_thread::sleep_for(discovery_retry_delay);
                     }
@@ -336,6 +428,7 @@ void GatewayController::control_thread_func() {
             }
             case State::CONNECTING_TO_BRIDGE:
             {
+                // Networked mode only
                 logger_.Info("gateway_controller.cpp: State transition: Connecting to Bridge Control Plane at {}:{}", bridge_cp_host_, bridge_cp_port_);
                 
                 bridge_cp_client_ = std::make_unique<BridgeCpClient>();
@@ -345,10 +438,8 @@ void GatewayController::control_thread_func() {
                     std::bind(&GatewayController::on_session_approved, this, std::placeholders::_1),
                     std::bind(&GatewayController::on_session_denied, this, std::placeholders::_1, std::placeholders::_2))) {
                     
-                    // Send the DP_INFO message immediately
                     logger_.Info("gateway_controller.cpp: Bridge CP client connected successfully. Sending DP_INFO message...");
                     bridge_cp_client_->send_dp_info(component_id_, "0.0.0.0", data_plane_listen_port_);
-                    logger_.Info("gateway_controller.cpp: DP_INFO sent. State transition: CONNECTING_TO_BRIDGE -> WAITING_FOR_DP_CONNECTION");
                     state_ = State::WAITING_FOR_DP_CONNECTION;
                 } else {
                     logger_.Error("gateway_controller.cpp: Failed to start Bridge CP client. Retrying in 10s.");
@@ -358,23 +449,27 @@ void GatewayController::control_thread_func() {
             }
             case State::WAITING_FOR_DP_CONNECTION:
             {
-                logger_.Info("gateway_controller.cpp: Waiting for DP_CONNECTION_CONFIRMED message from Bridge CP...");
-                std::unique_lock<std::mutex> lock(state_mutex_);
-                
-                // Wait with a timeout so we can periodically log our status
-                if (state_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; })) {
-                    if (state_ == State::OPERATIONAL) {
-                        logger_.Info("gateway_controller.cpp: Successfully received DP_CONNECTION_CONFIRMED and transitioned to OPERATIONAL");
+                // For VHC P2P/P2P_DS: Perform proactive connection
+                if (operation_mode_ != "networked" && component_type_ == "V") {
+                    auto transport = dynamic_cast<TcpClientTransport*>(gateway_->get_transport());
+                    if (transport) {
+                        if (transport->connect()) {
+                            logger_.Info("gateway_controller.cpp: [P2P] Successfully connected to peer MEC.");
+                            on_dp_confirmed(); // Manually trigger OPERATIONAL transition
+                        } else {
+                            logger_.Warn("gateway_controller.cpp: [P2P] Peer MEC not reached, retrying in 5s...");
+                            std::this_thread::sleep_for(std::chrono::seconds(5));
+                        }
                     }
-                } else {
-                    logger_.Warn("gateway_controller.cpp: Still waiting for DP_CONNECTION_CONFIRMED from Bridge CP (30s timeout reached)");
                 }
+
+                logger_.Info("gateway_controller.cpp: Waiting for data plane connection...");
+                std::unique_lock<std::mutex> lock(state_mutex_);
+                state_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return state_ != State::WAITING_FOR_DP_CONNECTION || !running_; });
                 break;
             }
             case State::OPERATIONAL:
             {
-                logger_.Debug("gateway_controller.cpp: In OPERATIONAL state, checking for work...");
-                
                 // Process any queued offloading or termination requests
                 std::unique_lock<std::mutex> lock(queue_mutex_);
                 if (queue_cv_.wait_for(lock, keepalive_interval, [this] { 
@@ -396,13 +491,16 @@ void GatewayController::control_thread_func() {
                             {
                                 std::lock_guard<std::mutex> session_lock(session_mutex_);
                                 active_sessions_[request_id] = {request_id, req.task_id, std::chrono::steady_clock::now()};
-                                logger_.Info("gateway_controller.cpp: Created new active session '{}' for task '{}'", request_id, req.task_id);
                             }
                             
-                            auto task_it = task_database_.find(req.task_id);
-                            if (task_it != task_database_.end()) {
-                                bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name, req.vhc_data);
-                                logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}', vhc_data: '{}'", req.task_id, request_id, req.vhc_data);
+                            if (operation_mode_ == "networked" && bridge_cp_client_) {
+                                auto task_it = task_database_.find(req.task_id);
+                                if (task_it != task_database_.end()) {
+                                    bridge_cp_client_->send_offload_request(component_id_, request_id, req.task_id, task_it->second.task_name, req.vhc_data);
+                                    logger_.Info("gateway_controller.cpp: Sent offload request for task '{}' with request_id '{}', vhc_data: '{}'", req.task_id, request_id, req.vhc_data);
+                                }
+                            } else {
+                                logger_.Warn("gateway_controller.cpp: [P2P] Ignored dynamic offloading request '{}' for task '{}'. P2P mode auto-activates all tasks.", request_id, req.task_id);
                             }
                             
                             lock.lock();
@@ -415,35 +513,25 @@ void GatewayController::control_thread_func() {
                         termination_request_queue_.pop();
                         lock.unlock();
                         
-                        bridge_cp_client_->send_session_terminate_request(component_id_, req_id);
+                        if (operation_mode_ == "networked" && bridge_cp_client_) {
+                            bridge_cp_client_->send_session_terminate_request(component_id_, req_id);
+                        }
                         handle_session_teardown(req_id);
-                        logger_.Info("gateway_controller.cpp: Sent termination request for session '{}'", req_id);
                         
                         lock.lock();
                     }
                 } else {
-                    // Timeout occurred, send keepalives for active sessions
+                    // Timeout occurred, send keepalives for active sessions (Networked only)
                     lock.unlock();
                     
-                    std::lock_guard<std::mutex> session_lock(session_mutex_);
-                    auto now = std::chrono::steady_clock::now();
-                    
-                    if (active_sessions_.empty()) {
-                        logger_.Debug("gateway_controller.cpp: No active sessions to send keepalives for");
-                    } else {
-                        logger_.Info("gateway_controller.cpp: Checking {} active sessions for keepalive requirements", active_sessions_.size());
-                    }
-                    
-                    for (auto& [req_id, session] : active_sessions_) {
-                        if (now - session.last_keepalive_sent >= keepalive_interval) {
-                            logger_.Info("gateway_controller.cpp: Sending keepalive for session '{}' (last sent {}s ago)", 
-                                        req_id, std::chrono::duration_cast<std::chrono::seconds>(now - session.last_keepalive_sent).count());
-                            bridge_cp_client_->send_session_keepalive(component_id_, req_id);
-                            session.last_keepalive_sent = now;
-                        } else {
-                            auto time_until_next = keepalive_interval - (now - session.last_keepalive_sent);
-                            logger_.Debug("gateway_controller.cpp: Session '{}' keepalive not due yet ({}s remaining)", 
-                                         req_id, std::chrono::duration_cast<std::chrono::seconds>(time_until_next).count());
+                    if (operation_mode_ == "networked" && bridge_cp_client_) {
+                        std::lock_guard<std::mutex> session_lock(session_mutex_);
+                        auto now = std::chrono::steady_clock::now();
+                        for (auto& [req_id, session] : active_sessions_) {
+                            if (now - session.last_keepalive_sent >= keepalive_interval) {
+                                bridge_cp_client_->send_session_keepalive(component_id_, req_id);
+                                session.last_keepalive_sent = now;
+                            }
                         }
                     }
                 }
@@ -536,25 +624,34 @@ void GatewayController::handle_session_teardown(const std::string& request_id) {
 void GatewayController::on_discovery_success(const std::string& bridge_host, int bridge_port, const std::string& config_json) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (state_ == State::DISCOVERING) {
-        bridge_cp_host_ = bridge_host;
-        bridge_cp_port_ = bridge_port;
-        // Load task database from global config before connecting to Bridge
-        if (!config_json.empty()) {
-            bool ok = load_global_config_from_json(config_json);
-            if (!ok) {
-                logger_.Error("gateway_controller.cpp: Failed to parse global config JSON from DiscoveryService. Staying in FAILED state.");
+        if (operation_mode_ == "p2p_ds") {
+            logger_.Info("gateway_controller.cpp: Discovery successful. Peer MEC found at {}:{}", bridge_host, bridge_port);
+            auto transport = dynamic_cast<TcpClientTransport*>(gateway_->get_transport());
+            if (transport) {
+                transport->set_target(bridge_host, bridge_port);
+            }
+            state_ = State::WAITING_FOR_DP_CONNECTION;
+        } else {
+            bridge_cp_host_ = bridge_host;
+            bridge_cp_port_ = bridge_port;
+            // Load task database from global config before connecting to Bridge
+            if (!config_json.empty()) {
+                bool ok = load_global_config_from_json(config_json);
+                if (!ok) {
+                    logger_.Error("gateway_controller.cpp: Failed to parse global config JSON from DiscoveryService. Staying in FAILED state.");
+                    state_ = State::FAILED;
+                    state_cv_.notify_one();
+                    return;
+                }
+            } else {
+                logger_.Error("gateway_controller.cpp: DiscoveryService returned empty config JSON. Cannot continue without task database.");
                 state_ = State::FAILED;
                 state_cv_.notify_one();
                 return;
             }
-        } else {
-            logger_.Error("gateway_controller.cpp: DiscoveryService returned empty config JSON. Cannot continue without task database.");
-            state_ = State::FAILED;
-            state_cv_.notify_one();
-            return;
+            state_ = State::CONNECTING_TO_BRIDGE;
+            logger_.Info("gateway_controller.cpp: Discovery successful. Bridge found at {}:{}", bridge_host, bridge_port);
         }
-        state_ = State::CONNECTING_TO_BRIDGE;
-        logger_.Info("gateway_controller.cpp: Discovery successful. Bridge found at {}:{}", bridge_host, bridge_port);
     }
     state_cv_.notify_one();
 }
@@ -572,13 +669,17 @@ void GatewayController::on_discovery_failure(const std::string& error_message) {
 // Transitions to OPERATIONAL state and starts receiving binary messages
 void GatewayController::on_dp_confirmed() {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    logger_.Info("gateway_controller.cpp: Received DP_CONNECTION_CONFIRMED from Bridge CP");
+    logger_.Info("gateway_controller.cpp: Data Plane connection confirmed");
     
     if (state_ == State::WAITING_FOR_DP_CONNECTION) {
         logger_.Info("gateway_controller.cpp: State transition: WAITING_FOR_DP_CONNECTION -> OPERATIONAL");
         gateway_->start_receiver();  // Begin processing data plane messages
         state_ = State::OPERATIONAL;
         logger_.Info("gateway_controller.cpp: Data plane confirmed. Gateway is now OPERATIONAL and ready to handle sessions.");
+        
+        if (operation_mode_ != "networked") {
+            activate_all_p2p_sessions();
+        }
     } else {
         logger_.Warn("gateway_controller.cpp: Received DP confirmation in unexpected state: {} (expected WAITING_FOR_DP_CONNECTION)", 
                     static_cast<int>(state_.load()));

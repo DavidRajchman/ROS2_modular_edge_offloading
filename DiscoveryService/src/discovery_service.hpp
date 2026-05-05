@@ -16,7 +16,7 @@
 
 class DiscoveryService {
 public:
-    DiscoveryService(uint16_t port);
+    DiscoveryService(uint16_t port, bool p2p_mode = false);
     void start();
 
 private:
@@ -40,6 +40,7 @@ private:
     static constexpr std::chrono::seconds KEEPALIVE_TIMEOUT{15};
 
     uint16_t port_;
+    bool p2p_mode_;
     std::unique_ptr<gateway::TcpServerTransport> transport_;
     ComponentRegistry registry_;
 

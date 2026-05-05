@@ -76,102 +76,85 @@ void DiscoveryClient::stop() {
 void DiscoveryClient::client_thread_func() {
     transport_ = std::make_unique<TcpClientTransport>(host_, port_);
     
-    // Connect to Discovery Service (only component with fixed IP address)
-    if (!transport_->connect()) {
-        logger_.Error("discovery_client.cpp: Failed to connect to DiscoveryService at {}:{}", host_, port_);
-        if (failure_cb_) failure_cb_("Could not connect to DiscoveryService.");
-        return;
-    }
-
-    logger_.Info("discovery_client.cpp: Connected to DiscoveryService. Sending registration for component type '{}'.", discovery_protocol::component_type_to_string(component_type_));
-    
-    // Build registration request using discovery protocol format (DISC: prefixed messages)
-    discovery_protocol::RegistrationRequest request_payload;
-    request_payload.componentType = component_type_;
-    request_payload.idRequestType = discovery_protocol::IdRequestType::STATIC;  // Use provided ID, not auto-assigned
-    request_payload.groupId = group_id_;
-    request_payload.idInGroup = id_in_group_;
-    request_payload.componentName = component_name_;
-    request_payload.listenAddress = "0.0.0.0";  // Data plane listen address
-    request_payload.listenPort = std::to_string(data_plane_port_);
-    request_payload.humanReadableMessage = "registration request from MGW";
-
-    discovery_protocol::Message reg_msg(request_payload);
-
-    // Encode to discovery protocol text format (semicolon-delimited fields)
-    std::string encoded_msg;
-    if (discovery_protocol::encode_message(reg_msg, encoded_msg) != discovery_protocol::ProtocolStatus::OK) {
-        logger_.Error("discovery_client.cpp: Failed to encode registration message.");
-        if (failure_cb_) failure_cb_("Failed to encode registration message.");
-        return;
-    }
-
-    if (encoded_msg.empty()) {
-        logger_.Error("discovery_client.cpp: Encoded message is empty!");
-        if (failure_cb_) failure_cb_("Encoded message is empty.");
-        return;
-    }
-
-    // Send registration request
-    logger_.Info("discovery_client.cpp: Sending encoded registration message ({} bytes)", encoded_msg.size());
-    std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
-    transport_->async_send_data(std::move(reg_data));
-
-    // Wait for registration response with 5 second timeout
-    if (transport_->data_available(5000)) {
-        std::vector<uint8_t> buffer(4096);
-        int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
-        if (bytes_received > 0) {
-            buffer[bytes_received] = '\0';
-            std::string response_str(reinterpret_cast<char*>(buffer.data()));
-            logger_.Info("discovery_client.cpp: Received raw response from DiscoveryService: '{}'", response_str);
-
-            // Decode REGISTRATION_RESPONSE message
-            discovery_protocol::Message response_msg;
-            if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
-                logger_.Info("discovery_client.cpp: Successfully decoded message with type: {}", static_cast<int>(response_msg.type));
-                if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
-                    auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
-                    if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
-                        // Registration approved - extract Bridge CP address and global config JSON
-                        logger_.Info("discovery_client.cpp: Discovery successful. Bridge target at {}:{}", resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
-                        try {
-                            int bridge_port = std::stoi(resp_payload.connectionTargetPort);
-                            registered_ = true;
-                            if (success_cb_) {
-                                // Callback triggers state transition to CONNECTING_TO_BRIDGE
-                                success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
-                            }
-                        } catch (const std::invalid_argument& e) {
-                            logger_.Error("discovery_client.cpp: Invalid port number received from DiscoveryService: '{}'", resp_payload.connectionTargetPort);
-                            if (failure_cb_) failure_cb_("Invalid port number from DiscoveryService.");
-                            return;
-                        }
-                    } else {
-                        // Registration denied (e.g., OM not registered yet, bridge unavailable)
-                        logger_.Error("discovery_client.cpp: Registration denied by DiscoveryService: {}", resp_payload.humanReadableMessage);
-                        if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);
-                        return;
-                    }
-                } else {
-                    logger_.Error("discovery_client.cpp: Unexpected message type after registration: {}", static_cast<int>(response_msg.type));
-                    if (failure_cb_) failure_cb_("Unexpected message type from DiscoveryService.");
-                    return;
-                }
-            } else {
-                logger_.Error("discovery_client.cpp: Failed to decode response from DiscoveryService. Raw message: '{}'", response_str);
-                if (failure_cb_) failure_cb_("Failed to decode response.");
+    // Phase 1 & 2: Registration with polling for WAIT response
+    while (running_ && !registered_) {
+        if (!transport_->is_connected()) {
+            if (!transport_->connect()) {
+                logger_.Error("discovery_client.cpp: Failed to connect to DiscoveryService at {}:{}", host_, port_);
+                if (failure_cb_) failure_cb_("Could not connect to DiscoveryService.");
                 return;
             }
-        } else {
-            logger_.Error("discovery_client.cpp: No data received from DiscoveryService or connection lost.");
-            if (failure_cb_) failure_cb_("No response from DiscoveryService.");
+            logger_.Info("discovery_client.cpp: Connected to DiscoveryService. Sending registration for component type '{}'.", 
+                         discovery_protocol::component_type_to_string(component_type_));
+        }
+
+        // Build registration request
+        discovery_protocol::RegistrationRequest request_payload;
+        request_payload.componentType = component_type_;
+        request_payload.idRequestType = discovery_protocol::IdRequestType::STATIC;
+        request_payload.groupId = group_id_;
+        request_payload.idInGroup = id_in_group_;
+        request_payload.componentName = component_name_;
+        request_payload.listenAddress = "0.0.0.0";
+        request_payload.listenPort = std::to_string(data_plane_port_);
+        request_payload.humanReadableMessage = "registration request from MGW";
+
+        discovery_protocol::Message reg_msg(request_payload);
+        std::string encoded_msg;
+        if (discovery_protocol::encode_message(reg_msg, encoded_msg) != discovery_protocol::ProtocolStatus::OK) {
+            logger_.Error("discovery_client.cpp: Failed to encode registration message.");
+            if (failure_cb_) failure_cb_("Failed to encode registration message.");
             return;
         }
-    } else {
-        logger_.Warn("discovery_client.cpp: Timed out waiting for response from DiscoveryService.");
-        if (failure_cb_) failure_cb_("Timeout waiting for DiscoveryService response.");
-        return;
+
+        std::vector<uint8_t> reg_data(encoded_msg.begin(), encoded_msg.end());
+        transport_->async_send_data(std::move(reg_data));
+
+        // Wait for registration response
+        if (transport_->data_available(5000)) {
+            std::vector<uint8_t> buffer(8192); // Larger buffer for potentially large configJson
+            int bytes_received = transport_->receive_data(buffer.data(), buffer.size() - 1);
+            if (bytes_received > 0) {
+                buffer[bytes_received] = '\0';
+                std::string response_str(reinterpret_cast<char*>(buffer.data()));
+                
+                discovery_protocol::Message response_msg;
+                if (discovery_protocol::decode_message(response_str, response_msg) == discovery_protocol::ProtocolStatus::OK) {
+                    if (response_msg.type == discovery_protocol::MessageType::REGISTRATION_RESPONSE) {
+                        auto& resp_payload = std::get<discovery_protocol::RegistrationResponse>(response_msg.data);
+                        
+                        if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
+                            logger_.Info("discovery_client.cpp: Registration successful. Target at {}:{}", 
+                                         resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
+                            try {
+                                int bridge_port = std::stoi(resp_payload.connectionTargetPort);
+                                registered_ = true;
+                                if (success_cb_) {
+                                    success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
+                                }
+                            } catch (const std::exception& e) {
+                                logger_.Error("discovery_client.cpp: Invalid port received: '{}'", resp_payload.connectionTargetPort);
+                                if (failure_cb_) failure_cb_("Invalid port from DiscoveryService.");
+                                return;
+                            }
+                        } else if (resp_payload.responseCode == discovery_protocol::ResponseCode::WAIT) {
+                            logger_.Info("discovery_client.cpp: Received WAIT from DiscoveryService: {}. Retrying in 2s...", 
+                                         resp_payload.humanReadableMessage);
+                            std::this_thread::sleep_for(std::chrono::seconds(2));
+                            continue; // Retry the loop
+                        } else {
+                            logger_.Error("discovery_client.cpp: Registration denied: {}", resp_payload.humanReadableMessage);
+                            if (failure_cb_) failure_cb_("Registration denied: " + resp_payload.humanReadableMessage);
+                            return;
+                        }
+                    }
+                }
+            }
+        } else {
+            logger_.Warn("discovery_client.cpp: Timed out waiting for registration response.");
+            if (failure_cb_) failure_cb_("Timeout waiting for response.");
+            return;
+        }
     }
 
     // Phase 3: Keepalive loop - maintain registration with periodic pings

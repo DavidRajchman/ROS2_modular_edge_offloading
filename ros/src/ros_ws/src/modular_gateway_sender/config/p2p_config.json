@@ -1,0 +1,12 @@
+{
+  "default_session_timeout": 300,
+  "max_concurrent_sessions": 10,
+  "available_tasks": [
+    {
+      "task_id": 1,
+      "task_name": "P2P_LIDAR_TASK",
+      "input_message_types": [11, 201],
+      "output_message_types": [202]
+    }
+  ]
+}

@@ -4,3 +4,5 @@ log/
 src/.vscode
 .vscode/
 external_libs/
+**/__pycache__/
+*.py[cod]

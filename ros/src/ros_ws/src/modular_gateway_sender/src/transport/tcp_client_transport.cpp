@@ -100,12 +100,18 @@ bool TcpClientTransport::connect()
 
 void TcpClientTransport::disconnect()
 {
-    connected_ = false;
-    if (socket_fd_ >= 0) {
-        close(socket_fd_);
-        socket_fd_ = -1;
+    if (socket_fd_.load() != -1) {
+        ::close(socket_fd_.load());
+        socket_fd_.store(-1);
         logger_.Info("tcp_client_transport.cpp: Disconnected from server.");
     }
+    connected_ = false;
+    is_reconnecting_ = false;
+}
+
+void TcpClientTransport::set_target(const std::string& host, int port) {
+    server_host_ = host;
+    server_port_ = port;
 }
 
 TransportAsyncSendResult TcpClientTransport::async_send_data(std::vector<uint8_t>&& data)

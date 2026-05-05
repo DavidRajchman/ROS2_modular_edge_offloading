@@ -23,8 +23,10 @@ Sequence (VHC perspective):
 4. Transition to CONNECTING_TO_BRIDGE → `BridgeCpClient` established → WAITING_FOR_DP_CONNECTION → OPERATIONAL after DP confirmation.
 5. Research application (e.g. `vhc_node.py`) calls ROS service `request_offloading` (task_id string) → MGW sends OFFLOAD_REQUEST via Bridge CP.
 6. On SESSION_APPROVED, MGW activates handlers for listed input/output `MessageType`s with role-based modes.
-7. Handlers forward ROS topic data to DP; remote counterpart publishes into its ROS graph.
 8. Session keepalives maintain liveness until termination or timeout.
+
+**P2P Modes (`p2p` / `p2p_ds`):**
+In these modes, the Gateway bypasses the Bridge and OM entirely. It connects directly to the peer Gateway, loads a local `p2p_config.json`, and automatically activates all tasks defined within it upon data plane connection.
 
 Key components & files:
 * Controller: `src/modular_gateway_sender/src/gateway_controller.cpp`
@@ -59,6 +61,9 @@ Parameters (declared in `gateway_controller.cpp`):
 * `identity.component_name`
 * `identity.group_id`, `identity.id_in_group`
 * `data_plane.listen_port`
+* `operation.mode` ("networked" (default), "p2p", or "p2p_ds")
+* `operation.local_config_path` (required for P2P modes)
+* `p2p.peer_host` / `p2p.peer_port` (required for pure "p2p" mode VHC)
 * Per-handler topic override parameters (declared in each handler, e.g. `string_test_input_handler.topic`).
 
 Global Config JSON (delivered in `RegistrationResponse.configJson`):
@@ -166,6 +171,9 @@ User Application Flow (see `offloading_latency_test_loopback/vhc_node.py`):
 
 Session Maintenance:
 * Controller sends periodic keepalives; absence of approval or DP confirmation prevents session entry into OPERATIONAL.
+
+**P2P Modes Difference:**
+In `p2p` and `p2p_ds` modes, the Gateway does NOT wait for ROS service requests to initiate offloading. All tasks listed in the local config are automatically approved and activated as soon as the data plane connection to the peer is established.
 
 Troubleshooting Checklist:
 * If no result messages: verify topic overrides in launch, confirm logs for handler initialization & activation for msgTypes expected, ensure global config lists the task.

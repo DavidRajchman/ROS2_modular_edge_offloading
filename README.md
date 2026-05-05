@@ -48,6 +48,7 @@ There are many .md files curently present in all components folders. THESE SHOUL
 - Testing Component - [ros/src/ros_ws/src/offloading_latency_test_loopback/docs/user_guide_TEST.md](./ros/src/ros_ws/src/offloading_latency_test_loopback/docs/user_guide_TEST.md)
 - **protocol details** - [ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/protocol_details.md)
 - **process flow diagrams** [ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/process_flow_diagrams.md)
+- **p2p process flow diagrams** [ros/src/ros_ws/src/modular_gateway_sender/docs/p2p_process_flow_diagrams.md](./ros/src/ros_ws/src/modular_gateway_sender/docs/p2p_process_flow_diagrams.md)
 - **network topology pictures** [docs/network_topology.pdf](./docs/network_topology.pdf).
 - **NO OTHER GUIDES AND REFERENCES ARE CURRENTLY AVAILABLE.** 
 
@@ -60,11 +61,19 @@ The system includes fail-broken mechanisms to prevent unintended behavior. One o
 
 **HOWEVER** to prevent the issue of incorect global configuration, the DISC service will shut down if the OM disconects. Which means that the DISC must be restarted for every experiment. Also currently there is no mechanism to auto-asign the component ID, its recomended to restart the DISC even if the OM has not been disconected when changing experiments.
 
+### Networked Mode
 Order of launching the components:
 1. Discovery Service
 2. Offloading Manager
 3. Bridge
 4. **SYSTEM READY** other components can be launched.
+
+### P2P Modes (p2p / p2p_ds)
+These modes bypass the OM and Bridge, allowing direct connection between VHC and MEC using a local task configuration.
+* **p2p (Pure P2P):** VHC and MEC connect directly using static IP addresses. Launch `p2p_mec_launch.py` and `p2p_vhc_launch.py`. No Discovery Service required.
+* **p2p_ds (Discovery-Assisted P2P):** Uses the Discovery Service for matchmaking, but no OM/Bridge is required.
+  1. Discovery Service (must be launched with the `--p2p` flag)
+  2. `p2p_mec_launch.py` and `p2p_vhc_launch.py` (any order)
 
 TBD
 

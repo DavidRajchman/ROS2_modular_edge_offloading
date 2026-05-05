@@ -3,8 +3,8 @@
 #include <sstream>
 #include <transport/logging_utils.hpp>
 
-DiscoveryService::DiscoveryService(uint16_t port)
-    : port_(port), last_purge_time_(std::chrono::steady_clock::now()), shutting_down_(false) {
+DiscoveryService::DiscoveryService(uint16_t port, bool p2p_mode)
+    : port_(port), p2p_mode_(p2p_mode), last_purge_time_(std::chrono::steady_clock::now()), shutting_down_(false) {
     // The constructor for TcpServerTransport is:
     // TcpServerTransport(int port, bool multi_client_mode = false, int max_clients = 0);
     // We enable multi-client mode to handle multiple components registering.
@@ -93,8 +93,8 @@ void DiscoveryService::onClientDisconnected(uint32_t client_id) {
                  component->name.c_str(), component->group_id, component->id_in_group, client_id);
         registry_.unregister_component(client_id);
 
-        // Only call stop() once
-        if (component->component_type == discovery_protocol::ComponentType::OFFLOAD_MANAGER
+        // Only call stop() once. In P2P mode, we don't shut down if OM/Bridge disconnects.
+        if (!p2p_mode_ && component->component_type == discovery_protocol::ComponentType::OFFLOAD_MANAGER
             && !shutting_down_.load()) {
             LOG_ERROR("The Offloading Manager has disconnected. This is a critical failure. Shutting down the system.");
             stop();
@@ -144,75 +144,146 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
     resp.assignedGroupId = req.groupId;
     resp.assignedIdInGroup = req.idInGroup;
 
-    // Special handling for the Offloading Manager
-    if (req.componentType == discovery_protocol::ComponentType::OFFLOAD_MANAGER) {
-        global_configuration_ = req.humanReadableMessage;
-        LOG_INFO("Offloading Manager registered. Global configuration has been set.");
-    } else {
-        // All other components must wait for the OM to provide the configuration
-        if (!global_configuration_.has_value()) {
-            LOG_WARN("Component '%s' trying to register before OM. Sending WAIT.", req.componentName.c_str());
-            resp.responseCode = discovery_protocol::ResponseCode::WAIT;
-            resp.humanReadableMessage = "Waiting for system configuration from Offloading Manager.";
+    if (p2p_mode_) {
+        LOG_INFO("Discovery Service in P2P mode. Matchmaking for ID %u.%u", req.groupId, req.idInGroup);
+        
+        if (req.componentType == discovery_protocol::ComponentType::VEHICLE) {
+            // VHC (Client) looking for MEC (Server)
+            auto components = registry_.get_all_components();
+            bool found_mec = false;
+            for (const auto& comp : components) {
+                if (comp.component_type == discovery_protocol::ComponentType::MEC && 
+                    comp.group_id == req.groupId && comp.id_in_group == req.idInGroup) {
+                    
+                    LOG_INFO("Match found! Forwarding MEC %s (%s:%u) to Vehicle", 
+                             comp.name.c_str(), comp.listen_address.c_str(), comp.listen_port);
+                    
+                    resp.responseCode = discovery_protocol::ResponseCode::SUCCESS;
+                    resp.connectionTargetType = "MEC";
+                    resp.connectionTargetAddress = comp.listen_address;
+                    resp.connectionTargetPort = std::to_string(comp.listen_port);
+                    resp.humanReadableMessage = "P2P Match found.";
+                    found_mec = true;
+                    break;
+                }
+            }
+            
+            if (!found_mec) {
+                LOG_INFO("No MEC registered for ID %u.%u yet. Telling Vehicle to WAIT.", req.groupId, req.idInGroup);
+                resp.responseCode = discovery_protocol::ResponseCode::WAIT;
+                resp.humanReadableMessage = "Waiting for peer MEC to register.";
+                
+                auto it = client_ip_addresses_.find(client_id);
+                if (it != client_ip_addresses_.end()) resp.detectedClientAddress = it->second;
+                
+                std::string response_str;
+                discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+                sendResponse(client_id, response_str);
+                return;
+            }
+        } else if (req.componentType == discovery_protocol::ComponentType::MEC) {
+            // MEC (Server) just registers and waits for incoming VHC connection
+            LOG_INFO("MEC registered for ID %u.%u. Ready for connections.", req.groupId, req.idInGroup);
+            resp.responseCode = discovery_protocol::ResponseCode::SUCCESS;
+            resp.humanReadableMessage = "MEC registered in P2P mode.";
+        } else {
+            LOG_WARN("Unexpected component type %d in P2P mode.", static_cast<int>(req.componentType));
+            resp.responseCode = discovery_protocol::ResponseCode::INVALID_REQUEST;
+            resp.humanReadableMessage = "Only VHC and MEC allowed in P2P mode.";
+            
             std::string response_str;
             discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
             sendResponse(client_id, response_str);
             return;
         }
+    } else {
+        // Standard networked mode logic
+        // Special handling for the Offloading Manager
+        if (req.componentType == discovery_protocol::ComponentType::OFFLOAD_MANAGER) {
+            global_configuration_ = req.humanReadableMessage;
+            LOG_INFO("Offloading Manager registered. Global configuration has been set.");
+        } else {
+            // All other components must wait for the OM to provide the configuration
+            if (!global_configuration_.has_value()) {
+                LOG_WARN("Component '%s' trying to register before OM. Sending WAIT.", req.componentName.c_str());
+                resp.responseCode = discovery_protocol::ResponseCode::WAIT;
+                resp.humanReadableMessage = "Waiting for system configuration from Offloading Manager.";
+                std::string response_str;
+                discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+                sendResponse(client_id, response_str);
+                return;
+            }
+        }
+
+        // Check for ID conflicts
+        if (registry_.is_id_taken(req.groupId, req.idInGroup)) {
+            LOG_ERROR("ID conflict for component '%s'. ID %u.%u is already taken.", req.componentName.c_str(), req.groupId, req.idInGroup);
+            resp.responseCode = discovery_protocol::ResponseCode::ID_CONFLICT;
+            resp.humanReadableMessage = "Component ID is already in use.";
+            std::string response_str;
+            discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+            sendResponse(client_id, response_str);
+            return;
+        }
+
+        // For Vehicles or MECs, check if a Bridge is available
+        if (req.componentType == discovery_protocol::ComponentType::VEHICLE || req.componentType == discovery_protocol::ComponentType::MEC) {
+            auto bridge_info_opt = registry_.find_available_bridge();
+            if (!bridge_info_opt) {
+                LOG_WARN("Component '%s' (VHC/MEC) trying to register, but no Bridge is available. Sending WAIT.", req.componentName.c_str());
+                resp.responseCode = discovery_protocol::ResponseCode::WAIT;
+                resp.humanReadableMessage = "No Bridge component is currently available.";
+                std::string response_str;
+                discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+                sendResponse(client_id, response_str);
+                return;
+            } else {
+                auto& bridge_info = *bridge_info_opt;
+                // Populate Bridge connection info in the response
+                resp.connectionTargetType = discovery_protocol::component_type_to_string(bridge_info.component_type);
+                resp.connectionTargetAddress = bridge_info.listen_address;
+                resp.connectionTargetPort = std::to_string(bridge_info.listen_port);
+                resp.connectionTargetId = (bridge_info.group_id << 8) | bridge_info.id_in_group;
+            }
+        }
+        
+        // For Bridges, check if OM is available and provide OM connection info
+        if (req.componentType == discovery_protocol::ComponentType::BRIDGE) {
+            auto om_info_opt = registry_.find_available_om();
+            if (!om_info_opt) {
+                LOG_WARN("Bridge '%s' trying to register, but no OM is available. Sending WAIT.", req.componentName.c_str());
+                resp.responseCode = discovery_protocol::ResponseCode::WAIT;
+                resp.humanReadableMessage = "No Offloading Manager is currently available.";
+                std::string response_str;
+                discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+                sendResponse(client_id, response_str);
+                return;
+            } else {
+                auto& om_info = *om_info_opt;
+                // Populate OM connection info in the response
+                resp.connectionTargetType = discovery_protocol::component_type_to_string(om_info.component_type);
+                resp.connectionTargetAddress = om_info.listen_address;
+                resp.connectionTargetPort = std::to_string(om_info.listen_port);
+                resp.connectionTargetId = (om_info.group_id << 8) | om_info.id_in_group;
+                LOG_INFO("Providing OM connection details to Bridge: %s:%u", om_info.listen_address.c_str(), om_info.listen_port);
+            }
+        }
     }
 
-    // Check for ID conflicts
+    // Common registration logic (both P2P and Networked)
+    // Check for ID conflicts again just in case (for MEC in P2P mode)
     if (registry_.is_id_taken(req.groupId, req.idInGroup)) {
         LOG_ERROR("ID conflict for component '%s'. ID %u.%u is already taken.", req.componentName.c_str(), req.groupId, req.idInGroup);
         resp.responseCode = discovery_protocol::ResponseCode::ID_CONFLICT;
         resp.humanReadableMessage = "Component ID is already in use.";
+        
+        auto it = client_ip_addresses_.find(client_id);
+        if (it != client_ip_addresses_.end()) resp.detectedClientAddress = it->second;
+
         std::string response_str;
         discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
         sendResponse(client_id, response_str);
         return;
-    }
-
-    // For Vehicles or MECs, check if a Bridge is available
-    if (req.componentType == discovery_protocol::ComponentType::VEHICLE || req.componentType == discovery_protocol::ComponentType::MEC) {
-        auto bridge_info_opt = registry_.find_available_bridge();
-        if (!bridge_info_opt) {
-            LOG_WARN("Component '%s' (VHC/MEC) trying to register, but no Bridge is available. Sending WAIT.", req.componentName.c_str());
-            resp.responseCode = discovery_protocol::ResponseCode::WAIT;
-            resp.humanReadableMessage = "No Bridge component is currently available.";
-            std::string response_str;
-            discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
-            sendResponse(client_id, response_str);
-            return;
-        } else {
-            auto& bridge_info = *bridge_info_opt;
-            // Populate Bridge connection info in the response
-            resp.connectionTargetType = discovery_protocol::component_type_to_string(bridge_info.component_type);
-            resp.connectionTargetAddress = bridge_info.listen_address;
-            resp.connectionTargetPort = std::to_string(bridge_info.listen_port);
-            resp.connectionTargetId = (bridge_info.group_id << 8) | bridge_info.id_in_group;
-        }
-    }
-    
-    // For Bridges, check if OM is available and provide OM connection info
-    if (req.componentType == discovery_protocol::ComponentType::BRIDGE) {
-        auto om_info_opt = registry_.find_available_om();
-        if (!om_info_opt) {
-            LOG_WARN("Bridge '%s' trying to register, but no OM is available. Sending WAIT.", req.componentName.c_str());
-            resp.responseCode = discovery_protocol::ResponseCode::WAIT;
-            resp.humanReadableMessage = "No Offloading Manager is currently available.";
-            std::string response_str;
-            discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
-            sendResponse(client_id, response_str);
-            return;
-        } else {
-            auto& om_info = *om_info_opt;
-            // Populate OM connection info in the response
-            resp.connectionTargetType = discovery_protocol::component_type_to_string(om_info.component_type);
-            resp.connectionTargetAddress = om_info.listen_address;
-            resp.connectionTargetPort = std::to_string(om_info.listen_port);
-            resp.connectionTargetId = (om_info.group_id << 8) | om_info.id_in_group;
-            LOG_INFO("Providing OM connection details to Bridge: %s:%u", om_info.listen_address.c_str(), om_info.listen_port);
-        }
     }
 
     // All checks passed, register the component
