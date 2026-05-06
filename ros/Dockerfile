@@ -8,9 +8,6 @@ RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-inf
     && apt-get install /tmp/ros2-apt-source.deb \
     && rm -f /tmp/ros2-apt-source.deb
 
-# Nastavte pracovní adresář
-COPY ./src /home/ubuntu/
-
 # Instalace balíčků pro ROS 2 a gz_bridge
 RUN apt update && apt install -y \
 ros-jazzy-demo-nodes-cpp \
@@ -48,10 +45,10 @@ WORKDIR ${EXTERNAL_LIBS_DIR}
 RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
     cd CppCommon && \
     git checkout 1.0.5.0 && \
-    sed -i 's/fmt.git master/fmt.git 11.0.2/g' .gitlinks && \
+    sed -i 's/fmt.git master/fmt.git main/g' .gitlinks && \
     gil update && \
     cd build && \
-    CXXFLAGS="-Wno-error=deprecated-declarations" ./unix.sh
+    CXXFLAGS="-Wno-error=deprecated-declarations -fPIC" CFLAGS="-fPIC" ./unix.sh
 
 # --- Clone CppLogging ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}
@@ -59,18 +56,18 @@ RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
     cd CppLogging && \
     git checkout 1.0.5.0 && \
     (gil update || true) && \
-    sed -i 's/fmt.git master/fmt.git 11.0.2/g' modules/CppCommon/.gitlinks && \
+    sed -i 's/fmt.git master/fmt.git main/g' modules/CppCommon/.gitlinks && \
     gil update && \
     cd build && \
-    CXXFLAGS="-Wno-error=deprecated-declarations" ./unix.sh
+    CXXFLAGS="-Wno-error=deprecated-declarations -fPIC" CFLAGS="-fPIC" ./unix.sh
 
 # --- Clone and Build fmt ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}
 RUN git clone https://github.com/fmtlib/fmt.git fmt && \
     cd fmt && \
-    git checkout 11.0.2 && \
+    git checkout 12.1.0 && \
     mkdir -p build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
     make -j$(nproc) && \
     make install
 # fmt is now installed to /usr/local

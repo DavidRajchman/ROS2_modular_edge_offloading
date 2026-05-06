@@ -126,16 +126,21 @@ void DiscoveryClient::client_thread_func() {
                         if (resp_payload.responseCode == discovery_protocol::ResponseCode::SUCCESS) {
                             logger_.Info("discovery_client.cpp: Registration successful. Target at {}:{}", 
                                          resp_payload.connectionTargetAddress, resp_payload.connectionTargetPort);
-                            try {
-                                int bridge_port = std::stoi(resp_payload.connectionTargetPort);
-                                registered_ = true;
-                                if (success_cb_) {
-                                    success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
+                            
+                            int bridge_port = 0;
+                            if (!resp_payload.connectionTargetPort.empty()) {
+                                try {
+                                    bridge_port = std::stoi(resp_payload.connectionTargetPort);
+                                } catch (const std::exception& e) {
+                                    logger_.Error("discovery_client.cpp: Invalid port received: '{}'", resp_payload.connectionTargetPort);
+                                    if (failure_cb_) failure_cb_("Invalid port from DiscoveryService.");
+                                    return;
                                 }
-                            } catch (const std::exception& e) {
-                                logger_.Error("discovery_client.cpp: Invalid port received: '{}'", resp_payload.connectionTargetPort);
-                                if (failure_cb_) failure_cb_("Invalid port from DiscoveryService.");
-                                return;
+                            }
+                            
+                            registered_ = true;
+                            if (success_cb_) {
+                                success_cb_(resp_payload.connectionTargetAddress, bridge_port, resp_payload.configJson);
                             }
                         } else if (resp_payload.responseCode == discovery_protocol::ResponseCode::WAIT) {
                             logger_.Info("discovery_client.cpp: Received WAIT from DiscoveryService: {}. Retrying in 2s...", 

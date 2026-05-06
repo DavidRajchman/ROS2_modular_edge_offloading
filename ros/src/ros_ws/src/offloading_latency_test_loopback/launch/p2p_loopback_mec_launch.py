@@ -41,6 +41,12 @@ def generate_launch_description():
         description='Path to the P2P configuration JSON file'
     )
 
+    operation_mode_arg = DeclareLaunchArgument(
+        'operation_mode',
+        default_value='p2p_ds',
+        description='Operation mode: p2p or p2p_ds'
+    )
+
     # MGW MEC Gateway Controller Node
     gateway_controller_node = Node(
         package='modular_gateway_sender',
@@ -53,8 +59,10 @@ def generate_launch_description():
             'identity.group_id': LaunchConfiguration('group_id'),
             'identity.id_in_group': LaunchConfiguration('id_in_group'),
             'data_plane.listen_port': LaunchConfiguration('listen_port'),
-            'operation.mode': 'p2p',
-            'operation.local_config_path': LaunchConfiguration('config_path'),
+            'operation_mode': LaunchConfiguration('operation_mode'),
+            'p2p.local_config_path': LaunchConfiguration('config_path'),
+            'discovery_service.host': '192.168.65.5',
+            'discovery_service.port': 9090,
             # Override handler topics to align with test app
             'string_test_input_handler.topic': 'test_input_topic',
             'string_test_result_handler.topic': 'test_result_topic'
@@ -77,6 +85,7 @@ def generate_launch_description():
         id_in_group_arg,
         listen_port_arg,
         config_path_arg,
+        operation_mode_arg,
         gateway_controller_node,
         mec_test_node
     ])

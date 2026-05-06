@@ -17,7 +17,7 @@ services:
     stdin_open: true
     tty: true
     # Launch Discovery Service with the --p2p flag
-    command: ["/bin/bash", "-c", "cd /home/ubuntu/DiscoveryService && ./autostart.sh --p2p"]
+    command: ["/bin/bash", "-c", "cd /home/ubuntu/DiscoveryService && chmod +x ./autostart.sh && ./autostart.sh --p2p"]
     networks:
       public_net:
           ipv4_address: 192.168.65.5
@@ -32,7 +32,7 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-root
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - ROS_DOMAIN_ID=12
-      - LAUNCH_FILE=p2p_ds_loopback_vhc_launch.py
+      - LAUNCH_FILE=p2p_loopback_vhc_launch.py
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
@@ -59,7 +59,7 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-root
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - ROS_DOMAIN_ID=13
-      - LAUNCH_FILE=p2p_ds_loopback_mec_launch.py
+      - LAUNCH_FILE=p2p_loopback_mec_launch.py
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src

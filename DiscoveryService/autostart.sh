@@ -26,7 +26,7 @@ make -j$(nproc)
 # Check if executable exists
 if [ -f "./DiscoveryService" ]; then
     echo "Build successful! Starting discovery service..."
-    ./DiscoveryService
+    ./DiscoveryService "$@"
 else
     echo "ERROR: DiscoveryService executable not found after build!"
     exit 1

@@ -168,6 +168,13 @@ void DiscoveryService::handleRegistration(uint32_t client_id, const discovery_pr
                 }
             }
             
+            if (found_mec) {
+                std::string response_str;
+                discovery_protocol::encode_message(discovery_protocol::Message(resp), response_str);
+                sendResponse(client_id, response_str);
+                return;
+            }
+            
             if (!found_mec) {
                 LOG_INFO("No MEC registered for ID %u.%u yet. Telling Vehicle to WAIT.", req.groupId, req.idInGroup);
                 resp.responseCode = discovery_protocol::ResponseCode::WAIT;

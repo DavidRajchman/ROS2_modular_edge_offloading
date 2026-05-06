@@ -1,4 +1,5 @@
 from setuptools import setup
+import glob
 
 package_name = 'offloading_latency_test_loopback'
 
@@ -10,7 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/vch_launch.py', 'launch/mec_launch.py']),
+        ('share/' + package_name + '/launch', glob.glob('launch/*.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

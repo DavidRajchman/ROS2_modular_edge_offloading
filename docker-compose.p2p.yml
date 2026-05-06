@@ -19,7 +19,7 @@ services:
       - ./cpplib:/home/ubuntu/cpplib_src
     privileged: true
     tty: true
-    command: ["/bin/bash","-c","chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh && source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh"] 
+    command: ["/bin/bash","-c","chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh && source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh operation_mode:=p2p"] 
     networks:
       public_net:
           ipv4_address: 192.168.65.101
@@ -44,7 +44,7 @@ services:
       - ./cpplib:/home/ubuntu/cpplib_src
     privileged: true
     tty: true
-    command: ["/bin/bash","-c","chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh && source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh"]
+    command: ["/bin/bash","-c","chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh && source /opt/ros/jazzy/setup.bash && bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh operation_mode:=p2p"]
     networks:
       public_net:
           ipv4_address: 192.168.65.102

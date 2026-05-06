@@ -88,4 +88,4 @@ echo "Sourcing workspace (safe)..."
 safe_source "${ROS_WS}/install/setup.bash"
 
 echo "Launching P2P stack: ${LAUNCH_FILE}"
-exec ros2 launch offloading_latency_test_loopback "${LAUNCH_FILE}"
+exec ros2 launch offloading_latency_test_loopback "${LAUNCH_FILE}" "$@"

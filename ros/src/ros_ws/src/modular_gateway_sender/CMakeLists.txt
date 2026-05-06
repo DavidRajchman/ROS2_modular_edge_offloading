@@ -64,18 +64,24 @@ list(APPEND CMAKE_PREFIX_PATH "/usr/local")
 #find_package(ControlPlaneProtocol REQUIRED)
 find_package(DiscoveryProtocol REQUIRED)
 
-# --- Fetch fmt via FetchContent to avoid system library issues ---
-include(FetchContent)
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 11.0.2  # Use a version of fmt that CppLogging is compatible with (e.g., 11.x)
-  CMAKE_ARGS -DBUILD_SHARED_LIBS=OFF -DFMT_HEADER_ONLY=OFF # Ensure fmt is built as a static, compiled library
+# --- fmt: use the version bundled inside CppCommon (same one CppLogging was compiled against) ---
+set(FMT_BUNDLED_INCLUDE_DIR "${CPPCOMMON_DIR}/modules/fmt/include")
+set(FMT_BUNDLED_LIB "")
+# Search for pre-built libfmt from CppCommon's build tree
+find_library(FMT_BUNDLED_LIBRARY
+    NAMES fmt
+    HINTS
+        "${CPPCOMMON_DIR}/build/_deps/fmt-build"
+        "${CPPCOMMON_DIR}/build/modules/fmt"
+        "${CPPCOMMON_DIR}/build"
+        "/usr/local/lib"
 )
-
-# Set options to avoid building tests or installing fmt from this build
-set(FMT_TEST OFF CACHE BOOL "Disable building of fmt tests" FORCE)
-FetchContent_MakeAvailable(fmt) # This makes the fmt::fmt target available from the fetched source
+if(FMT_BUNDLED_LIBRARY)
+    message(STATUS "Found bundled fmt library: ${FMT_BUNDLED_LIBRARY}")
+else()
+    # Fallback: header-only mode (fmt is mostly header-only for our usage)
+    message(STATUS "fmt library not found as pre-built, using header-only from: ${FMT_BUNDLED_INCLUDE_DIR}")
+endif()
 
 # --- Generate ROS 2 Service Definitions ---
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -90,6 +96,7 @@ set(CPPCOMMON_DIR "/home/ubuntu/external_libs/CppCommon")
 set(MOODYCAMEL_DIR "/home/ubuntu/external_libs/readerwriterqueue")
 
 # --- Fetch nlohmann_json via FetchContent ---
+include(FetchContent)
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -132,16 +139,43 @@ target_include_directories(gateway_transport_lib PUBLIC
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
     $<BUILD_INTERFACE:${MOODYCAMEL_DIR}>
 )
-target_link_libraries(gateway_transport_lib Threads::Threads)
+target_link_libraries(gateway_transport_lib
+    Threads::Threads
+    ${CPPLOGGING_LIBRARY}
+    ${CPPCOMMON_LIBRARY}
+    bfd
+    uuid
+    dl
+    z
+    rt
+)
+if(FMT_BUNDLED_LIBRARY)
+    target_link_libraries(gateway_transport_lib ${FMT_BUNDLED_LIBRARY})
+endif()
+target_include_directories(gateway_transport_lib PUBLIC
+    $<BUILD_INTERFACE:${FMT_BUNDLED_INCLUDE_DIR}>)
 
-# Message Handler Base library
-add_library(message_handler_base_lib src/message_handler_base.cpp)
+# Message Handler Base library & RosGateway library (Combined to avoid circular dependency)
+add_library(message_handler_base_lib src/message_handler_base.cpp src/ros_gateway.cpp)
 target_include_directories(message_handler_base_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CPPLOGGER_DIR}/include>
     $<BUILD_INTERFACE:${CPPCOMMON_DIR}/include>
 )
+target_link_libraries(message_handler_base_lib
+    gateway_transport_lib
+    ${CPPLOGGING_LIBRARY}
+    ${CPPCOMMON_LIBRARY}
+    bfd
+    uuid
+    dl
+    z
+    rt
+)
+if(FMT_BUNDLED_LIBRARY)
+    target_link_libraries(message_handler_base_lib ${FMT_BUNDLED_LIBRARY})
+endif()
 ament_target_dependencies(message_handler_base_lib rclcpp)
 
 # Handlers library (all concrete message handlers)
@@ -158,15 +192,6 @@ target_include_directories(handlers_lib PUBLIC
 target_link_libraries(handlers_lib message_handler_base_lib)
 ament_target_dependencies(handlers_lib rclcpp std_msgs sensor_msgs)
 
-# RosGateway library (Data Plane core)
-add_library(ros_gateway_lib src/ros_gateway.cpp)
-target_include_directories(ros_gateway_lib PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-target_link_libraries(ros_gateway_lib gateway_transport_lib message_handler_base_lib)
-ament_target_dependencies(ros_gateway_lib rclcpp)
-
 # GatewayController library (Control Plane core)
 add_library(gateway_controller_lib
     src/gateway_controller.cpp
@@ -182,7 +207,7 @@ target_include_directories(gateway_controller_lib PUBLIC
 )
 # Use the proper CMake targets instead of manually found library paths
 target_link_libraries(gateway_controller_lib 
-    ros_gateway_lib
+    message_handler_base_lib
     handlers_lib
     #ControlPlaneProtocol::control_plane_protocol
     DiscoveryProtocol::discovery_protocol
@@ -198,13 +223,15 @@ target_link_libraries(gateway_controller
     Threads::Threads
     ${CPPLOGGING_LIBRARY}
     ${CPPCOMMON_LIBRARY}
-    fmt::fmt              # Link fmt library
     bfd
     uuid
     dl
     z
     rt
 )
+if(FMT_BUNDLED_LIBRARY)
+    target_link_libraries(gateway_controller ${FMT_BUNDLED_LIBRARY})
+endif()
 ament_target_dependencies(gateway_controller rclcpp)
 
 # MEC Gateway executable with MEC-specific defaults
@@ -214,13 +241,15 @@ target_link_libraries(mec_gateway
     Threads::Threads
     ${CPPLOGGING_LIBRARY}
     ${CPPCOMMON_LIBRARY}
-    fmt::fmt              # Link fmt library
     bfd
     uuid
     dl
     z
     rt
 )
+if(FMT_BUNDLED_LIBRARY)
+    target_link_libraries(mec_gateway ${FMT_BUNDLED_LIBRARY})
+endif()
 ament_target_dependencies(mec_gateway rclcpp)
 
 # --- Make sure the service headers are available to the gateway_controller_lib ---
@@ -236,7 +265,6 @@ install(TARGETS
 
 install(TARGETS
   gateway_transport_lib
-  ros_gateway_lib
   message_handler_base_lib
   handlers_lib
   gateway_controller_lib
@@ -253,6 +281,11 @@ install(
 install(
     DIRECTORY srv
     DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
 )
 
 ament_package()

@@ -361,7 +361,7 @@ void GatewayController::control_thread_func() {
                         logger_.Info("gateway_controller.cpp: Server transport started on port {}", data_plane_listen_port_);
                         data_plane_connection_thread_ = std::thread(&GatewayController::data_plane_connection_thread_func, this);
                         
-                        if (operation_mode_ == "networked") {
+                        if (operation_mode_ == "networked" || operation_mode_ == "p2p_ds") {
                             state_ = State::DISCOVERING;
                         } else {
                             // MEC P2P: No discovery needed, skip to waiting for peer connection
@@ -559,7 +559,14 @@ void GatewayController::data_plane_connection_thread_func()
   while (running_) {
     auto tcp_server = dynamic_cast<TcpServerTransport*>(transport);
     if (tcp_server && tcp_server->accept_connection()) {
-      logger_.Info("gateway_controller.cpp: Data plane connection accepted from Bridge.");
+      logger_.Info("gateway_controller.cpp: Data plane connection accepted.");
+      
+      // In P2P modes, we don't have a Bridge CP to confirm the connection,
+      // so we transition to OPERATIONAL immediately upon TCP accept.
+      if (operation_mode_ != "networked") {
+          on_dp_confirmed();
+      }
+      
       // After a successful accept, do not log again until a new connection occurs (accept_connection will return false while connected).
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     } else {

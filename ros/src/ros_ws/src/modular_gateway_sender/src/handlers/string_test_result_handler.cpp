@@ -21,7 +21,7 @@ void StringTestResultHandler::initialize()
   
   subscription_ = node_->create_subscription<std_msgs::msg::String>(
     topic_name_, 10,
-    [this](const std::string::msg::String::SharedPtr msg) {
+    [this](const std_msgs::msg::String::SharedPtr msg) {
       this->handle_message(topic_name_, msg);
     }
   );

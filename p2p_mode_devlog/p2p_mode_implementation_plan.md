@@ -99,3 +99,21 @@ The `p2p.local_config_path` parameter supports:
 
 ### 5. Task ID Normalization
 The `BridgeCpClient` currently performs normalization on `task_id` (converting numbers to strings). The P2P auto-activation logic must ensure that `task_id` is consistently handled as a string when passed to `task_database_.find()`.
+
+## Phase 8: CRITICAL HOTFIX: P2P Matchmaking ID Conflict
+
+> [!CAUTION]
+> **POTENTIAL BREAKING CHANGE / ARCHITECTURAL DEBT**
+>
+> During the final loopback testing, an ID conflict was discovered in `p2p_ds` mode. The Discovery Service registry was designed for globally unique IDs, but P2P matchmaking requires the VHC and MEC to share the same `groupId:idInGroup`.
+>
+> ### Hotfix Implemented (2026-05-06):
+> To allow the test to pass, a "Short-Circuit Matchmaking" fix was applied to `discovery_service.cpp`:
+> 1. When a **VEHICLE** requests registration in P2P mode, the service checks for an MEC match first.
+> 2. If a match is found, the service sends the MEC details to the VHC and **IMMEDIATELY RETURNS** without registering the VHC in the registry.
+> 3. This avoids the `ID_CONFLICT` error because only the MEC is ever "officially" registered for that ID.
+>
+> ### Future Corrective Action Required:
+> *   **Registry Redesign**: The `ComponentRegistry` should be updated to use a composite key `(ComponentType, GroupID, IdInGroup)` instead of just `(GroupID, IdInGroup)`.
+> *   **Matchmaking Formalization**: Matchmaking should be handled by a dedicated `Matchmaker` component rather than side-effects within the `handleRegistration` flow.
+> *   **Standard Mode Verification**: Ensure this short-circuit logic never triggers in `networked` mode, as it would prevent Vehicles from being managed by the Bridge/OM.

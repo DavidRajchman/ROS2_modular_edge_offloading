@@ -37,19 +37,8 @@ int main(int argc, char * argv[])
   install_abort_handler();
 
   try {
-    // 4. Create the main GatewayController node with MEC-specific defaults
+    // Create the main GatewayController node
     rclcpp::NodeOptions node_options;
-    
-    // Override default parameters for MEC gateway
-    std::vector<rclcpp::Parameter> mec_defaults = {
-      rclcpp::Parameter("identity.component_type", "M"),
-      rclcpp::Parameter("identity.component_name", "mec_gateway"),
-      rclcpp::Parameter("identity.group_id", 70),           // Different group for MEC
-      rclcpp::Parameter("identity.id_in_group", 1),         // Start with ID 1 for MEC
-      rclcpp::Parameter("data_plane.listen_port", 7501)     // Different port range for MEC
-    };
-    
-    node_options.parameter_overrides(mec_defaults);
     auto controller_node = std::make_shared<gateway::GatewayController>(node_options);
     
     // 5. Initialize components that require shared_from_this()
