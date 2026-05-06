@@ -48,18 +48,21 @@ WORKDIR ${EXTERNAL_LIBS_DIR}
 RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
     cd CppCommon && \
     git checkout 1.0.5.0 && \
+    sed -i 's/fmt.git master/fmt.git 11.0.2/g' .gitlinks && \
     gil update && \
     cd build && \
-    ./unix.sh
+    CXXFLAGS="-Wno-error=deprecated-declarations" ./unix.sh
 
 # --- Clone CppLogging ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}
 RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
     cd CppLogging && \
     git checkout 1.0.5.0 && \
+    (gil update || true) && \
+    sed -i 's/fmt.git master/fmt.git 11.0.2/g' modules/CppCommon/.gitlinks && \
     gil update && \
     cd build && \
-    ./unix.sh
+    CXXFLAGS="-Wno-error=deprecated-declarations" ./unix.sh
 
 # --- Clone and Build fmt ---
 # WORKDIR is still ${EXTERNAL_LIBS_DIR}

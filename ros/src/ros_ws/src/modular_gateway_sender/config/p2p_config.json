@@ -7,6 +7,12 @@
       "task_name": "P2P_LIDAR_TASK",
       "input_message_types": [11, 201],
       "output_message_types": [202]
+    },
+    {
+      "task_id": 3,
+      "task_name": "STRING_TEST_PIPELINE",
+      "input_message_types": [201],
+      "output_message_types": [202]
     }
   ]
 }
