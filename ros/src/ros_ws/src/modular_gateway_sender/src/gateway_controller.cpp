@@ -18,7 +18,12 @@ bool GatewayController::message_type_from_id(uint32_t id, MessageType& out) {
         case 3: out = MessageType::FLOAT32; return true;
         case 4: out = MessageType::BOOL; return true;
         case 11: out = MessageType::smLASERSCAN; return true;
+        case 12: out = MessageType::smSERIAL_STRING; return true;
+        case 13: out = MessageType::smJOINTSTATE; return true;
+        case 14: out = MessageType::smSERIAL_FEEDBACK; return true;
         case 201: out = MessageType::STRING_TEST_INPUT; return true;
+
+
         case 202: out = MessageType::STRING_TEST_RESULT; return true;
         default: return false;
     }

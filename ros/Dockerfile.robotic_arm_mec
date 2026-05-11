@@ -1,0 +1,100 @@
+# Dockerfile for the Robotic Arm MEC (Edge Compute) Node
+# Extends the base ROS2 image with the modular gateway sender package.
+# The MEC is the compute side: it receives JointState commands from the
+# compute application, and receives serial feedback from the physical arm (via VHC).
+
+FROM ros:jazzy
+
+RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') ;\
+    curl -L -s -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo $VERSION_CODENAME)_all.deb" \
+    && apt-get update \
+    && apt-get install /tmp/ros2-apt-source.deb \
+    && rm -f /tmp/ros2-apt-source.deb
+
+RUN apt update && apt install -y \
+    nano \
+    iputils-ping \
+    iproute2 \
+    python3-pip \
+    binutils-dev \
+    uuid-dev \
+    ros-jazzy-sensor-msgs
+
+# Install gil (used by CppCommon and CppLogging)
+RUN python3 -m pip config set global.break-system-packages true
+RUN pip3 install gil
+
+# --- Build External Libraries ---
+ARG EXTERNAL_LIBS_DIR=/home/ubuntu/external_libs
+RUN mkdir -p ${EXTERNAL_LIBS_DIR}
+WORKDIR ${EXTERNAL_LIBS_DIR}
+
+RUN git clone https://github.com/chronoxor/CppCommon.git CppCommon && \
+    cd CppCommon && \
+    git checkout 1.0.5.0 && \
+    sed -i 's/fmt.git master/fmt.git main/g' .gitlinks && \
+    gil update && \
+    cd build && \
+    CXXFLAGS="-Wno-error=deprecated-declarations -fPIC" CFLAGS="-fPIC" ./unix.sh
+
+RUN git clone https://github.com/chronoxor/CppLogging.git CppLogging && \
+    cd CppLogging && \
+    git checkout 1.0.5.0 && \
+    (gil update || true) && \
+    sed -i 's/fmt.git master/fmt.git main/g' modules/CppCommon/.gitlinks && \
+    gil update && \
+    cd build && \
+    CXXFLAGS="-Wno-error=deprecated-declarations -fPIC" CFLAGS="-fPIC" ./unix.sh
+
+RUN git clone https://github.com/fmtlib/fmt.git fmt && \
+    cd fmt && \
+    git checkout 12.1.0 && \
+    mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/usr/local -DFMT_TEST=OFF && \
+    make -j$(nproc) && \
+    make install
+
+RUN git clone https://github.com/cameron314/readerwriterqueue.git readerwriterqueue && \
+    cd readerwriterqueue && \
+    mkdir -p build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
+
+# --- Permanent Library Path Configuration ---
+RUN echo "/usr/local/lib" >> /etc/ld.so.conf.d/usr-local.conf && ldconfig
+ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+RUN echo 'export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"' >> /etc/bash.bashrc
+
+# --- Copy ROS2 workspace sources ---
+COPY ./src/ros_ws/src /home/ubuntu/ros_ws/src/
+
+WORKDIR /home/ubuntu/ros_ws
+
+# --- Build the workspace ---
+RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build --packages-select modular_gateway_sender"
+
+RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
+RUN echo "source /home/ubuntu/ros_ws/install/setup.bash" >> ~/.bashrc
+
+# --- Default entrypoint: launch the robotic arm MEC node ---
+# Override OPERATION_MODE env var at runtime for p2p_ds:
+#   docker run -e OPERATION_MODE=p2p_ds -e DISCOVERY_HOST=192.168.1.1 ...
+ENV OPERATION_MODE=p2p
+ENV DISCOVERY_HOST=192.168.1.1
+ENV DISCOVERY_PORT=9090
+ENV MEC_LISTEN_PORT=7401
+ENV MEC_GROUP_ID=61
+ENV MEC_ID_IN_GROUP=1
+
+CMD ["/bin/bash", "-c", "\
+    source /opt/ros/jazzy/setup.bash && \
+    source /home/ubuntu/ros_ws/install/setup.bash && \
+    ros2 launch modular_gateway_sender robotic_arm_mec_launch.py \
+        operation_mode:=${OPERATION_MODE} \
+        listen_port:=${MEC_LISTEN_PORT} \
+        group_id:=${MEC_GROUP_ID} \
+        id_in_group:=${MEC_ID_IN_GROUP} \
+        discovery_host:=${DISCOVERY_HOST} \
+        discovery_port:=${DISCOVERY_PORT} \
+"]

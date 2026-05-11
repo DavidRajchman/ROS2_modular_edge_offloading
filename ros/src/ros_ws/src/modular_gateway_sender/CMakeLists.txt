@@ -184,7 +184,12 @@ add_library(handlers_lib
   src/handlers/laserscan_handler.cpp
   src/handlers/string_test_input_handler.cpp
   src/handlers/string_test_result_handler.cpp
+  src/handlers/serial_string_handler.cpp
+  src/handlers/joint_state_handler.cpp
+  src/handlers/serial_feedback_handler.cpp
 )
+
+
 target_include_directories(handlers_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -286,6 +291,11 @@ install(
 install(
   DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
+)
+
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
 )
 
 ament_package()

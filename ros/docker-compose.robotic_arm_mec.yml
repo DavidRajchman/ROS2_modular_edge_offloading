@@ -1,0 +1,35 @@
+services:
+  roarm_mec:
+    build:
+      context: ../ros        # Build context is the ros/ directory (contains the Dockerfile)
+      dockerfile: Dockerfile.robotic_arm_mec
+    image: roarm_mec:latest
+    container_name: roarm_mec
+
+    # --- Mode Selection ---
+    # Set OPERATION_MODE to 'p2p' or 'p2p_ds'.
+    #
+    # p2p mode:     MEC listens for a direct connection from the VHC.
+    #               No discovery service required.
+    #               VHC must be configured with MEC_HOST as its peer_host.
+    #
+    # p2p_ds mode:  MEC registers with the discovery service.
+    #               VHC uses the same discovery service to find this MEC.
+    #               DISCOVERY_HOST and DISCOVERY_PORT must point to a running DiscoveryService.
+    environment:
+      - OPERATION_MODE=p2p
+      - DISCOVERY_HOST=192.168.1.1
+      - DISCOVERY_PORT=9090
+      - MEC_LISTEN_PORT=7401
+      - MEC_GROUP_ID=61
+      - MEC_ID_IN_GROUP=1
+
+    # Expose the data plane port so the VHC can connect
+    ports:
+      - "7401:7401"
+
+    # Use host network for lowest latency in LAN/5G environments.
+    # Comment out 'ports' above if using network_mode: host
+    # network_mode: host
+
+    restart: unless-stopped

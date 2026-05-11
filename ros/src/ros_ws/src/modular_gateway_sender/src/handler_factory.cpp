@@ -6,6 +6,9 @@
 #include "modular_gateway_sender/handlers/laserscan_handler.hpp"
 #include "modular_gateway_sender/handlers/string_test_input_handler.hpp"
 #include "modular_gateway_sender/handlers/string_test_result_handler.hpp"
+#include "modular_gateway_sender/handlers/serial_string_handler.hpp"
+#include "modular_gateway_sender/handlers/joint_state_handler.hpp"
+#include "modular_gateway_sender/handlers/serial_feedback_handler.hpp"
 
 namespace gateway {
 
@@ -41,6 +44,17 @@ void HandlerFactory::register_known_handlers() {
     creator_map_["test/string_result"] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
         return std::make_shared<StringTestResultHandler>(gw, n);
     };
+    
+    // Robotic Arm handlers
+    creator_map_["std_msgs/msg/String/serial"] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<SerialStringHandler>(gw, n);
+    };
+    creator_map_["sensor_msgs/msg/JointState"] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<JointStateHandler>(gw, n);
+    };
+    creator_map_["std_msgs/msg/String/feedback"] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<SerialFeedbackHandler>(gw, n);
+    };
 
     // MessageType enum-based registry (canonical approach)
     // Maps MessageType enum values (1=STRING, 11=LASERSCAN, etc.) to handler creators
@@ -55,6 +69,15 @@ void HandlerFactory::register_known_handlers() {
     };
     mt_creator_map_[MessageType::STRING_TEST_RESULT] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
         return std::make_shared<StringTestResultHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::smSERIAL_STRING] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<SerialStringHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::smJOINTSTATE] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<JointStateHandler>(gw, n);
+    };
+    mt_creator_map_[MessageType::smSERIAL_FEEDBACK] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+        return std::make_shared<SerialFeedbackHandler>(gw, n);
     };
 
     logger_.Info("handler_factory.cpp: Registered {} legacy string types and {} MessageType creators.", creator_map_.size(), mt_creator_map_.size());

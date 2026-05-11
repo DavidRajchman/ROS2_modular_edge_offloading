@@ -79,6 +79,30 @@ To add a new message handler for a custom type:
 3. Register the message type in `MessageType` enum
 4. Add the handler to the appropriate main file
 
+### Modern Architecture Update (v0.20.0+)
+
+> [!IMPORTANT]
+> **[NEEDS VERIFICATION, AI GEN]**
+> In the current modular architecture, the following additional registration steps are mandatory for the handler to be recognized and instantiated by the `GatewayController`.
+
+5. **Map JSON ID to Enum**:
+   - Update `GatewayController::message_type_from_id` in `src/gateway_controller.cpp`.
+   - Add a `case` for your numeric ID (from the global config) mapping to your `MessageType`.
+
+6. **Register in Factory**:
+   - Include your handler header in `src/handler_factory.cpp`.
+   - Add a creator lambda to the `mt_creator_map_` inside `register_known_handlers()`:
+     ```cpp
+     mt_creator_map_[MessageType::YOUR_TYPE] = [](RosGateway* gw, std::shared_ptr<rclcpp::Node> n) {
+         return std::make_shared<YourHandler>(gw, n);
+     };
+     ```
+
+7. **Update CMakeLists.txt**:
+   - Add your source file to the `handlers_lib` library in the main `CMakeLists.txt`.
+   - Add any required ROS message packages to the `handlers_lib` dependencies.
+
+
 ## Thread Safety
 
 The system uses mutex protection with the `transport_access_mutex_` to ensure thread-safe access to the transport layer when sending and receiving messages.
