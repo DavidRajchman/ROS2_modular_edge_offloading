@@ -175,23 +175,26 @@ sudo ldconfig
 
 ## 6. Build the ROS 2 Workspace
 
+> [!WARNING]
+> You **must** source the base ROS environment before running colcon. Without it, the build fails with `No module named 'ament_package'` and `ros2: command not found`. Set up `~/.bashrc` first so every new terminal is ready automatically.
 
-```bash
-# Navigate to your ROS 2 workspace root (the directory that contains the src/ folder)
-# Example: cd ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws
-cd <your_workspace_root>
-source /opt/ros/jazzy/setup.bash
-colcon build --packages-select modular_gateway_sender
-source install/setup.bash
-```
-
-Add the workspace source to your shell profile so it is available in every terminal:
-
+**Step 1 — Add both sources to `~/.bashrc` permanently:**
 ```bash
 echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 echo "source <your_workspace_root>/install/setup.bash" >> ~/.bashrc
 # Example:
 # echo "source ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws/install/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Step 2 — Build:**
+```bash
+# Navigate to your ROS 2 workspace root (the directory that contains the src/ folder)
+# Example: cd ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws
+cd <your_workspace_root>
+source /opt/ros/jazzy/setup.bash   # required before colcon
+colcon build --packages-select modular_gateway_sender
+source install/setup.bash
 ```
 
 ---

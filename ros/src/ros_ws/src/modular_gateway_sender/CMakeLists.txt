@@ -5,7 +5,8 @@ project(modular_gateway_sender)
 # Logging configuration (user-adjustable via cmake command line)
 # ------------------------------------------------------------------
 # MGW_LOG_MODE: BINARY or TEXT
-set(MGW_LOG_MODE "BINARY" CACHE STRING "Logging output mode: BINARY or TEXT")
+# MGW_LOG_MODE: BINARY or TEXT
+set(MGW_LOG_MODE "TEXT" CACHE STRING "Logging output mode: BINARY or TEXT")
 set_property(CACHE MGW_LOG_MODE PROPERTY STRINGS BINARY TEXT)
 
 # MGW_LOG_LEVEL_PRESET: convenience presets (optional)
@@ -32,9 +33,6 @@ else()
 endif()
 
 # ------------------------------------------------------------------
-# Existing project configuration continues below
-# ------------------------------------------------------------------
-
 # Set version information
 add_definitions(-DVERSION_MAJOR=0)
 add_definitions(-DVERSION_MINOR=20)

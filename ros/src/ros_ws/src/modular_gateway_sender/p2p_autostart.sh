@@ -7,6 +7,7 @@ echo "=== P2P Autostart Script ==="
 CPPLIB_SRC_DIR="${CPPLIB_SRC_DIR:-/home/ubuntu/cpplib_src}"
 ROS_WS="${ROS_WS:-/home/ubuntu/ros_ws}"
 DISCOVERY_DIR="${DISCOVERY_DIR:-${CPPLIB_SRC_DIR}/discovery_protocol}"
+LAUNCH_PACKAGE="${LAUNCH_PACKAGE:-offloading_latency_test_loopback}"
 LAUNCH_FILE="${LAUNCH_FILE:-p2p_loopback_vhc_launch.py}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
@@ -16,6 +17,7 @@ echo "User: $(whoami)"
 echo "Using CPPLIB_SRC_DIR=${CPPLIB_SRC_DIR}"
 echo "Using ROS_WS=${ROS_WS}"
 echo "Using DISCOVERY_DIR=${DISCOVERY_DIR}"
+echo "Using LAUNCH_PACKAGE=${LAUNCH_PACKAGE}"
 echo "Using LAUNCH_FILE=${LAUNCH_FILE}"
 
 if [[ ! -d "${CPPLIB_SRC_DIR}" ]]; then
@@ -67,8 +69,8 @@ if [[ "${CLEAN:-0}" == "1" ]]; then
   rm -rf build install log
 fi
 
-echo "Building modular_gateway_sender and offloading_latency_test_loopback..."
-colcon build --packages-select modular_gateway_sender offloading_latency_test_loopback
+echo "Building ${LAUNCH_PACKAGE} and dependencies..."
+colcon build --packages-up-to "${LAUNCH_PACKAGE}"
 
 # Safe sourcing helper to avoid 'set -u' unbound variable errors in generated scripts
 safe_source() {
@@ -87,5 +89,5 @@ safe_source() {
 echo "Sourcing workspace (safe)..."
 safe_source "${ROS_WS}/install/setup.bash"
 
-echo "Launching P2P stack: ${LAUNCH_FILE}"
-exec ros2 launch offloading_latency_test_loopback "${LAUNCH_FILE}" "$@"
+echo "Launching P2P stack: ${LAUNCH_PACKAGE} ${LAUNCH_FILE}"
+exec ros2 launch "${LAUNCH_PACKAGE}" "${LAUNCH_FILE}" "$@"

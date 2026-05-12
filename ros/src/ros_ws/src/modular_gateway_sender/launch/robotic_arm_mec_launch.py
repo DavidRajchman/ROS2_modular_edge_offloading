@@ -59,10 +59,10 @@ def generate_launch_description():
                 'discovery_service.host': LaunchConfiguration('discovery_host'),
                 'discovery_service.port': LaunchConfiguration('discovery_port'),
 
-                # Topic overrides for robotic arm compute side
-                'serial_feedback_handler.topic': 'serial_ctrl/rx',
-                'serial_string_handler.topic': 'serial_ctrl/tx',
-                'joint_state_handler.topic': 'joint_states',
+                # Topic overrides for robotic arm compute side (using absolute paths)
+                'serial_feedback_handler.topic': '/serial_ctrl/rx',
+                'serial_string_handler.topic': '/serial_ctrl/tx',
+                'joint_state_handler.topic': '/joint_states',
             }],
         )
     ])

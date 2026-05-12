@@ -37,14 +37,12 @@ Both nodes use fixed IP addresses. No discovery service is required. The MEC sta
 
 **Step 1 — Start the MEC (Docker):**
 ```bash
-cd autonomous-driving-ros2/ros
-
-# Default mode is p2p. Edit the compose file to set MEC_LISTEN_PORT if needed.
+# From the repository root
 docker compose -f docker-compose.robotic_arm_mec.yml up
 ```
-Or override inline:
+Or override parameters inline:
 ```bash
-OPERATION_MODE=p2p MEC_LISTEN_PORT=7401 \
+OPERATION_MODE=p2p_ds DISCOVERY_HOST=192.168.1.1 \
   docker compose -f docker-compose.robotic_arm_mec.yml up
 ```
 

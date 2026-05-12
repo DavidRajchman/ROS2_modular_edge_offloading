@@ -1,0 +1,29 @@
+services:
+  robotic_arm_mec:
+    build:
+      context: ./ros/
+      dockerfile: Dockerfile
+    container_name: robotic_arm_mec
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=13
+      - LAUNCH_PACKAGE=modular_gateway_sender
+      - LAUNCH_FILE=robotic_arm_mec_launch.py
+      - OPERATION_MODE=p2p  # Default mode
+    volumes:
+      - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
+      - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
+      - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
+      - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
+      - ./cpplib:/home/ubuntu/cpplib_src
+    ports:
+      - "7401:7401"  # Data plane
+      - "9090:9090"  # Discovery service (optional)
+    privileged: true
+    tty: true
+    command: >
+      /bin/bash -c "
+      chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh &&
+      source /opt/ros/jazzy/setup.bash &&
+      bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh
+      "
