@@ -69,8 +69,8 @@ if [[ "${CLEAN:-0}" == "1" ]]; then
   rm -rf build install log
 fi
 
-echo "Building ${LAUNCH_PACKAGE} and dependencies..."
-colcon build --packages-up-to "${LAUNCH_PACKAGE}"
+echo "Building entire workspace (including RoArm-M1 and dependencies)..."
+colcon build
 
 # Safe sourcing helper to avoid 'set -u' unbound variable errors in generated scripts
 safe_source() {

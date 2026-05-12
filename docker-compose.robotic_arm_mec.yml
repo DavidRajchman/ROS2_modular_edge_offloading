@@ -4,21 +4,22 @@ services:
       context: ./ros/
       dockerfile: Dockerfile
     container_name: robotic_arm_mec
+    network_mode: host  # Use host network for easier X11 and discovery
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - ROS_DOMAIN_ID=13
       - LAUNCH_PACKAGE=modular_gateway_sender
       - LAUNCH_FILE=robotic_arm_mec_launch.py
-      - OPERATION_MODE=p2p  # Default mode
+      - OPERATION_MODE=p2p
+      - DISPLAY=${DISPLAY}  # Pass host display to container
     volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix  # X11 socket
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
       - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
       - ./cpplib:/home/ubuntu/cpplib_src
-    ports:
-      - "7401:7401"  # Data plane
-      - "9090:9090"  # Discovery service (optional)
+      - ./external_repos/RoArm-M1:/home/ubuntu/ros_ws/src/RoArm-M1  # Mount RoArm-M1 into src
     privileged: true
     tty: true
     command: >

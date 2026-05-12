@@ -14,6 +14,9 @@ ros-jazzy-demo-nodes-cpp \
 ros-jazzy-rviz2 \
 ros-jazzy-teleop-twist-keyboard \
 ros-jazzy-slam-toolbox \
+ros-jazzy-joint-state-publisher \
+ros-jazzy-joint-state-publisher-gui \
+ros-jazzy-xacro \
 nano \ 
 iputils-ping \
 iproute2 \
