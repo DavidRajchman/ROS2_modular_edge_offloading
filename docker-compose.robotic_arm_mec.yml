@@ -12,6 +12,7 @@ services:
       - LAUNCH_FILE=robotic_arm_mec_launch.py
       - OPERATION_MODE=p2p
       - DISPLAY=${DISPLAY}  # Pass host display to container
+      - TELEOP=${TELEOP:-false}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix  # X11 socket
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
@@ -27,5 +28,5 @@ services:
       /bin/bash -c "
       chmod +x /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh &&
       source /opt/ros/jazzy/setup.bash &&
-      bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh
+      bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh teleop:=$$TELEOP
       "

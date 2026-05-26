@@ -9,30 +9,30 @@ RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-inf
     && rm -f /tmp/ros2-apt-source.deb
 
 # Instalace balíčků pro ROS 2 a gz_bridge
-RUN apt update && apt install -y \
-ros-jazzy-demo-nodes-cpp \
-ros-jazzy-rviz2 \
-ros-jazzy-teleop-twist-keyboard \
-ros-jazzy-slam-toolbox \
-ros-jazzy-joint-state-publisher \
-ros-jazzy-joint-state-publisher-gui \
-ros-jazzy-xacro \
-nano \ 
-iputils-ping \
-iproute2 \
-python3-pip \
-binutils-dev \
-uuid-dev 
-
-RUN apt install -y tmux \
-ros-jazzy-robot-localization \
-ros-jazzy-navigation2 \
-ros-jazzy-nav2-bringup \
-#ros-jazzy-rmw-cyclonedx-cpp \ # MUST BE FIXED - THROWS DOCKER BUILD ERROR
-ros-jazzy-pcl-conversions \
-ros-jazzy-pcl-msgs \
-python3-scipy \
-python3-serial 
+RUN apt-get update && apt-get install -y \
+    ros-jazzy-demo-nodes-cpp \
+    ros-jazzy-rviz2 \
+    ros-jazzy-teleop-twist-keyboard \
+    ros-jazzy-slam-toolbox \
+    ros-jazzy-joint-state-publisher \
+    ros-jazzy-joint-state-publisher-gui \
+    ros-jazzy-xacro \
+    nano \
+    iputils-ping \
+    iproute2 \
+    python3-pip \
+    binutils-dev \
+    uuid-dev \
+    tmux \
+    ros-jazzy-robot-localization \
+    ros-jazzy-navigation2 \
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-pcl-conversions \
+    ros-jazzy-pcl-msgs \
+    python3-scipy \
+    python3-serial \
+    python3-tk && \
+    rm -rf /var/lib/apt/lists/* 
 
 # Install gil (used by CppCommon and CppLogging)
 RUN python3 -m pip config set global.break-system-packages true

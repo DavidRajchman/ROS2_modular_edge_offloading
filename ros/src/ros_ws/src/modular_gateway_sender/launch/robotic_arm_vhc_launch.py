@@ -9,6 +9,10 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     pkg_dir = get_package_share_directory('modular_gateway_sender')
     default_config = os.path.join(pkg_dir, 'config', 'robotic_arm_config.json')
+    
+    # Dynamically resolve workspace root and script path
+    ws_dir = os.path.abspath(os.path.join(pkg_dir, '../../../../'))
+    roarm_bridge_script = os.path.join(ws_dir, 'roarm_control', 'roarm_serial_bridge.py')
 
     return LaunchDescription([
         # --- Mode Selection ---
@@ -89,7 +93,7 @@ def generate_launch_description():
 
         ExecuteProcess(
             condition=IfCondition(LaunchConfiguration('teleop')),
-            cmd=['python3', '/home/david/Desktop/6G - LAB/autonomous-driving-ros2/ros/src/ros_ws/roarm_control/roarm_serial_bridge.py'],
+            cmd=['python3', roarm_bridge_script],
             output='screen'
         ),
 
