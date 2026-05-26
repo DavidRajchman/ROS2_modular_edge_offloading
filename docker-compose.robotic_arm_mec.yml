@@ -18,6 +18,7 @@ services:
       - ./ros/src/ros_ws/lib:/home/ubuntu/ros_ws/lib
       - ./ros/src/ros_ws/rosbags:/home/ubuntu/ros_ws/rosbags
       - ./ros/src/ros_ws/launch:/home/ubuntu/ros_ws/launch
+      - ./ros/src/ros_ws/roarm_control:/home/ubuntu/ros_ws/roarm_control
       - ./cpplib:/home/ubuntu/cpplib_src
       - ./external_repos/RoArm-M1:/home/ubuntu/ros_ws/src/RoArm-M1  # Mount RoArm-M1 into src
     privileged: true

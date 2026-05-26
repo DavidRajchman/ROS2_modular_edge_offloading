@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition, UnlessCondition
 import os
 from ament_index_python.packages import get_package_share_directory
 
@@ -17,6 +18,12 @@ def generate_launch_description():
             'operation_mode',
             default_value='p2p',
             description="Connection mode: 'p2p' (static IP) or 'p2p_ds' (discovery-assisted)"
+        ),
+        
+        DeclareLaunchArgument(
+            'teleop',
+            default_value='false',
+            description='Launch custom python serial bridge instead of default serial_ctrl'
         ),
 
         # --- p2p mode args (required when operation_mode:=p2p) ---
@@ -78,5 +85,17 @@ def generate_launch_description():
                 'serial_string_handler.topic': '/serial_ctrl/tx',
                 'joint_state_handler.topic': '/joint_states',
             }],
+        ),
+
+        ExecuteProcess(
+            condition=IfCondition(LaunchConfiguration('teleop')),
+            cmd=['python3', '/home/david/Desktop/6G - LAB/autonomous-driving-ros2/ros/src/ros_ws/roarm_control/roarm_serial_bridge.py'],
+            output='screen'
+        ),
+
+        ExecuteProcess(
+            condition=UnlessCondition(LaunchConfiguration('teleop')),
+            cmd=['ros2', 'run', 'serial_ctrl', 'serial_ctrl_py'],
+            output='screen'
         )
     ])

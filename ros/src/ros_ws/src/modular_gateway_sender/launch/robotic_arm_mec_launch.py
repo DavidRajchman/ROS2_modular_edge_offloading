@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition, UnlessCondition
 import os
 from ament_index_python.packages import get_package_share_directory
 
@@ -17,6 +18,12 @@ def generate_launch_description():
             'operation_mode',
             default_value='p2p',
             description="Connection mode: 'p2p' (static, MEC listens) or 'p2p_ds' (registers with discovery service)"
+        ),
+        
+        DeclareLaunchArgument(
+            'teleop',
+            default_value='false',
+            description='Launch custom python teleop script instead of default roarm GUI'
         ),
 
         # --- p2p_ds mode args (required when operation_mode:=p2p_ds) ---
@@ -64,5 +71,17 @@ def generate_launch_description():
                 'serial_string_handler.topic': '/serial_ctrl/tx',
                 'joint_state_handler.topic': '/joint_states',
             }],
+        ),
+
+        ExecuteProcess(
+            condition=IfCondition(LaunchConfiguration('teleop')),
+            cmd=['python3', '/home/ubuntu/ros_ws/roarm_control/roarm_keyboard_teleop.py'],
+            output='screen'
+        ),
+
+        ExecuteProcess(
+            condition=UnlessCondition(LaunchConfiguration('teleop')),
+            cmd=['ros2', 'launch', 'roarm', 'roarm.launch.py', 'gui:=True'],
+            output='screen'
         )
     ])
