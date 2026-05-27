@@ -18,30 +18,33 @@ class RoArmKeyboardTeleop(Node):
         self.mode = "CARTESIAN"
         self.pressed_keys = {}
 
-        self.cur_x = 180.0
-        self.cur_y = 0.0
-        self.cur_z = 120.0
-        self.cur_t = 0.0   
-        self.cur_g = 0.0   
+# Cartesian State (Coordinates in mm, Angles in Degrees to match ESP32 IK)
+        self.cur_x = 277.5
+        self.cur_y = -13.75
+        self.cur_z = 276.5
+        self.cur_t = 90.0   
+        self.cur_g = 180.0
 
-        self.joints = {1: 2047, 2: 2047, 3: 2047, 4: 2047, 5: 2047}
-        self.selected_joint = 1
+        # --- DIRECT JOINT CONTROL COMMENTED OUT ---
+        # self.joints = {1: 2047, 2: 2047, 3: 2047, 4: 2047, 5: 2047}
+        # self.selected_joint = 1
+        # self.joint_step = 20       
 
-        self.linear_step = 2.5     
-        self.angular_step = 0.04   
-        self.joint_step = 20       
+        self.linear_step = 2.5     # mm per tick
+        self.angular_step = 2.5    # degrees per tick
 
         self.R_MAX = 300.0         
         self.R_MIN = 80.0           
         self.Z_MIN = 25.0          
 
-        self.timer = self.create_timer(1.0 / 30.0, self.update_loop)
+        self.timer = self.create_timer(1.0 / 10.0, self.update_loop)
 
     def update_loop(self):
         if self.mode == "CARTESIAN":
             self.process_cartesian()
-        elif self.mode == "JOINT":
-            self.process_joint()
+        # --- DIRECT JOINT CONTROL COMMENTED OUT ---
+        # elif self.mode == "JOINT":
+        #     self.process_joint()
 
     def process_cartesian(self):
         state_changed = False
@@ -72,37 +75,40 @@ class RoArmKeyboardTeleop(Node):
                 scale = self.R_MIN / r
                 self.cur_x *= scale; self.cur_y *= scale; self.cur_z *= scale
 
+            # T:2 is the M1 Cartesian Command (COORD_CTRL)
             payload = {
-                "T": 104,
-                "x": round(self.cur_x, 1),
-                "y": round(self.cur_y, 1),
-                "z": round(self.cur_z, 1),
-                "t": round(self.cur_t, 2),
-                "g": round(self.cur_g, 2),
-                "spd": 0
+                "T": 2,
+                "P1": round(self.cur_x, 1), # X (mm)
+                "P2": round(self.cur_y, 1), # Y (mm)
+                "P3": round(self.cur_z, 1), # Z (mm)
+                "P4": round(self.cur_t, 2), # Pitch (Deg)
+                "P5": round(self.cur_g, 2), # Gripper (Deg)
+                "S1": 30,                   # Step Delay (ms) for interpolation
+                "S5": 200                   # Gripper speed
             }
             self.publish_command(payload)
 
-    def process_joint(self):
-        state_changed = False
-
-        for i in range(1, 6):
-            if self.pressed_keys.get(str(i)):
-                self.selected_joint = i
-
-        if self.pressed_keys.get('w'): self.joints[self.selected_joint] += self.joint_step; state_changed = True
-        if self.pressed_keys.get('s'): self.joints[self.selected_joint] -= self.joint_step; state_changed = True
-
-        if state_changed:
-            self.joints[self.selected_joint] = max(0, min(4095, self.joints[self.selected_joint]))
-
-            payload = {
-                "T": 101,
-                "joint": self.selected_joint,
-                "value": self.joints[self.selected_joint],
-                "spd": 0
-            }
-            self.publish_command(payload)
+    # --- DIRECT JOINT CONTROL COMMENTED OUT ---
+    # def process_joint(self):
+    #     state_changed = False
+    #
+    #     for i in range(1, 6):
+    #         if self.pressed_keys.get(str(i)):
+    #             self.selected_joint = i
+    #
+    #     if self.pressed_keys.get('w'): self.joints[self.selected_joint] += self.joint_step; state_changed = True
+    #     if self.pressed_keys.get('s'): self.joints[self.selected_joint] -= self.joint_step; state_changed = True
+    #
+    #     if state_changed:
+    #         self.joints[self.selected_joint] = max(0, min(4095, self.joints[self.selected_joint]))
+    #
+    #         payload = {
+    #             "T": 3,
+    #             "P1": self.joints[1], "P2": self.joints[2], "P3": self.joints[3], "P4": self.joints[4], "P5": self.joints[5],
+    #             "S1": 200, "S2": 200, "S3": 200, "S4": 200, "S5": 200,
+    #             "A1": 60, "A2": 60, "A3": 60, "A4": 60, "A5": 60
+    #         }
+    #         self.publish_command(payload)
 
     def publish_command(self, data_dict):
         msg = String()
@@ -114,19 +120,20 @@ def run_tkinter_gui(node):
     root.title("RoArm-M1 Teleop Pad (MEC)")
     root.geometry("350x150")
 
-    label = tk.Label(root, text="Mode: CARTESIAN\n\nWASD: XY Plane | Space/C: Height\nArrows: Pitch & Gripper\nPress [M] to Switch Modes", font=("Helvetica", 11))
+    label = tk.Label(root, text="Mode: CARTESIAN (Kinematics Only)\n\nWASD: XY Plane | Space/C: Height\nArrows: Pitch & Gripper", font=("Helvetica", 11))
     label.pack(pady=20)
 
     def key_press(event):
         key = event.keysym.lower()
         node.pressed_keys[key] = True
         
-        if key == 'm':
-            node.mode = "JOINT" if node.mode == "CARTESIAN" else "CARTESIAN"
-            if node.mode == "JOINT":
-                label.config(text=f"Mode: JOINT CONTROL\n\nKeys 1-5: Choose Joint (Active: {node.selected_joint})\nW/S: Move Selected Joint\nPress [M] to Switch Modes")
-            else:
-                label.config(text="Mode: CARTESIAN\n\nWASD: XY Plane | Space/C: Height\nArrows: Pitch & Gripper\nPress [M] to Switch Modes")
+        # --- DIRECT JOINT CONTROL COMMENTED OUT ---
+        # if key == 'm':
+        #     node.mode = "JOINT" if node.mode == "CARTESIAN" else "CARTESIAN"
+        #     if node.mode == "JOINT":
+        #         label.config(text=f"Mode: JOINT CONTROL\n\nKeys 1-5: Choose Joint (Active: {node.selected_joint})\nW/S: Move Selected Joint\nPress [M] to Switch Modes")
+        #     else:
+        #         label.config(text="Mode: CARTESIAN\n\nWASD: XY Plane | Space/C: Height\nArrows: Pitch & Gripper\nPress [M] to Switch Modes")
 
     def key_release(event):
         key = event.keysym.lower()

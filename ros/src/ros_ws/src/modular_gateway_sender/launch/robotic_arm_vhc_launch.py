@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition, UnlessCondition
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -13,6 +13,7 @@ def generate_launch_description():
     # Dynamically resolve workspace root and script path
     ws_dir = os.path.abspath(os.path.join(pkg_dir, '../../../../'))
     roarm_bridge_script = os.path.join(ws_dir, 'roarm_control', 'roarm_serial_bridge.py')
+    roarm_ik_bridge_script = os.path.join(ws_dir, 'roarm_control', 'roarm_joint_state_IK.py')
 
     return LaunchDescription([
         # --- Mode Selection ---
@@ -28,6 +29,11 @@ def generate_launch_description():
             'teleop',
             default_value='false',
             description='Launch custom python serial bridge instead of default serial_ctrl'
+        ),
+        DeclareLaunchArgument(
+            'IK_MEC',
+            default_value='false',
+            description='Offload IK computation to MEC (requires teleop:=true)'
         ),
 
         # --- p2p mode args (required when operation_mode:=p2p) ---
@@ -92,7 +98,13 @@ def generate_launch_description():
         ),
 
         ExecuteProcess(
-            condition=IfCondition(LaunchConfiguration('teleop')),
+            condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'true'"])),
+            cmd=['python3', roarm_ik_bridge_script],
+            output='screen'
+        ),
+
+        ExecuteProcess(
+            condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'false'"])),
             cmd=['python3', roarm_bridge_script],
             output='screen'
         ),
