@@ -17,26 +17,30 @@ class RoArmSafeTeleop(Node):
         self.pressed_keys = {}
 
         # --- RoArm-M1 Mechanical Constants (mm) ---
-        self.LEN_A = 131.22  # Height from ground to shoulder pivot (Z offset)
-        self.LEN_B = 140.0   # Length of the bicep
-        self.LEN_C = 140.0   # Length of the forearm
-        self.LEN_D = 60.0    # Distance from wrist pivot to gripper tip
+        self.LEN_A = 115.432
+        self.LEN_B = 41.0513
+        self.LEN_C = 168.8579
+        self.LEN_D = 127.9234
+        self.LEN_E = 108.5357
+        self.LEN_F = 7.7076
+        self.LEN_G = 90.0
+        self.LEN_H = -13.75
 
         # --- Dual State Separation (Cartesian) ---
         # The invisible target driven by the operator
-        self.target_x, self.target_y, self.target_z = 277.5, 0.0, 276.5
-        self.target_t, self.target_g = 0.0, 0.0 # Pitch & Gripper (Radians)
+        self.target_x, self.target_y, self.target_z = 277.5, -13.75, 276.5
+        self.target_t, self.target_g = 90.0, 0.0 # Pitch (Degrees) & Gripper (Radians)
         
         # The physical commanded state of the arm
-        self.cmd_x, self.cmd_y, self.cmd_z = 277.5, 0.0, 276.5
-        self.cmd_t, self.cmd_g = 0.0, 0.0 
+        self.cmd_x, self.cmd_y, self.cmd_z = 277.5, -13.75, 276.5
+        self.cmd_t, self.cmd_g = 90.0, 0.0 
         self.last_base_rad = 0.0 # Cache for singularity protection
 
         # --- Velocity Limits ---
         self.operator_speed = 15.0       # mm/s
-        self.operator_ang_speed = 0.5    # rad/s
+        self.operator_ang_speed = 15.0   # degrees/s for pitch
         self.arm_speed = 30.0            # mm/s
-        self.arm_ang_speed = 1.0         # rad/s
+        self.arm_ang_speed = 30.0        # degrees/s for pitch
 
         # --- Workspace Limits (Spherical Shell) ---
         self.R_MAX = 300.0         
@@ -48,48 +52,104 @@ class RoArmSafeTeleop(Node):
         self.last_time = time.time()
         self.timer = self.create_timer(1.0 / self.hz, self.control_loop)
 
-    def compute_inverse_kinematics(self, x, y, z, pitch):
+    def compute_inverse_kinematics(self, x, y, z, pitch_deg):
         """ 
         Direct Python port of the ESP32 RoArm-M1 C++ IK Solver 
-        (EoAT_IK -> wigglePlaneIK -> simpleLinkageIK)
+        (wigglePlaneIK -> EoAT_IK -> simpleLinkageIK)
         """
-        # 1. Base Pan Angle (Protect against singularity at x=0, y=0)
-        r_plane = math.sqrt(x**2 + y**2)
-        if r_plane > 0.01:
-            base_rad = math.atan2(y, x)
-            self.last_base_rad = base_rad
-        else:
-            base_rad = self.last_base_rad
-        
-        # 2. End of Arm Tooling (EoAT) Offset
-        wrist_z = z - (self.LEN_D * math.sin(pitch))
-        wrist_r = r_plane - (self.LEN_D * math.cos(pitch))
-        
-        # 3. Primary Linkage (Law of Cosines)
-        z_from_shoulder = wrist_z - self.LEN_A
-        d_sq = wrist_r**2 + z_from_shoulder**2
-        d = math.sqrt(d_sq)
-        
-        # Safety clamp to prevent math domain errors (NaN) and division by zero
-        if d < 0.001:
-            d = 0.001
-            d_sq = d**2
-        elif d >= (self.LEN_B + self.LEN_C):
-            d = self.LEN_B + self.LEN_C - 0.001 
-            d_sq = d**2
+        # --- 1. wigglePlaneIK ---
+        aIn = x
+        bIn = -y
+        if bIn > 0:
+            L2C = aIn * aIn + bIn * bIn
+            LC = math.sqrt(L2C)
+            lambda_ = math.degrees(math.atan2(aIn, bIn))
+            psi = math.degrees(math.acos(self.LEN_H/LC)) if LC >= abs(self.LEN_H) else 0
+            LB = math.sqrt(L2C - self.LEN_H * self.LEN_H) if L2C >= self.LEN_H * self.LEN_H else 0
+            alpha = psi + lambda_ - 90
+        elif bIn == 0:
+            alpha = 90 + math.degrees(math.asin(self.LEN_H/aIn)) if aIn != 0 else 90
+            L2C = aIn * aIn + bIn * bIn
+            LB = math.sqrt(L2C)
+        else: # bIn < 0
+            bIn = -bIn
+            L2C = aIn * aIn + bIn * bIn
+            LC = math.sqrt(L2C)
+            lambda_ = math.degrees(math.atan2(aIn, bIn))
+            psi = math.degrees(math.acos(self.LEN_H/LC)) if LC >= abs(self.LEN_H) else 0
+            LB = math.sqrt(L2C - self.LEN_H * self.LEN_H) if L2C >= self.LEN_H * self.LEN_H else 0
+            alpha = 90 - lambda_ + psi
+            
+        angle_1 = alpha + 90
+        len_totalXY = LB - self.LEN_B
 
-        cos_elbow = (self.LEN_B**2 + self.LEN_C**2 - d_sq) / (2 * self.LEN_B * self.LEN_C)
-        cos_elbow = max(-1.0, min(1.0, cos_elbow)) 
-        elbow_rad = math.pi - math.acos(cos_elbow) 
+        # --- 2. EoAT_IK ---
+        if pitch_deg == 90:
+            betaGenOut = pitch_deg - self.LEN_G
+            betaRad = math.radians(betaGenOut)
+            angleRad = math.radians(pitch_deg)
+            aGenOut = self.LEN_E
+            bGenOut = self.LEN_F
+        elif pitch_deg < 90:
+            betaGenOut = 90 - pitch_deg
+            betaRad = math.radians(betaGenOut)
+            angleRad = math.radians(pitch_deg)
+            aGenOut = math.cos(angleRad)*self.LEN_F + math.cos(betaRad)*self.LEN_E
+            bGenOut = math.sin(angleRad)*self.LEN_F - math.sin(betaRad)*self.LEN_E
+            betaGenOut = -betaGenOut
+        else: # pitch_deg > 90
+            betaGenOut = self.LEN_G - (180 - pitch_deg)
+            betaRad = math.radians(betaGenOut)
+            angleRad = math.radians(pitch_deg)
+            aGenOut = -math.cos(math.pi-angleRad)*self.LEN_F + math.cos(betaRad)*self.LEN_E
+            bGenOut = math.sin(math.pi-angleRad)*self.LEN_F + math.sin(betaRad)*self.LEN_E
+
+        angle_EoAT = betaGenOut
+        len_a = aGenOut
+        len_b = bGenOut
+
+        # --- 3. simpleLinkageIK ---
+        LA = self.LEN_C
+        LB = self.LEN_D
+        aIn2 = len_totalXY - len_a
+        bIn2 = z - self.LEN_A + len_b
+
+        # Safety clamps for math domain
+        if aIn2 < 0.001: aIn2 = 0.001
         
-        cos_shoulder = (self.LEN_B**2 + d_sq - self.LEN_C**2) / (2 * self.LEN_B * d)
-        cos_shoulder = max(-1.0, min(1.0, cos_shoulder))
+        if bIn2 == 0:
+            val = (LA * LA + aIn2 * aIn2 - LB * LB) / (2 * LA * aIn2)
+            psi = math.degrees(math.acos(max(-1.0, min(1.0, val))))
+            alpha2 = 90 - psi
+            val2 = (aIn2 * aIn2 + LB * LB - LA * LA) / (2 * aIn2 * LB)
+            omega = math.degrees(math.acos(max(-1.0, min(1.0, val2))))
+            beta = psi + omega
+        else:
+            L2C2 = aIn2 * aIn2 + bIn2 * bIn2
+            LC2 = math.sqrt(L2C2)
+            lambda2 = math.degrees(math.atan2(bIn2, aIn2))
+            val = (LA * LA + L2C2 - LB * LB) / (2 * LA * LC2)
+            psi = math.degrees(math.acos(max(-1.0, min(1.0, val))))
+            alpha2 = 90 - lambda2 - psi
+            val2 = (LB * LB + L2C2 - LA * LA) / (2 * LC2 * LB)
+            omega = math.degrees(math.acos(max(-1.0, min(1.0, val2))))
+            beta = psi + omega
+
+        delta = 90 - alpha2 - beta
         
-        shoulder_rad = math.acos(cos_shoulder) + math.atan2(z_from_shoulder, wrist_r)
+        angle_2 = alpha2
+        angle_3 = beta
+        angle_IKE = delta
         
-        # 4. Wrist Counter-Rotation
-        wrist_rad = pitch - (shoulder_rad - elbow_rad)
-        gripper_rad = self.cmd_g
+        # --- 4. Final Combination ---
+        angle_4 = angle_IKE + angle_EoAT
+        
+        # --- 5. Map to ROS 2 joint states ---
+        base_rad     = math.radians(180.0 - angle_1)
+        shoulder_rad = math.radians(45.0 - angle_2)
+        elbow_rad    = math.radians(-angle_3)
+        wrist_rad    = math.radians(angle_4)
+        gripper_rad  = self.cmd_g
         
         return [base_rad, shoulder_rad, elbow_rad, wrist_rad, gripper_rad]
 
@@ -121,7 +181,7 @@ class RoArmSafeTeleop(Node):
         self.target_g += dg_in * self.operator_ang_speed * dt
 
         # Clamp angles to prevent integrator windup
-        self.target_t = max(-math.pi, min(math.pi, self.target_t))
+        self.target_t = max(0.0, min(180.0, self.target_t)) # Pitch in degrees
         self.target_g = max(-math.pi, min(math.pi, self.target_g))
 
         # Enforce Workspace limits

@@ -6,3 +6,5 @@ src/.vscode
 external_libs/
 **/__pycache__/
 *.py[cod]
+
+external_repos
