@@ -86,7 +86,7 @@ def generate_launch_description():
 
         ExecuteProcess(
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'false'"])),
-            cmd=['python3', '/home/ubuntu/ros_ws/roarm_control/roarm_keyboard_teleop.py'],
+            cmd=['python3', '/home/ubuntu/ros_ws/roarm_control/roarm_joint_teleop.py'],
             output='screen'
         ),
 

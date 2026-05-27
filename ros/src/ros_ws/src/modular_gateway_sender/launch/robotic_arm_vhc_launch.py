@@ -12,8 +12,6 @@ def generate_launch_description():
     
     # Dynamically resolve workspace root and script path
     ws_dir = os.path.abspath(os.path.join(pkg_dir, '../../../../'))
-    roarm_bridge_script = os.path.join(ws_dir, 'roarm_control', 'roarm_serial_bridge.py')
-    roarm_ik_bridge_script = os.path.join(ws_dir, 'roarm_control', 'roarm_joint_state_IK.py')
 
     return LaunchDescription([
         # --- Mode Selection ---
@@ -98,19 +96,6 @@ def generate_launch_description():
         ),
 
         ExecuteProcess(
-            condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'true'"])),
-            cmd=['ros2', 'run', 'serial_ctrl', 'serial_ctrl_py'],
-            output='screen'
-        ),
-
-        ExecuteProcess(
-            condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'false'"])),
-            cmd=['python3', roarm_bridge_script],
-            output='screen'
-        ),
-
-        ExecuteProcess(
-            condition=UnlessCondition(LaunchConfiguration('teleop')),
             cmd=['ros2', 'run', 'serial_ctrl', 'serial_ctrl_py'],
             output='screen'
         )
