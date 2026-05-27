@@ -99,7 +99,7 @@ def generate_launch_description():
 
         ExecuteProcess(
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'true'"])),
-            cmd=['python3', roarm_ik_bridge_script],
+            cmd=['ros2', 'run', 'serial_ctrl', 'serial_ctrl_py'],
             output='screen'
         ),
 
