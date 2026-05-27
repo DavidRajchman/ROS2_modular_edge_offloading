@@ -57,8 +57,8 @@ class RoArmHardwareBridge(Node):
     def cmd_callback(self, msg):
         pos = msg.position
         
-        # Fallback to 0 (max speed) if the MEC doesn't provide velocity data
-        vel = msg.velocity if len(msg.velocity) >= 5 else [0, 0, 0, 0, 0]
+        # Force velocity to 0 (max speed) to exactly match Waveshare's serial_ctrl_py
+        vel = [0, 0, 0, 0, 0]
         
         join1 = self.posGet(pos[0], -1, 1)
         join2 = self.posGet(pos[1], -1, 3)
@@ -75,7 +75,7 @@ class RoArmHardwareBridge(Node):
         }
         
         try:
-            data = json.dumps(payload) + "\n"
+            data = json.dumps(payload)
             self.ser.write(data.encode('utf-8'))
         except Exception as e:
             self.get_logger().error(f"Serial write error: {e}")
