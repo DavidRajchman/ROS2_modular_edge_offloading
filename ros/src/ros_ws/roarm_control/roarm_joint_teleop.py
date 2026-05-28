@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState, Joy
 import tkinter as tk
 import threading
 import math
@@ -19,6 +19,10 @@ class RoArmJointTeleop(Node):
     def __init__(self):
         super().__init__('roarm_joint_teleop')
         self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
+        
+        self.joy_axes = [0.0] * 8
+        self.joy_sub = self.create_subscription(Joy, '/joy', self.joy_callback, 10)
+        
         self.get_logger().info("Direct Joint Teleop Node running. Publishing to /joint_states.")
 
         self.pressed_keys = {}
@@ -68,6 +72,9 @@ class RoArmJointTeleop(Node):
         self.last_time = time.time()
         self.timer = self.create_timer(1.0 / self.hz, self.control_loop)
 
+    def joy_callback(self, msg):
+        self.joy_axes = msg.axes
+
     def control_loop(self):
         current_time = time.time()
         dt = current_time - self.last_time
@@ -75,20 +82,37 @@ class RoArmJointTeleop(Node):
 
         d_joints = [0.0, 0.0, 0.0, 0.0, 0.0]
 
-        if self.pressed_keys.get('q'): d_joints[0] += 1
-        if self.pressed_keys.get('e'): d_joints[0] -= 1
+        if self.pressed_keys.get('q'): d_joints[0] += 1.0
+        if self.pressed_keys.get('e'): d_joints[0] -= 1.0
         
-        if self.pressed_keys.get('w'): d_joints[1] += 1
-        if self.pressed_keys.get('s'): d_joints[1] -= 1
+        if self.pressed_keys.get('w'): d_joints[1] += 1.0
+        if self.pressed_keys.get('s'): d_joints[1] -= 1.0
         
-        if self.pressed_keys.get('d'): d_joints[2] += 1
-        if self.pressed_keys.get('a'): d_joints[2] -= 1
+        if self.pressed_keys.get('d'): d_joints[2] += 1.0
+        if self.pressed_keys.get('a'): d_joints[2] -= 1.0
         
-        if self.pressed_keys.get('up'):    d_joints[3] += 1
-        if self.pressed_keys.get('down'):  d_joints[3] -= 1
+        if self.pressed_keys.get('up'):    d_joints[3] += 1.0
+        if self.pressed_keys.get('down'):  d_joints[3] -= 1.0
         
-        if self.pressed_keys.get('left'):  d_joints[4] += 1
-        if self.pressed_keys.get('right'): d_joints[4] -= 1
+        if self.pressed_keys.get('left'):  d_joints[4] += 1.0
+        if self.pressed_keys.get('right'): d_joints[4] -= 1.0
+
+        # Blend Joystick Input
+        if len(self.joy_axes) >= 6:
+            # Base (Pan): Left Stick L/R (Axis 0)
+            d_joints[0] += self.joy_axes[0]
+            # Shoulder (Lift): Left Stick U/D (Axis 1)
+            d_joints[1] += self.joy_axes[1]
+            # Elbow (Extension): Right Stick U/D (Axis 4)
+            d_joints[2] += self.joy_axes[4]
+            # Wrist (Pitch): Right Stick L/R (Axis 3)
+            d_joints[3] += self.joy_axes[3]
+            
+            # Gripper: Sum of Triggers (Axis 2 and 5)
+            # ROS joy driver outputs 1.0 (unpressed) to -1.0 (fully pressed) for triggers
+            lt_val = (1.0 - self.joy_axes[2]) / 2.0
+            rt_val = (1.0 - self.joy_axes[5]) / 2.0
+            d_joints[4] += (lt_val - rt_val)
 
         for i in range(5):
             joint = Joint(i)
@@ -140,15 +164,24 @@ class RoArmJointTeleop(Node):
 def run_tkinter_gui(node):
     root = tk.Tk()
     root.title("RoArm-M1 Direct Joint Teleop")
-    root.geometry("450x700")
+    root.geometry("800x650")
+
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+    
+    left_col = tk.Frame(main_frame)
+    left_col.pack(side=tk.LEFT, fill='both', expand=True, padx=(0, 10))
+    
+    right_col = tk.Frame(main_frame)
+    right_col.pack(side=tk.RIGHT, fill='both', expand=True, padx=(10, 0))
 
     text = ("Mode: DIRECT JOINT CONTROL")
             
-    label = tk.Label(root, text=text, font=("Helvetica", 12, "bold"))
+    label = tk.Label(left_col, text=text, font=("Helvetica", 12, "bold"))
     label.pack(pady=10)
 
     # Speed Slider
-    speed_frame = tk.Frame(root)
+    speed_frame = tk.Frame(left_col)
     speed_frame.pack(pady=10, fill='x', padx=20)
     tk.Label(speed_frame, text="Global Speed Multiplier (0.5x - 2.0x)", font=("Helvetica", 10)).pack()
     speed_slider = tk.Scale(speed_frame, from_=0.5, to=2.0, resolution=0.1, orient=tk.HORIZONTAL)
@@ -156,7 +189,7 @@ def run_tkinter_gui(node):
     speed_slider.pack(fill='x')
 
     # Frequency Slider
-    freq_frame = tk.Frame(root)
+    freq_frame = tk.Frame(left_col)
     freq_frame.pack(pady=10, fill='x', padx=20)
     tk.Label(freq_frame, text="Update Frequency (3Hz - 30Hz)", font=("Helvetica", 10)).pack()
     freq_slider = tk.Scale(freq_frame, from_=3, to=30, resolution=1, orient=tk.HORIZONTAL)
@@ -164,7 +197,7 @@ def run_tkinter_gui(node):
     freq_slider.pack(fill='x')
     
     # Servo Speed Checkbox and Slider
-    servo_frame = tk.Frame(root)
+    servo_frame = tk.Frame(left_col)
     servo_frame.pack(pady=10, fill='x', padx=20)
     
     auto_speed_var = tk.BooleanVar(value=True)
@@ -185,8 +218,10 @@ def run_tkinter_gui(node):
     scales = {}
     joint_names = ["Base (Q/E)", "Shoulder (W/S)", "Elbow (A/D)", "Wrist (Up/Down)", "Gripper (L/R)"]
     
+    tk.Label(left_col, text="Virtual Joint State", font=("Helvetica", 12, "bold")).pack(pady=(20, 5))
+    
     for i, name in enumerate(joint_names):
-        frame = tk.Frame(root)
+        frame = tk.Frame(left_col)
         frame.pack(pady=5, fill='x', padx=20)
         tk.Label(frame, text=name, width=15, anchor='w').pack(side=tk.LEFT)
         
@@ -218,7 +253,26 @@ def run_tkinter_gui(node):
             scales[joint].set(node.cmd_joints[i])
             scales[joint].config(state=tk.DISABLED)
             
+        # Update joy indicators
+        if len(node.joy_axes) >= 6:
+            for i in range(6):
+                joy_scales[i].config(state=tk.NORMAL)
+                joy_scales[i].set(node.joy_axes[i])
+                joy_scales[i].config(state=tk.DISABLED)
+            
         root.after(50, update_gui)
+
+    # Joy Indicators (Right Column)
+    tk.Label(right_col, text="Joystick Activity", font=("Helvetica", 12, "bold")).pack(pady=10)
+    joy_scales = []
+    joy_labels = ["LS L/R (Base)", "LS U/D (Shoulder)", "LT (Gripper Close)", "RS L/R (Wrist)", "RS U/D (Elbow)", "RT (Gripper Open)"]
+    for i, name in enumerate(joy_labels):
+        jf = tk.Frame(right_col)
+        jf.pack(pady=15, fill='x')
+        tk.Label(jf, text=name, width=15, anchor='w').pack(side=tk.LEFT)
+        s = tk.Scale(jf, from_=-1.0, to=1.0, resolution=0.01, orient=tk.HORIZONTAL, state=tk.DISABLED)
+        s.pack(side=tk.RIGHT, fill='x', expand=True)
+        joy_scales.append(s)
 
     update_gui()
 

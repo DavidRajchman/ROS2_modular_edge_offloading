@@ -78,6 +78,15 @@ def generate_launch_description():
             }],
         ),
 
+        Node(
+            condition=IfCondition(LaunchConfiguration('teleop')),
+            package='joy',
+            executable='joy_node',
+            name='joy_node',
+            output='screen',
+            parameters=[{'deadzone': 0.05, 'autorepeat_rate': 20.0, 'coalesce_interval': 0.02}]
+        ),
+
         ExecuteProcess(
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('teleop'), "' == 'true' and '", LaunchConfiguration('IK_MEC'), "' == 'true'"])),
             cmd=['python3', '/home/ubuntu/ros_ws/roarm_control/roarm_keybaord_IK_teleop.py'],

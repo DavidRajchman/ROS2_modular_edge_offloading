@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     ros-jazzy-joint-state-publisher \
     ros-jazzy-joint-state-publisher-gui \
     ros-jazzy-xacro \
+    ros-jazzy-joy \
     nano \
     iputils-ping \
     iproute2 \
