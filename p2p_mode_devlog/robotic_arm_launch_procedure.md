@@ -52,6 +52,9 @@ The Pi runs the gateway natively to allow direct access to the USB serial port. 
 
 ### Step 1: Build and Source
 ```bash
+# Source the main ROS 2 installation first
+source /opt/ros/jazzy/setup.bash
+
 cd ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws
 colcon build --packages-select modular_gateway_sender
 source install/setup.bash
@@ -69,9 +72,12 @@ ros2 launch modular_gateway_sender robotic_arm_vhc_launch.py \
 ### Step 3: Start the Hardware Driver
 In another terminal on the Pi, ensure your `serial_ctrl` node is running. This **must** be launched in a separate terminal to avoid serial port blocking issues:
 ```bash
+# Source the main ROS 2 installation
+source /opt/ros/jazzy/setup.bash
+
 # Assuming RoArm-M1 is built on the Pi
 source ~/RobotArmProject/RoArm-M1/install/setup.bash
-ros2 run serial_ctrl serial_ctrl_py
+ros2 run serial_ctrl serial_ctrl
 ```
 
 ---
@@ -79,7 +85,7 @@ ros2 run serial_ctrl serial_ctrl_py
 ## Control Layouts
 
 ### Direct Joint Control (`IK_MEC=false`)
-*   **Q/R**: Base Rotation
+*   **Q/E**: Base Rotation
 *   **W/S**: Shoulder
 *   **A/D**: Elbow
 *   **Up/Down**: Wrist

@@ -24,6 +24,9 @@ services:
       - ./ros/src/ros_ws/roarm_control:/home/ubuntu/ros_ws/roarm_control
       - ./cpplib:/home/ubuntu/cpplib_src
       - ./external_repos/RoArm-M1:/home/ubuntu/ros_ws/src/RoArm-M1  # Mount RoArm-M1 into src
+      - ros_build:/home/ubuntu/ros_ws/build
+      - ros_install:/home/ubuntu/ros_ws/install
+      - ros_log:/home/ubuntu/ros_ws/log
     privileged: true
     tty: true
     command: >
@@ -32,3 +35,8 @@ services:
       source /opt/ros/jazzy/setup.bash &&
       bash /home/ubuntu/ros_ws/src/modular_gateway_sender/p2p_autostart.sh teleop:=$$TELEOP IK_MEC:=$$IK_MEC
       "
+
+volumes:
+  ros_build:
+  ros_install:
+  ros_log:
