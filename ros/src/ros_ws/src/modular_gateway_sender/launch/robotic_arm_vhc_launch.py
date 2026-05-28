@@ -93,10 +93,5 @@ def generate_launch_description():
                 'serial_string_handler.topic': '/serial_ctrl/tx',
                 'joint_state_handler.topic': '/joint_states',
             }],
-        ),
-
-        ExecuteProcess(
-            cmd=['ros2', 'run', 'serial_ctrl', 'serial_ctrl_py'],
-            output='screen'
         )
     ])

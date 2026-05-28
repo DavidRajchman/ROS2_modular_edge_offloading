@@ -30,47 +30,54 @@ if [[ ! -d "${DISCOVERY_DIR}" ]]; then
   exit 1
 fi
 
-echo "== Building discovery_protocol =="
+SKIP_BUILD="${SKIP_BUILD:-0}"
 
-cd "${DISCOVERY_DIR}"
+if [[ "${SKIP_BUILD}" != "1" ]]; then
+  echo "== Building discovery_protocol =="
 
-if [[ ! -d build ]]; then
-  echo "Creating build directory..."
-  mkdir build
-fi
+  cd "${DISCOVERY_DIR}"
 
-cd build
+  if [[ ! -d build ]]; then
+    echo "Creating build directory..."
+    mkdir build
+  fi
 
-if [[ ! -f CMakeCache.txt || "${FORCE_RECONFIGURE:-0}" == "1" ]]; then
-  echo "Running cmake .. (BUILD_TYPE=${BUILD_TYPE})"
-  cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+  cd build
+
+  if [[ ! -f CMakeCache.txt || "${FORCE_RECONFIGURE:-0}" == "1" ]]; then
+    echo "Running cmake .. (BUILD_TYPE=${BUILD_TYPE})"
+    cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+  else
+    echo "CMake already configured (skip). Use FORCE_RECONFIGURE=1 to force."
+  fi
+
+  echo "Compiling discovery_protocol (jobs: ${JOBS})..."
+  make -j"${JOBS}"
+
+  echo "Installing discovery_protocol..."
+  make install
+
+  echo "== Returning to ROS workspace and building selected packages =="
+
+  cd "${ROS_WS}"
+
+  if [[ ! -d src ]]; then
+    echo "ERROR: ROS workspace at '${ROS_WS}' missing 'src' directory." >&2
+    exit 1
+  fi
+
+
+  if [[ "${CLEAN:-0}" == "1" ]]; then
+    echo "Cleaning previous build/ install/ log/..."
+    rm -rf build install log
+  fi
+
+  echo "Building entire workspace (including RoArm-M1 and dependencies)..."
+  colcon build
 else
-  echo "CMake already configured (skip). Use FORCE_RECONFIGURE=1 to force."
+  echo "== Skipping build phase (SKIP_BUILD=1) =="
+  cd "${ROS_WS}"
 fi
-
-echo "Compiling discovery_protocol (jobs: ${JOBS})..."
-make -j"${JOBS}"
-
-echo "Installing discovery_protocol..."
-make install
-
-echo "== Returning to ROS workspace and building selected packages =="
-
-cd "${ROS_WS}"
-
-if [[ ! -d src ]]; then
-  echo "ERROR: ROS workspace at '${ROS_WS}' missing 'src' directory." >&2
-  exit 1
-fi
-
-
-if [[ "${CLEAN:-0}" == "1" ]]; then
-  echo "Cleaning previous build/ install/ log/..."
-  rm -rf build install log
-fi
-
-echo "Building entire workspace (including RoArm-M1 and dependencies)..."
-colcon build
 
 # Safe sourcing helper to avoid 'set -u' unbound variable errors in generated scripts
 safe_source() {

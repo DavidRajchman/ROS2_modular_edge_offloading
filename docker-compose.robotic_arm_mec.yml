@@ -14,6 +14,7 @@ services:
       - DISPLAY=${DISPLAY}  # Pass host display to container
       - TELEOP=${TELEOP:-false}
       - IK_MEC=${IK_MEC:-false}
+      - SKIP_BUILD=${SKIP_BUILD:-1}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix  # X11 socket
       - ./ros/src/ros_ws/src:/home/ubuntu/ros_ws/src
