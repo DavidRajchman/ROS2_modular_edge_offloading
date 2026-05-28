@@ -56,7 +56,7 @@ The Pi runs the gateway natively to allow direct access to the USB serial port. 
 source /opt/ros/jazzy/setup.bash
 
 cd ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws
-colcon build --packages-select modular_gateway_sender
+colcon build --packages-select modular_gateway_sender serial_ctrl
 source install/setup.bash
 ```
 
@@ -75,8 +75,8 @@ In another terminal on the Pi, ensure your `serial_ctrl` node is running. This *
 # Source the main ROS 2 installation
 source /opt/ros/jazzy/setup.bash
 
-# Assuming RoArm-M1 is built on the Pi
-source ~/RobotArmProject/RoArm-M1/install/setup.bash
+# Source the project workspace (where the forked serial_ctrl now lives)
+source ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws/install/setup.bash
 ros2 run serial_ctrl serial_ctrl
 ```
 
