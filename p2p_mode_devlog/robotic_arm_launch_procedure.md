@@ -69,7 +69,7 @@ Launch the gateway node using `robotic_arm_vhc_launch.py`:
 ```bash
 ros2 launch modular_gateway_sender robotic_arm_vhc_launch.py \
   operation_mode:=p2p \
-  peer_host:=<MEC_IP_ADDRESS>
+  peer_host:=12.1.1.67
 ```
 
 ### Step 3: Start the Hardware Driver

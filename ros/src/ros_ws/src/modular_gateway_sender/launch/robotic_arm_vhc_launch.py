@@ -37,7 +37,7 @@ def generate_launch_description():
         # --- p2p mode args (required when operation_mode:=p2p) ---
         DeclareLaunchArgument(
             'peer_host',
-            default_value='192.168.1.100',
+            default_value='12.1.1.67',
             description="[p2p] Static IP of the MEC node"
         ),
         DeclareLaunchArgument(
