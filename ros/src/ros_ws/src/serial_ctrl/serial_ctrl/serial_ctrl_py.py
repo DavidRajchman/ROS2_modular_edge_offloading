@@ -8,13 +8,20 @@ from std_msgs.msg import Float64
 import json
 import serial
 
-ser = serial.Serial("/dev/ttyUSB0",115200)
-
-
 class MinimalSubscriber(Node):
 
     def __init__(self):
         super().__init__('serial_ctrl')
+        
+        self.declare_parameter('serial_port', '/dev/ttyUSB0')
+        port_name = self.get_parameter('serial_port').get_parameter_value().string_value
+        
+        try:
+            self.ser = serial.Serial(port_name, 115200)
+            self.get_logger().info(f"Successfully connected to arm on {port_name}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to connect to {port_name}: {e}")
+            raise e
         
         self.position = []
         
@@ -41,11 +48,10 @@ class MinimalSubscriber(Node):
         join4 = self.posGet(a[3],  1, 1)
         join5 = self.posGet(a[4], -1, 1)
         v = msg.velocity if (msg.velocity and len(msg.velocity) >= 5) else [0, 0, 0, 0, 0]
-        data = json.dumps({'T':3,'P1':join1,'P2':join2,'P3':join3,'P4':join4,'P5':join5,'S1':int(v[0]),'S2':int(v[1]),'S3':int(v[2]),'S4':int(v[3]),'S5':int(v[4]),'A1':60,'A2':60,'A3':60,'A4':60,'A5':60})
+        data = json.dumps({'T':3,'P1':join1,'P2':join2,'P3':join3,'P4':join4,'P5':join5,'S1':int(v[0]),'S2':int(v[1]),'S3':int(v[2]),'S4':int(v[3]),'S5':int(v[4]),'A1':60,'A2':60,'A3':60,'A4':60,'A5':60}) + '\n'
         
-        ser.write(data.encode())
-        
-        print(data)
+        if hasattr(self, 'ser'):
+            self.ser.write(data.encode())
 
 
 def main(args=None):
