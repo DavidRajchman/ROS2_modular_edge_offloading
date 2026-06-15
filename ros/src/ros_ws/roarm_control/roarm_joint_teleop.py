@@ -21,6 +21,8 @@ class RoArmJointTeleop(Node):
         self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
         
         self.joy_axes = [0.0] * 8
+        self.lt_touched = False
+        self.rt_touched = False
         self.joy_sub = self.create_subscription(Joy, '/joy', self.joy_callback, 10)
         
         self.get_logger().info("Direct Joint Teleop Node running. Publishing to /joint_states.")
@@ -74,59 +76,72 @@ class RoArmJointTeleop(Node):
 
     def joy_callback(self, msg):
         self.joy_axes = msg.axes
+        if len(self.joy_axes) >= 6:
+            if self.joy_axes[2] != 0.0: self.lt_touched = True
+            if self.joy_axes[5] != 0.0: self.rt_touched = True
 
     def control_loop(self):
         current_time = time.time()
         dt = current_time - self.last_time
         self.last_time = current_time
 
-        d_joints = [0.0, 0.0, 0.0, 0.0, 0.0]
+        kb_d_joints = [0.0, 0.0, 0.0, 0.0, 0.0]
+        joy_d_joints = [0.0, 0.0, 0.0, 0.0, 0.0]
 
-        if self.pressed_keys.get('q'): d_joints[0] += 1.0
-        if self.pressed_keys.get('e'): d_joints[0] -= 1.0
+        if self.pressed_keys.get('q'): kb_d_joints[0] += 1.0
+        if self.pressed_keys.get('e'): kb_d_joints[0] -= 1.0
         
-        if self.pressed_keys.get('w'): d_joints[1] += 1.0
-        if self.pressed_keys.get('s'): d_joints[1] -= 1.0
+        if self.pressed_keys.get('w'): kb_d_joints[1] += 1.0
+        if self.pressed_keys.get('s'): kb_d_joints[1] -= 1.0
         
-        if self.pressed_keys.get('d'): d_joints[2] += 1.0
-        if self.pressed_keys.get('a'): d_joints[2] -= 1.0
+        if self.pressed_keys.get('d'): kb_d_joints[2] += 1.0
+        if self.pressed_keys.get('a'): kb_d_joints[2] -= 1.0
         
-        if self.pressed_keys.get('up'):    d_joints[3] += 1.0
-        if self.pressed_keys.get('down'):  d_joints[3] -= 1.0
+        if self.pressed_keys.get('up'):    kb_d_joints[3] += 1.0
+        if self.pressed_keys.get('down'):  kb_d_joints[3] -= 1.0
         
-        if self.pressed_keys.get('left'):  d_joints[4] += 1.0
-        if self.pressed_keys.get('right'): d_joints[4] -= 1.0
+        if self.pressed_keys.get('left'):  kb_d_joints[4] += 1.0
+        if self.pressed_keys.get('right'): kb_d_joints[4] -= 1.0
 
         # Blend Joystick Input
         if len(self.joy_axes) >= 6:
             # Base (Pan): Left Stick L/R (Axis 0)
-            d_joints[0] += self.joy_axes[0]
+            joy_d_joints[0] += self.joy_axes[0]
             # Shoulder (Lift): Left Stick U/D (Axis 1)
-            d_joints[1] += self.joy_axes[1]
+            joy_d_joints[1] += self.joy_axes[1]
             # Elbow (Extension): Right Stick U/D (Axis 4)
-            d_joints[2] += self.joy_axes[4]
+            joy_d_joints[2] += self.joy_axes[4]
             # Wrist (Pitch): Right Stick L/R (Axis 3)
-            d_joints[3] += self.joy_axes[3]
+            joy_d_joints[3] += self.joy_axes[3]
             
             # Gripper: Sum of Triggers (Axis 2 and 5)
             # ROS joy driver outputs 1.0 (unpressed) to -1.0 (fully pressed) for triggers
-            lt_val = (1.0 - self.joy_axes[2]) / 2.0
-            rt_val = (1.0 - self.joy_axes[5]) / 2.0
-            d_joints[4] += (lt_val - rt_val)
+            # Linux joy workaround: Untouched triggers default to 0.0, which acts as 50% pressed!
+            lt_axis = self.joy_axes[2] if self.lt_touched else 1.0
+            rt_axis = self.joy_axes[5] if self.rt_touched else 1.0
+            
+            lt_val = (1.0 - lt_axis) / 2.0
+            rt_val = (1.0 - rt_axis) / 2.0
+            joy_d_joints[4] += (lt_val - rt_val)
 
         for i in range(5):
             joint = Joint(i)
-            speed = self.base_speed * self.joint_speed_multipliers[joint]
+            # Keyboard speed uses the joint multipliers, Joystick speed ignores them
+            kb_speed = self.base_speed * self.joint_speed_multipliers[joint]
+            joy_speed = self.base_speed
                 
-            self.target_joints[i] += d_joints[i] * speed * dt
+            delta_rad = (kb_d_joints[i] * kb_speed) + (joy_d_joints[i] * joy_speed)
+            self.target_joints[i] += delta_rad * dt
             
             # Clamp to limits
             min_val, max_val = self.joint_limits[joint]
             self.target_joints[i] = max(min_val, min(max_val, self.target_joints[i]))
 
             # Chase target (smooth movement)
+            # We chase at joy_speed (which is self.base_speed) so it can catch up 
+            # to both joystick targets and slower keyboard targets smoothly.
             diff = self.target_joints[i] - self.cmd_joints[i]
-            step = speed * dt
+            step = joy_speed * dt
             if abs(diff) > step:
                 self.cmd_joints[i] += math.copysign(step, diff)
             else:

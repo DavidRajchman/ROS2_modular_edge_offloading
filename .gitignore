@@ -8,3 +8,5 @@ external_libs/
 *.py[cod]
 
 external_repos
+presentation_files/
+presentation.quarto*

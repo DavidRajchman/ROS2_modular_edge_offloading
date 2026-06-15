@@ -60,6 +60,9 @@ colcon build --packages-select modular_gateway_sender serial_ctrl
 source install/setup.bash
 ```
 
+> [!NOTE]
+> **Duplicate Package Error during build?** If you mounted the old `RoArm-M1` repository into your container alongside the forked `serial_ctrl` package, `colcon build` will complain about duplicate package names. Simply create an empty `COLCON_IGNORE` file inside the old `RoArm-M1/src/serial_ctrl/` folder to tell ROS to ignore the duplicate.
+
 ### Step 2: Start the VHC Gateway
 Launch the gateway node using `robotic_arm_vhc_launch.py`:
 
