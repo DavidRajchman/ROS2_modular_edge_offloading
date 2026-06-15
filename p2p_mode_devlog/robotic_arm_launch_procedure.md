@@ -114,3 +114,11 @@ If you don't see movement, verify data is flowing by echoing topics:
 Internal gateway logs are now in **TEXT mode** on the console. Look for `[gateway]` lines to confirm:
 - `Successfully connected to peer MEC`
 - `Activated handler for msgType 13` (JointState)
+
+
+
+# Create external repos
+```
+mkdir -p external_repos
+git clone https://github.com/waveshareteam/RoArm-M1.git external_repos/RoArm-M1
+```
