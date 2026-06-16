@@ -1,0 +1,77 @@
+/*-- scss:defaults --*/
+
+// Import Rajdhani font
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+
+// Colors
+$dark-blue: #0a192f;
+$accent-blue: #1e3a8a;
+$light-blue: #e6f1ff;
+$text-main: #333333;
+
+// Global settings
+$body-bg: #ffffff;
+$body-color: $text-main;
+$link-color: $accent-blue;
+$selection-bg: $light-blue;
+
+// Typography overrides
+$font-family-sans-serif: "Rajdhani", sans-serif !default;
+$heading-font-family: "Rajdhani", sans-serif !default;
+$heading-color: $dark-blue;
+$heading-font-weight: 600;
+
+/*-- scss:rules --*/
+
+// Fix for the shifted layout: Do NOT override .reveal .slides positioning!
+// It relies on absolute positioning for centering.
+
+// Global static HUD lines on the presentation window itself
+.reveal::before,
+.reveal::after {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 4px solid $accent-blue;
+  pointer-events: none;
+  z-index: 100;
+}
+
+// Top left viewport corner
+.reveal::before {
+  top: 20px;
+  left: 20px;
+  border-right: none;
+  border-bottom: none;
+}
+
+// Bottom right viewport corner
+.reveal::after {
+  bottom: 20px;
+  right: 20px;
+  border-left: none;
+  border-top: none;
+}
+
+// Hide the static HUD when on the big image slide
+.reveal:has(section.big-image-slide.present)::before,
+.reveal:has(section.big-image-slide.present)::after {
+  display: none !important;
+}
+
+// Keep heading modifications for big-image slides
+.reveal section.big-image-slide h2 {
+  font-size: 1.2em !important;
+  margin-bottom: 0 !important;
+}
+
+// Move page number safely inside the bottom right HUD bracket
+.reveal .slide-number {
+  bottom: 30px !important;
+  right: 35px !important;
+  background-color: transparent !important;
+  color: $accent-blue !important;
+  font-weight: 600;
+  font-size: 0.5em !important;
+}

@@ -1,62 +1,95 @@
 ---
-title: "Quarto Basics"
+title: "Project presentation"
+subtitle: "etsteseteserttestet"
+author: "David Rajchman"
 format:
   revealjs:
+    margin: 0.05             # Universally shrink slide margins (default is 0.1 / 10%)
     code-fold: true
     slide-number: 'c/t'      # Display as "Slide / Total"
     show-slide-number: all
     progress: true           # Enable the bottom progress bar
     history: true
-    theme: white
+    theme: [white, custom_theme.scss]
 jupyter: python3
 ---
 
-# Placeholder Title Slide
 
-## Project assignment recap
 
-* Allow for a remote control of the ROARM-M1 through a 5G connected device
-    * Connect the ROARM-M1 to ROS2
-    * Forward the ROS2 topics over 5G
-    * Control the arm using a intuitive interface - keyboard or a controler
 
-## Figuring out the lab network
 
-* I have to have inernet access - forward my eduraom network internet acceses to the rpi
-* Used a router that acted as a DHCP server and a switch. Forwarded the network from my laptop, setup laptop as the default gateway
+## Project assignment recap {background-image="drawIOdiags/exports/HW_setup.svg" background-size="80%" background-position="center 85%"}
+
+**Remote control of a robotic arm through 5G**
+
+* Connect the ROARM-M1 to ROS2
+* Forward the ROS2 topics over 5G
+* Allow gamepad control
+
+## RPI Internet & SSH access {background-image="drawIOdiags/exports/HW_setup_internet.svg" background-size="80%" background-position="center 85%"}
+
+* Allow RPI to access internet
+* Allow personal laptop access to RPI
+
 
 ## My background 6G-LAB
 
 * I created an experimental setup to allow for measuring the impact of diferent offloading algorithms, for this reason I had to create a very complex and fully configurale solution 
 * I have decided to adapt this solution to solve the problem of ROS2 p2p connection
+* test
 
 ## Old OffloadingManager setup
 
 * Showcase the original solution - briefly talk about the bridge and offloading manager
 
+## Network topology {background-image="drawIOdiags/exports/OM_network_topology.svg" background-size="85%" background-position="center 85%"}
+
 ## Necessary changes
 
-* the modular gateways cannot be exactly same as one has to act as a server and the other as a client
+* The modular gateways cannot be exactly same as one has to act as a server and the other as a client
 * There is no offloading manager to distribute the global config
+* Adding new topic handlers
 
 ## Additional changes - improvements
 
 * Adding the tcp server/client functionality
 * MAYBE - addithe the option to use a streamed UDP library instead of tcp (KCP)
 
-## Final setup - daigram p2p
+## Final setup p2p {background-image="drawIOdiags/exports/P2P_network_topology.svg" background-size="85%" background-position="center 60%"}
 
-## Final setup - diagram p2p DS
+## Final setup p2p with discovery {background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" background-size="80%" background-position="center 85%"}
 
 ## connection setup workflow p2p
 
-## Robotic ARM controler - original setup based on guide
+## ROARM Manufacturerer Demo
 
-* Explain the ROS2 topics used originaly
+* **`joint_state_publisher_gui` Node:** 
+  * basic slider to manipulate each joint
+* **`/joint_states` Topic:** 
+  * Intended joint coordinates (radian angle)
+* **`serial_ctrl` Node**:
+  * subscribes to `/joint_states`, 
+  * radians -> hardware servo values
+  * conencts to arm over serial
 
-## Robotic ARM conntroler - adding gamepad controll - issue with IK
+## Custom GUI
 
-* Explain the role of the joy ros2 node
+:::: {.columns}
+
+::: {.column width="45%"}
+* ROS2 `joy` node for gamepad support
+* Keyboard control 
+* Adjustable
+  * Speed
+  * Joint Acceleration
+  * Update frequency
+:::
+
+::: {.column width="50%"}
+![](images/newGUI.png)
+:::
+
+::::
 
 ## 5G conenction of the project --issues faced and resolved
 

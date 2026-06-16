@@ -73,14 +73,25 @@ ros2 launch modular_gateway_sender robotic_arm_vhc_launch.py \
 ```
 
 ### Step 3: Start the Hardware Driver
-In another terminal on the Pi, ensure your `serial_ctrl` node is running. This **must** be launched in a separate terminal to avoid serial port blocking issues:
+In another terminal on the Pi, ensure your `serial_ctrl` node is running. This **must** be launched in a separate terminal to avoid serial port blocking issues.
+
+If you are unsure which USB port the arm is plugged into, you can list the active serial devices:
+```bash
+    ls -l /dev/serial/by-id/
+```
+*(Alternatively, run `dmesg | grep tty` right after plugging it in to see the exact port assigned).*
+
+Launch the hardware driver, making sure to specify the correct serial port if it is not the default `/dev/ttyUSB0`:
+
 ```bash
 # Source the main ROS 2 installation
 source /opt/ros/jazzy/setup.bash
 
 # Source the project workspace (where the forked serial_ctrl now lives)
 source ~/RobotArmProject/ROS2_modular_edge_offloading/ros/src/ros_ws/install/setup.bash
-ros2 run serial_ctrl serial_ctrl
+
+# Run the hardware driver, overriding the serial port parameter
+ros2 run serial_ctrl serial_ctrl --ros-args -p serial_port:=/dev/ttyUSB4
 ```
 
 ---
