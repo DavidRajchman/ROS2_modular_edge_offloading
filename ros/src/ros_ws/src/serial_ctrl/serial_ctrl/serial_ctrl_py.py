@@ -48,7 +48,8 @@ class MinimalSubscriber(Node):
         join4 = self.posGet(a[3],  1, 1)
         join5 = self.posGet(a[4], -1, 1)
         v = msg.velocity if (msg.velocity and len(msg.velocity) >= 5) else [0, 0, 0, 0, 0]
-        data = json.dumps({'T':3,'P1':join1,'P2':join2,'P3':join3,'P4':join4,'P5':join5,'S1':int(v[0]),'S2':int(v[1]),'S3':int(v[2]),'S4':int(v[3]),'S5':int(v[4]),'A1':60,'A2':60,'A3':60,'A4':60,'A5':60}) + '\n'
+        acc = msg.effort if (msg.effort and len(msg.effort) >= 5) else [60, 60, 60, 60, 60]
+        data = json.dumps({'T':3,'P1':join1,'P2':join2,'P3':join3,'P4':join4,'P5':join5,'S1':int(v[0]),'S2':int(v[1]),'S3':int(v[2]),'S4':int(v[3]),'S5':int(v[4]),'A1':int(acc[0]),'A2':int(acc[1]),'A3':int(acc[2]),'A4':int(acc[3]),'A5':int(acc[4])}) + '\n'
         
         if hasattr(self, 'ser'):
             self.ser.write(data.encode())

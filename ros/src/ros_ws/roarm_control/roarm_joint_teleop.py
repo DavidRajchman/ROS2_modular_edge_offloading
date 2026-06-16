@@ -37,6 +37,7 @@ class RoArmJointTeleop(Node):
         # Auto Servo Speed feature
         self.auto_servo_speed = True
         self.manual_servo_speed = 3000.0
+        self.acceleration_cap = 60.0
 
         # Base Velocity (rad/s) and Custom Multipliers 
         # Keep values below 1, to prevent speed from exceeding the hard limits 
@@ -173,6 +174,9 @@ class RoArmJointTeleop(Node):
                 else:
                     msg.velocity[i] = self.manual_servo_speed
 
+            # Pack acceleration cap into unused effort array
+            msg.effort = [self.acceleration_cap] * 5
+
             self.publisher_.publish(msg)
             self.last_published_joints = self.cmd_joints.copy()
 
@@ -229,6 +233,14 @@ def run_tkinter_gui(node):
     servo_slider.set(3000)
     servo_slider.pack(fill='x')
 
+    # Servo Acceleration Slider
+    accel_frame = tk.Frame(left_col)
+    accel_frame.pack(pady=10, fill='x', padx=20)
+    tk.Label(accel_frame, text="Acceleration Cap (1-60)", font=("Helvetica", 10)).pack()
+    accel_slider = tk.Scale(accel_frame, from_=1, to=60, resolution=1, orient=tk.HORIZONTAL)
+    accel_slider.set(60)
+    accel_slider.pack(fill='x')
+
     # Joint Indicators
     scales = {}
     joint_names = ["Base (Q/E)", "Shoulder (W/S)", "Elbow (A/D)", "Wrist (Up/Down)", "Gripper (L/R)"]
@@ -260,6 +272,9 @@ def run_tkinter_gui(node):
         # Update auto servo speed toggle and manual speed
         node.auto_servo_speed = auto_speed_var.get()
         node.manual_servo_speed = float(servo_slider.get())
+        
+        # Update acceleration cap
+        node.acceleration_cap = float(accel_slider.get())
 
         # Update joint indicators
         for i in range(5):
