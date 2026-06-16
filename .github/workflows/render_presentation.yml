@@ -1,0 +1,43 @@
+name: Render Quarto Presentation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write      # Required for modern GitHub Pages deployments
+      id-token: write
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      # 1. Render it locally to ensure it builds, and to save it as a downloadable ZIP artifact
+      - name: Render Presentation
+        run: quarto render p2p_mode_devlog/presentation/presentation.qmd
+
+      - name: Upload HTML Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-html
+          path: p2p_mode_devlog/presentation/presentation.html
+
+      # 2. Automatically publish it to the `gh-pages` branch so it's hosted live!
+      - name: Publish to GitHub Pages
+        if: github.event_name == 'push'
+        uses: quarto-dev/quarto-actions/publish@v2
+        with:
+          target: gh-pages
+          path: p2p_mode_devlog/presentation/presentation.qmd
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
