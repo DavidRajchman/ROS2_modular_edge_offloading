@@ -1,6 +1,6 @@
 ---
 title: "Project presentation"
-subtitle: "etsteseteserttestet"
+subtitle: "5G teleoperated Robotic Arm"
 author: "David Rajchman"
 format:
   revealjs:
@@ -28,55 +28,45 @@ jupyter: python3
 
 ## RPI Internet & SSH access {background-image="drawIOdiags/exports/HW_setup_internet.svg" background-size="80%" background-position="center 85%"}
 
-* Allow RPI to access internet
-* Allow personal laptop access to RPI
+* Allow RPI to access the internet
+* Allow personal laptop access to the RPI
 
 
-## My background 6G-LAB
+## ROS2 modular offloading codebase
 
-* I created an experimental setup to allow for measuring the impact of diferent offloading algorithms, for this reason I had to create a very complex and fully configurale solution 
-* I have decided to adapt this solution to solve the problem of ROS2 p2p connection
-* test
-
-## Old OffloadingManager setup
-
-* Showcase the original solution - briefly talk about the bridge and offloading manager
+* Created during my stay at the 6G Lab at FEE CTU Prague
+* The assignment:
+  * Transparent ROS2 to ROS2 topic transmission
+  * Per topic/task MEC server allocation
+  * Adjustable offloading resource allocation algorithm
+  * Low latency high throughput
 
 ## Network topology {background-image="drawIOdiags/exports/OM_network_topology.svg" background-size="85%" background-position="center 85%"}
 
-## Necessary changes
+## Modular Gateway {background-image="drawIOdiags/exports/MGW.svg" background-size="90%" background-position="center 75%"}
 
-* The modular gateways cannot be exactly same as one has to act as a server and the other as a client
-* There is no offloading manager to distribute the global config
-* Adding new topic handlers
 
-## Additional changes - improvements
+## P2P mode {background-image="drawIOdiags/exports/P2P_network_topology.svg" background-size="85%" background-position="center 60%"}
 
-* Adding the tcp server/client functionality
-* MAYBE - addithe the option to use a streamed UDP library instead of tcp (KCP)
+## P2P with discovery {background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" background-size="80%" background-position="center 85%"}
 
-## Final setup p2p {background-image="drawIOdiags/exports/P2P_network_topology.svg" background-size="85%" background-position="center 60%"}
-
-## Final setup p2p with discovery {background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" background-size="80%" background-position="center 85%"}
-
-## connection setup workflow p2p
-
-## ROARM Manufacturerer Demo
+## ROARM Manufacturer Demo
 
 * **`joint_state_publisher_gui` Node:** 
-  * basic slider to manipulate each joint
+  * Basic slider to manipulate each joint
 * **`/joint_states` Topic:** 
   * Intended joint coordinates (radian angle)
 * **`serial_ctrl` Node**:
-  * subscribes to `/joint_states`, 
-  * radians -> hardware servo values
-  * conencts to arm over serial
+  * Subscribes to `/joint_states`, 
+  * Radians -> hardware servo values
+  * Connects to the arm over serial
 
 ## Custom GUI
 
-:::: {.columns}
+:::: {.columns style="display: flex; justify-content: space-between;"}
 
 ::: {.column width="45%"}
+* Replaces <span style="font-size: 0.75em;">`joint_state_publisher_gui`</span>
 * ROS2 `joy` node for gamepad support
 * Keyboard control 
 * Adjustable
@@ -85,23 +75,94 @@ jupyter: python3
   * Update frequency
 :::
 
-::: {.column width="50%"}
+::: {.column width="45%"}
 ![](images/newGUI.png)
 :::
 
 ::::
 
-## 5G conenction of the project --issues faced and resolved
+## 5G network
 
-* 5G network is unstable, and sometimes its imposible to setup
-* Managed to get a video of everything working
+* 5G OAI network created by Meriem
+* Severe issues connecting
+  * Probably due to interference
+  * Only during working hours (stable after 5:30 pm)
+* RTT 40ms between laptop and RPI
+* RTT 50ms to Google DNS
 
-## Results - latency measurments
 
-* ROS2 forwarding on localhost - ros2 to ros2 RTT around 1ms
+
+## Performance
+
+* ROS2 forwarding on **localhost** - ROS2 to ROS2 RTT ~ **1 ms**
+* **5G** ROS2 to ROS2 RTT ~ **40 ms** with jitter
+* Precise arm control achievable
+* Best settings in the GUI for smoothest motion:
+  * **15 Hz** update frequency
+  * **20 steps/s<sup>2</sup>** maximum acceleration (60 is default)
+
 
 ## Future steps 
 
-* Slicing support almost ready - create multiple instances of ModularGateway
-* DiscoveryService NAT traversal - to allow for conenction setups in any mobile networks, even double nated comercial networks
-* Update the ROARM driver to mtitigate jitter by introducing constant latency mode
+* Slicing support
+* DiscoveryService NAT traversal using STUN
+* Further firmware and driver optimisation
+  * Maximum movement execution time
+  * Constant latency mode 
+
+
+
+# Thank you for your attention
+
+
+# P2P mode setup {.scrollable}
+```{mermaid}
+sequenceDiagram
+participant User as User/ROS2 Node
+participant VHC_GC as VHC Gateway Controller
+participant VHC_DP as VHC Data Plane
+participant MEC_DP as MEC Data Plane
+participant MEC_GC as MEC Gateway Controller
+
+    Note over VHC_GC,MEC_GC: Both nodes start with operation_mode="p2p"<br/>and load local p2p_config.json
+    
+    %% Phase 1: Initialization
+    VHC_GC->>VHC_GC: load_local_config("p2p_config.json")
+    MEC_GC->>MEC_GC: load_local_config("p2p_config.json")
+    
+    Note right of MEC_GC: MEC acts as TCP Server<br/>Listens on data_plane_listen_port
+    MEC_GC->>MEC_DP: Start TcpServerTransport
+    
+    Note left of VHC_GC: VHC acts as TCP Client<br/>Target is static p2p_peer_host:p2p_peer_port
+    VHC_GC->>VHC_DP: Start TcpClientTransport
+    
+    %% Phase 2: Connection
+    VHC_DP->>+MEC_DP: TCP Connect
+    MEC_DP-->>-VHC_DP: Connection Established
+    
+    %% Phase 3: Data Plane Confirmation & Auto-Activation
+    Note left of VHC_GC: on_dp_confirmed() triggered
+    VHC_GC->>VHC_GC: State: OPERATIONAL
+    VHC_GC->>VHC_GC: activate_all_p2p_sessions()
+    
+    Note right of MEC_GC: on_dp_confirmed() triggered
+    MEC_GC->>MEC_GC: State: OPERATIONAL
+    MEC_GC->>MEC_GC: activate_all_p2p_sessions()
+    
+    %% Phase 4: Local Auto-Approval
+    Note over VHC_GC,MEC_GC: For each task in local config:
+    
+    VHC_GC->>VHC_GC: on_session_approved(mock_payload)
+    VHC_GC->>VHC_GC: Activate handlers (SUBSCRIBER/PUBLISHER)
+    
+    MEC_GC->>MEC_GC: on_session_approved(mock_payload)
+    MEC_GC->>MEC_GC: Activate handlers (REVERSE MODE)
+    
+    %% Phase 5: Data Flow
+    Note over User,MEC_DP: ROS Data Flow begins directly between VHC and MEC
+    User->>VHC_GC: Publish ROS Message
+    VHC_GC->>VHC_DP: Serialize and send
+    VHC_DP->>MEC_DP: Binary message over TCP
+    MEC_DP->>MEC_GC: Deserialize and publish
+    Note right of MEC_GC: ROS message available on MEC
+```
