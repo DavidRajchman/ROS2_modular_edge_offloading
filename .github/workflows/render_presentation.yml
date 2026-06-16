@@ -19,6 +19,14 @@ jobs:
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install Dependencies
+        run: pip install jupyter matplotlib numpy
+
       # 1. Render it locally to ensure it builds, and to save it as a downloadable ZIP artifact
       - name: Render Presentation
         run: quarto render p2p_mode_devlog/presentation/presentation.qmd

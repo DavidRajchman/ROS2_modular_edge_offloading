@@ -8,7 +8,7 @@ format:
     progress: true           # Enable the bottom progress bar
     history: true
     theme: white
-jupyter: quarto-global
+jupyter: python3
 ---
 
 # Placeholder Title Slide
