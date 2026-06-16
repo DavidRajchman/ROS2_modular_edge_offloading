@@ -1,0 +1,74 @@
+---
+title: "Quarto Basics"
+format:
+  revealjs:
+    code-fold: true
+    slide-number: 'c/t'      # Display as "Slide / Total"
+    show-slide-number: all
+    progress: true           # Enable the bottom progress bar
+    history: true
+    theme: white
+jupyter: quarto-global
+---
+
+# Placeholder Title Slide
+
+## Project assignment recap
+
+* Allow for a remote control of the ROARM-M1 through a 5G connected device
+    * Connect the ROARM-M1 to ROS2
+    * Forward the ROS2 topics over 5G
+    * Control the arm using a intuitive interface - keyboard or a controler
+
+## Figuring out the lab network
+
+* I have to have inernet access - forward my eduraom network internet acceses to the rpi
+* Used a router that acted as a DHCP server and a switch. Forwarded the network from my laptop, setup laptop as the default gateway
+
+## My background 6G-LAB
+
+* I created an experimental setup to allow for measuring the impact of diferent offloading algorithms, for this reason I had to create a very complex and fully configurale solution 
+* I have decided to adapt this solution to solve the problem of ROS2 p2p connection
+
+## Old OffloadingManager setup
+
+* Showcase the original solution - briefly talk about the bridge and offloading manager
+
+## Necessary changes
+
+* the modular gateways cannot be exactly same as one has to act as a server and the other as a client
+* There is no offloading manager to distribute the global config
+
+## Additional changes - improvements
+
+* Adding the tcp server/client functionality
+* MAYBE - addithe the option to use a streamed UDP library instead of tcp (KCP)
+
+## Final setup - daigram p2p
+
+## Final setup - diagram p2p DS
+
+## connection setup workflow p2p
+
+## Robotic ARM controler - original setup based on guide
+
+* Explain the ROS2 topics used originaly
+
+## Robotic ARM conntroler - adding gamepad controll - issue with IK
+
+* Explain the role of the joy ros2 node
+
+## 5G conenction of the project --issues faced and resolved
+
+* 5G network is unstable, and sometimes its imposible to setup
+* Managed to get a video of everything working
+
+## Results - latency measurments
+
+* ROS2 forwarding on localhost - ros2 to ros2 RTT around 1ms
+
+## Future steps 
+
+* Slicing support almost ready - create multiple instances of ModularGateway
+* DiscoveryService NAT traversal - to allow for conenction setups in any mobile networks, even double nated comercial networks
+* Update the ROARM driver to mtitigate jitter by introducing constant latency mode
