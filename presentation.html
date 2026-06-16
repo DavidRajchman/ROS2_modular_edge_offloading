@@ -9,7 +9,8 @@
 <link href="presentation_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
   <meta name="generator" content="quarto-1.9.38">
 
-  <title>Quarto Basics</title>
+  <meta name="author" content="David Rajchman">
+  <title>Project presentation</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -31,7 +32,7 @@
       vertical-align: middle;
     }
   </style>
-  <link rel="stylesheet" href="presentation_files/libs/revealjs/dist/theme/quarto-2740581606dc327e82f18f789b69d8a0.css">
+  <link rel="stylesheet" href="presentation_files/libs/revealjs/dist/theme/quarto-bbcdc8e1bb9851729d2570f23bbcaf95.css">
   <link href="presentation_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
   <link href="presentation_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
   <link href="presentation_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
@@ -129,33 +130,32 @@
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Quarto Basics</h1>
+  <h1 class="title">Project presentation</h1>
+  <p class="subtitle">etsteseteserttestet</p>
 
 <div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+David Rajchman 
+</div>
+</div>
 </div>
 
 </section>
-<section>
-<section id="placeholder-title-slide" class="title-slide slide level1 center">
-<h1>Placeholder Title Slide</h1>
-
-</section>
-<section id="project-assignment-recap" class="slide level2">
+<section id="project-assignment-recap" class="slide level2" data-background-image="drawIOdiags/exports/HW_setup.svg" data-background-size="80%" data-background-position="center 85%">
 <h2>Project assignment recap</h2>
-<ul>
-<li>Allow for a remote control of the ROARM-M1 through a 5G connected device
+<p><strong>Remote control of a robotic arm through 5G</strong></p>
 <ul>
 <li>Connect the ROARM-M1 to ROS2</li>
 <li>Forward the ROS2 topics over 5G</li>
-<li>Control the arm using a intuitive interface - keyboard or a controler</li>
-</ul></li>
+<li>Allow gamepad control</li>
 </ul>
 </section>
-<section id="figuring-out-the-lab-network" class="slide level2">
-<h2>Figuring out the lab network</h2>
+<section id="rpi-internet-ssh-access" class="slide level2" data-background-image="drawIOdiags/exports/HW_setup_internet.svg" data-background-size="80%" data-background-position="center 85%">
+<h2>RPI Internet &amp; SSH access</h2>
 <ul>
-<li>I have to have inernet access - forward my eduraom network internet acceses to the rpi</li>
-<li>Used a router that acted as a DHCP server and a switch. Forwarded the network from my laptop, setup laptop as the default gateway</li>
+<li>Allow RPI to access internet</li>
+<li>Allow personal laptop access to RPI</li>
 </ul>
 </section>
 <section id="my-background-6g-lab" class="slide level2">
@@ -163,6 +163,7 @@
 <ul>
 <li>I created an experimental setup to allow for measuring the impact of diferent offloading algorithms, for this reason I had to create a very complex and fully configurale solution</li>
 <li>I have decided to adapt this solution to solve the problem of ROS2 p2p connection</li>
+<li>test</li>
 </ul>
 </section>
 <section id="old-offloadingmanager-setup" class="slide level2">
@@ -171,11 +172,15 @@
 <li>Showcase the original solution - briefly talk about the bridge and offloading manager</li>
 </ul>
 </section>
+<section id="network-topology" class="slide level2" data-background-image="drawIOdiags/exports/OM_network_topology.svg" data-background-size="85%" data-background-position="center 85%">
+<h2>Network topology</h2>
+</section>
 <section id="necessary-changes" class="slide level2">
 <h2>Necessary changes</h2>
 <ul>
-<li>the modular gateways cannot be exactly same as one has to act as a server and the other as a client</li>
+<li>The modular gateways cannot be exactly same as one has to act as a server and the other as a client</li>
 <li>There is no offloading manager to distribute the global config</li>
+<li>Adding new topic handlers</li>
 </ul>
 </section>
 <section id="additional-changes---improvements" class="slide level2">
@@ -185,26 +190,51 @@
 <li>MAYBE - addithe the option to use a streamed UDP library instead of tcp (KCP)</li>
 </ul>
 </section>
-<section id="final-setup---daigram-p2p" class="slide level2">
-<h2>Final setup - daigram p2p</h2>
+<section id="final-setup-p2p" class="slide level2" data-background-image="drawIOdiags/exports/P2P_network_topology.svg" data-background-size="85%" data-background-position="center 60%">
+<h2>Final setup p2p</h2>
 </section>
-<section id="final-setup---diagram-p2p-ds" class="slide level2">
-<h2>Final setup - diagram p2p DS</h2>
+<section id="final-setup-p2p-with-discovery" class="slide level2" data-background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" data-background-size="80%" data-background-position="center 85%">
+<h2>Final setup p2p with discovery</h2>
 </section>
 <section id="connection-setup-workflow-p2p" class="slide level2">
 <h2>connection setup workflow p2p</h2>
 </section>
-<section id="robotic-arm-controler---original-setup-based-on-guide" class="slide level2">
-<h2>Robotic ARM controler - original setup based on guide</h2>
+<section id="roarm-manufacturerer-demo" class="slide level2">
+<h2>ROARM Manufacturerer Demo</h2>
 <ul>
-<li>Explain the ROS2 topics used originaly</li>
+<li><strong><code>joint_state_publisher_gui</code> Node:</strong>
+<ul>
+<li>basic slider to manipulate each joint</li>
+</ul></li>
+<li><strong><code>/joint_states</code> Topic:</strong>
+<ul>
+<li>Intended joint coordinates (radian angle)</li>
+</ul></li>
+<li><strong><code>serial_ctrl</code> Node</strong>:
+<ul>
+<li>subscribes to <code>/joint_states</code>,</li>
+<li>radians -&gt; hardware servo values</li>
+<li>conencts to arm over serial</li>
+</ul></li>
 </ul>
 </section>
-<section id="robotic-arm-conntroler---adding-gamepad-controll---issue-with-ik" class="slide level2">
-<h2>Robotic ARM conntroler - adding gamepad controll - issue with IK</h2>
+<section id="custom-gui" class="slide level2">
+<h2>Custom GUI</h2>
+<div class="columns">
+<div class="column" style="width:45%;">
 <ul>
-<li>Explain the role of the joy ros2 node</li>
+<li>ROS2 <code>joy</code> node for gamepad support</li>
+<li>Keyboard control</li>
+<li>Adjustable
+<ul>
+<li>Speed</li>
+<li>Joint Acceleration</li>
+<li>Update frequency</li>
+</ul></li>
 </ul>
+</div><div class="column" style="width:50%;">
+<p><img data-src="images/newGUI.png"></p>
+</div></div>
 </section>
 <section id="g-conenction-of-the-project-issues-faced-and-resolved" class="slide level2">
 <h2>5G conenction of the project –issues faced and resolved</h2>
@@ -227,7 +257,7 @@
 <li>Update the ROARM driver to mtitigate jitter by introducing constant latency mode</li>
 </ul>
 
-</section></section>
+</section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
@@ -414,7 +444,7 @@
         height: 700,
 
         // Factor of the display size that should remain empty around the content
-        margin: 0.1,
+        margin: 5.0e-2,
 
         math: {
           mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
