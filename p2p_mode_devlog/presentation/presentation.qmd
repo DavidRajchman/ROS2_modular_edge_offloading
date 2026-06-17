@@ -126,6 +126,10 @@ jupyter: python3
 
 # Demo time
 
+## Hardware Demonstration
+
+{{< video https://youtu.be/R55aSlyh2z4 width="100%" height="85%" >}}
+
 
 ## P2P mode setup {.scrollable}
 ```{mermaid}
