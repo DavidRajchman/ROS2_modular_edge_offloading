@@ -54,8 +54,14 @@ sudo ip route add 12.1.1.0/24 dev ${WWAN_IFACE} 2>/dev/null
 ```
 bellow is for the laptop
 ```bash
-sudo ip addr add 12.1.1.67/29 dev peer 12.1.1.68 ${WWAN_IFACE} 
-sudo ip route add 12.1.1.0/24 dev ${WWAN_IFACE}
+# 1. Assign the IP with its proper /29 subnet mask 
+sudo ip addr add 12.1.1.67/29 dev ${WWAN_IFACE} 
+# 2. Tell the kernel to route the 5G traffic via your specific Gateway 
+sudo ip route add 12.1.1.0/24 via 12.1.1.68 dev ${WWAN_IFACE}
+
+
+# if file exists error apears use this
+sudo ip route replace 12.1.1.0/24 via 12.1.1.68 dev ${WWAN_IFACE}
 ```
 finaly try the google dns ping (note: DNS queries do not work on the 5g network, thus ping google.com wont be succesfull)
 ```bash

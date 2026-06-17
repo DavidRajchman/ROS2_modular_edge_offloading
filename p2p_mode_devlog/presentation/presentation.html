@@ -147,15 +147,14 @@ David Rajchman
 </section>
 <section id="project-assignment-recap" class="slide level2" data-background-image="drawIOdiags/exports/HW_setup.svg" data-background-size="80%" data-background-position="center 85%">
 <h2>Project assignment recap</h2>
-<p><strong>Remote control of a robotic arm through 5G</strong></p>
 <ul>
 <li>Connect the ROARM-M1 to ROS2</li>
 <li>Forward the ROS2 topics over 5G</li>
 <li>Allow gamepad control</li>
 </ul>
 </section>
-<section id="rpi-internet-ssh-access" class="slide level2" data-background-image="drawIOdiags/exports/HW_setup_internet.svg" data-background-size="80%" data-background-position="center 85%">
-<h2>RPI Internet &amp; SSH access</h2>
+<section id="aditional-devices" class="slide level2" data-background-image="drawIOdiags/exports/HW_setup_internet.svg" data-background-size="80%" data-background-position="center 85%">
+<h2>Aditional devices</h2>
 <ul>
 <li>Allow RPI to access the internet</li>
 <li>Allow personal laptop access to the RPI</li>
@@ -164,30 +163,34 @@ David Rajchman
 <section id="ros2-modular-offloading-codebase" class="slide level2">
 <h2>ROS2 modular offloading codebase</h2>
 <ul>
-<li>Created during my stay at the 6G Lab at FEE CTU Prague</li>
+<li>My previous assignment, similair use-case</li>
+<li>Created by me during my stay at the 6G Lab at FEE CTU</li>
 <li>The assignment:
 <ul>
 <li>Transparent ROS2 to ROS2 topic transmission</li>
 <li>Per topic/task MEC server allocation</li>
 <li>Adjustable offloading resource allocation algorithm</li>
-<li>Low latency high throughput</li>
+<li>Do not use high level tools/frameworks (e.g.&nbsp;MQTT)</li>
+<li>Low latency, high throughput</li>
 </ul></li>
 </ul>
 </section>
-<section id="network-topology" class="slide level2" data-background-image="drawIOdiags/exports/OM_network_topology.svg" data-background-size="85%" data-background-position="center 85%">
-<h2>Network topology</h2>
+<section id="original-network-topology" class="slide level2" data-background-image="drawIOdiags/exports/OM_network_topology.svg" data-background-size="90%" data-background-position="center 85%">
+<h2>Original network topology</h2>
 </section>
 <section id="modular-gateway" class="slide level2" data-background-image="drawIOdiags/exports/MGW.svg" data-background-size="90%" data-background-position="center 75%">
 <h2>Modular Gateway</h2>
 </section>
-<section id="p2p-mode" class="slide level2" data-background-image="drawIOdiags/exports/P2P_network_topology.svg" data-background-size="85%" data-background-position="center 60%">
-<h2>P2P mode</h2>
+<section id="p2p-mode---new" class="slide level2" data-background-image="drawIOdiags/exports/P2P_network_topology.svg" data-background-size="90%" data-background-position="center 65%">
+<h2>P2P mode - New</h2>
 </section>
 <section id="p2p-with-discovery" class="slide level2" data-background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" data-background-size="80%" data-background-position="center 85%">
 <h2>P2P with discovery</h2>
 </section>
-<section id="roarm-manufacturer-demo" class="slide level2">
-<h2>ROARM Manufacturer Demo</h2>
+<section id="roarm-manufacturer-ros2-demo" class="slide level2">
+<h2>ROARM Manufacturer ROS2 Demo</h2>
+<div class="columns" style="display: flex; justify-content: space-between;">
+<div class="column" style="width:70%;">
 <ul>
 <li><strong><code>joint_state_publisher_gui</code> Node:</strong>
 <ul>
@@ -204,6 +207,9 @@ David Rajchman
 <li>Connects to the arm over serial</li>
 </ul></li>
 </ul>
+</div><div class="column" style="width:25%;">
+<p><img data-src="images/demoGUI.png"></p>
+</div></div>
 </section>
 <section id="custom-gui" class="slide level2">
 <h2>Custom GUI</h2>
@@ -240,13 +246,13 @@ David Rajchman
 <section id="performance" class="slide level2">
 <h2>Performance</h2>
 <ul>
-<li>ROS2 forwarding on <strong>localhost</strong> - ROS2 to ROS2 RTT ~ <strong>1 ms</strong></li>
-<li><strong>5G</strong> ROS2 to ROS2 RTT ~ <strong>40 ms</strong> with jitter</li>
+<li>ROS2 forwarding on localhost - ROS2 to ROS2 RTT ~ 1 ms</li>
+<li>5G ROS2 to ROS2 RTT ~ 40 ms with jitter</li>
 <li>Precise arm control achievable</li>
 <li>Best settings in the GUI for smoothest motion:
 <ul>
-<li><strong>15 Hz</strong> update frequency</li>
-<li><strong>20 steps/s<sup>2</sup></strong> maximum acceleration (60 is default)</li>
+<li>15 Hz update frequency</li>
+<li>20 steps/s<sup>2</sup> maximum acceleration (60 is default)</li>
 </ul></li>
 </ul>
 </section>
@@ -262,13 +268,13 @@ David Rajchman
 </ul></li>
 </ul>
 </section>
-<section id="thank-you-for-your-attention" class="title-slide slide level1 center">
-<h1>Thank you for your attention</h1>
+<section>
+<section id="demo-time" class="title-slide slide level1 center">
+<h1>Demo time</h1>
 
 </section>
-
-<section id="p2p-mode-setup" class="title-slide slide level1 scrollable center">
-<h1>P2P mode setup</h1>
+<section id="p2p-mode-setup" class="slide level2 scrollable">
+<h2>P2P mode setup</h2>
 <div class="cell" data-reveal="true" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -328,8 +334,76 @@ participant MEC_GC as MEC Gateway Controller
 </div>
 </div>
 </div>
-
 </section>
+<section id="p2p-ds-mode-setup" class="slide level2 scrollable">
+<h2>P2P DS mode setup</h2>
+<div class="cell" data-reveal="true" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">sequenceDiagram
+participant VHC_GC as VHC Gateway Controller
+participant VHC_DC as VHC Discovery Client
+participant DS as Discovery Service
+participant MEC_DC as MEC Discovery Client
+participant MEC_GC as MEC Gateway Controller
+
+    Note over VHC_GC,MEC_GC: Both nodes start with operation_mode="p2p_ds"&lt;br/&gt;and load local p2p_config.json
+    
+    %% Phase 1: Initialization
+    VHC_GC-&gt;&gt;VHC_GC: load_local_config("p2p_config.json")
+    MEC_GC-&gt;&gt;MEC_GC: load_local_config("p2p_config.json")
+    
+    Note right of MEC_GC: MEC acts as TCP Server&lt;br/&gt;Listens on data_plane_listen_port
+    MEC_GC-&gt;&gt;MEC_GC: Start TcpServerTransport
+    
+    %% Phase 2: MEC Registration
+    MEC_GC-&gt;&gt;MEC_DC: Start Discovery Registration
+    MEC_DC-&gt;&gt;+DS: Send DISC:REG (type=MEC, groupId=X, idInGroup=Y)
+    Note right of DS: DS registers MEC and stores its IP/Port
+    DS--&gt;&gt;-MEC_DC: Send DISC:ACK (SUCCESS)
+    MEC_DC-&gt;&gt;MEC_GC: on_discovery_success()
+    
+    %% Phase 3: VHC Registration &amp; Matchmaking
+    VHC_GC-&gt;&gt;VHC_DC: Start Discovery Registration
+    
+    loop Matchmaking Retry
+        VHC_DC-&gt;&gt;+DS: Send DISC:REG (type=VHC, groupId=X, idInGroup=Y)
+        Note right of DS: DS searches for MEC with matching&lt;br/&gt;groupId and idInGroup
+        
+        alt MEC Found
+            Note right of DS: Match successful
+            DS--&gt;&gt;-VHC_DC: Send DISC:ACK (SUCCESS, MEC IP/Port)
+        else MEC Not Found
+            Note right of DS: Match failed (MEC offline)
+            DS--&gt;&gt;VHC_DC: Send DISC:ACK (WAIT)
+            Note left of VHC_DC: Wait 2 seconds and retry
+        end
+    end
+    
+    %% Phase 4: Dynamic Target Assignment
+    Note left of VHC_DC: Match successful
+    VHC_DC-&gt;&gt;VHC_GC: on_discovery_success(MEC_IP, MEC_PORT)
+    VHC_GC-&gt;&gt;VHC_GC: transport-&gt;set_target(MEC_IP, MEC_PORT)
+    VHC_GC-&gt;&gt;VHC_GC: State: WAITING_FOR_DP_CONNECTION
+    
+    %% Phase 5: P2P Connection &amp; Data Flow
+    Note over VHC_GC,MEC_GC: VHC TcpClientTransport connects to MEC TcpServerTransport
+    
+    VHC_GC-&gt;&gt;MEC_GC: TCP Connect (Direct)
+    Note over VHC_GC,MEC_GC: on_dp_confirmed() triggers activate_all_p2p_sessions()
+    
+    Note over VHC_GC,MEC_GC: Handlers activated locally
+    Note over VHC_GC,MEC_GC: ROS Data Flow begins directly between VHC and MEC
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+
+</section></section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">

@@ -20,13 +20,12 @@ jupyter: python3
 
 ## Project assignment recap {background-image="drawIOdiags/exports/HW_setup.svg" background-size="80%" background-position="center 85%"}
 
-**Remote control of a robotic arm through 5G**
 
 * Connect the ROARM-M1 to ROS2
 * Forward the ROS2 topics over 5G
 * Allow gamepad control
 
-## RPI Internet & SSH access {background-image="drawIOdiags/exports/HW_setup_internet.svg" background-size="80%" background-position="center 85%"}
+## Aditional devices {background-image="drawIOdiags/exports/HW_setup_internet.svg" background-size="80%" background-position="center 85%"}
 
 * Allow RPI to access the internet
 * Allow personal laptop access to the RPI
@@ -34,24 +33,29 @@ jupyter: python3
 
 ## ROS2 modular offloading codebase
 
-* Created during my stay at the 6G Lab at FEE CTU Prague
+* My previous assignment, similair use-case
+* Created by me during my stay at the 6G Lab at FEE CTU 
 * The assignment:
   * Transparent ROS2 to ROS2 topic transmission
   * Per topic/task MEC server allocation
   * Adjustable offloading resource allocation algorithm
-  * Low latency high throughput
+  * Do not use high level tools/frameworks (e.g. MQTT)
+  * Low latency, high throughput
 
-## Network topology {background-image="drawIOdiags/exports/OM_network_topology.svg" background-size="85%" background-position="center 85%"}
+## Original network topology {background-image="drawIOdiags/exports/OM_network_topology.svg" background-size="90%" background-position="center 85%"}
 
 ## Modular Gateway {background-image="drawIOdiags/exports/MGW.svg" background-size="90%" background-position="center 75%"}
 
 
-## P2P mode {background-image="drawIOdiags/exports/P2P_network_topology.svg" background-size="85%" background-position="center 60%"}
+## P2P mode - New {background-image="drawIOdiags/exports/P2P_network_topology.svg" background-size="90%" background-position="center 65%"}
 
 ## P2P with discovery {background-image="drawIOdiags/exports/P2P_DS_network_topology.svg" background-size="80%" background-position="center 85%"}
 
-## ROARM Manufacturer Demo
+## ROARM Manufacturer ROS2 Demo
 
+:::: {.columns style="display: flex; justify-content: space-between;"}
+
+::: {.column width="70%"}
 * **`joint_state_publisher_gui` Node:** 
   * Basic slider to manipulate each joint
 * **`/joint_states` Topic:** 
@@ -60,6 +64,14 @@ jupyter: python3
   * Subscribes to `/joint_states`, 
   * Radians -> hardware servo values
   * Connects to the arm over serial
+:::
+
+::: {.column width="25%"}
+![](images/demoGUI.png)
+:::
+
+::::
+
 
 ## Custom GUI
 
@@ -94,12 +106,12 @@ jupyter: python3
 
 ## Performance
 
-* ROS2 forwarding on **localhost** - ROS2 to ROS2 RTT ~ **1 ms**
-* **5G** ROS2 to ROS2 RTT ~ **40 ms** with jitter
+* ROS2 forwarding on localhost - ROS2 to ROS2 RTT ~ 1 ms
+* 5G ROS2 to ROS2 RTT ~ 40 ms with jitter
 * Precise arm control achievable
 * Best settings in the GUI for smoothest motion:
-  * **15 Hz** update frequency
-  * **20 steps/s<sup>2</sup>** maximum acceleration (60 is default)
+  * 15 Hz update frequency
+  * 20 steps/s<sup>2</sup> maximum acceleration (60 is default)
 
 
 ## Future steps 
@@ -112,10 +124,10 @@ jupyter: python3
 
 
 
-# Thank you for your attention
+# Demo time
 
 
-# P2P mode setup {.scrollable}
+## P2P mode setup {.scrollable}
 ```{mermaid}
 sequenceDiagram
 participant User as User/ROS2 Node
@@ -165,4 +177,63 @@ participant MEC_GC as MEC Gateway Controller
     VHC_DP->>MEC_DP: Binary message over TCP
     MEC_DP->>MEC_GC: Deserialize and publish
     Note right of MEC_GC: ROS message available on MEC
+```
+
+## P2P DS mode setup {.scrollable}
+
+```{mermaid}
+sequenceDiagram
+participant VHC_GC as VHC Gateway Controller
+participant VHC_DC as VHC Discovery Client
+participant DS as Discovery Service
+participant MEC_DC as MEC Discovery Client
+participant MEC_GC as MEC Gateway Controller
+
+    Note over VHC_GC,MEC_GC: Both nodes start with operation_mode="p2p_ds"<br/>and load local p2p_config.json
+    
+    %% Phase 1: Initialization
+    VHC_GC->>VHC_GC: load_local_config("p2p_config.json")
+    MEC_GC->>MEC_GC: load_local_config("p2p_config.json")
+    
+    Note right of MEC_GC: MEC acts as TCP Server<br/>Listens on data_plane_listen_port
+    MEC_GC->>MEC_GC: Start TcpServerTransport
+    
+    %% Phase 2: MEC Registration
+    MEC_GC->>MEC_DC: Start Discovery Registration
+    MEC_DC->>+DS: Send DISC:REG (type=MEC, groupId=X, idInGroup=Y)
+    Note right of DS: DS registers MEC and stores its IP/Port
+    DS-->>-MEC_DC: Send DISC:ACK (SUCCESS)
+    MEC_DC->>MEC_GC: on_discovery_success()
+    
+    %% Phase 3: VHC Registration & Matchmaking
+    VHC_GC->>VHC_DC: Start Discovery Registration
+    
+    loop Matchmaking Retry
+        VHC_DC->>+DS: Send DISC:REG (type=VHC, groupId=X, idInGroup=Y)
+        Note right of DS: DS searches for MEC with matching<br/>groupId and idInGroup
+        
+        alt MEC Found
+            Note right of DS: Match successful
+            DS-->>-VHC_DC: Send DISC:ACK (SUCCESS, MEC IP/Port)
+        else MEC Not Found
+            Note right of DS: Match failed (MEC offline)
+            DS-->>VHC_DC: Send DISC:ACK (WAIT)
+            Note left of VHC_DC: Wait 2 seconds and retry
+        end
+    end
+    
+    %% Phase 4: Dynamic Target Assignment
+    Note left of VHC_DC: Match successful
+    VHC_DC->>VHC_GC: on_discovery_success(MEC_IP, MEC_PORT)
+    VHC_GC->>VHC_GC: transport->set_target(MEC_IP, MEC_PORT)
+    VHC_GC->>VHC_GC: State: WAITING_FOR_DP_CONNECTION
+    
+    %% Phase 5: P2P Connection & Data Flow
+    Note over VHC_GC,MEC_GC: VHC TcpClientTransport connects to MEC TcpServerTransport
+    
+    VHC_GC->>MEC_GC: TCP Connect (Direct)
+    Note over VHC_GC,MEC_GC: on_dp_confirmed() triggers activate_all_p2p_sessions()
+    
+    Note over VHC_GC,MEC_GC: Handlers activated locally
+    Note over VHC_GC,MEC_GC: ROS Data Flow begins directly between VHC and MEC
 ```
