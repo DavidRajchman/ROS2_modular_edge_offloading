@@ -1,0 +1,16 @@
+---
+title: "Mermaid Test"
+format:
+  pdf:
+    papersize: a4
+---
+
+## Simple test
+
+```{mermaid}
+sequenceDiagram
+participant A as Alice
+participant B as Bob
+    A->>B: Hello
+    B-->>A: Hi
+```
