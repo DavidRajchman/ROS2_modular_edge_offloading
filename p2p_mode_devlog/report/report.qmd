@@ -139,7 +139,10 @@ To allows for control using the logitech gamepad, the ros2 joy package is used. 
 
 
 
-## Performance
+## Testing results and performance
+
+The robototic arm has been repeatedly tested for ease of operation and fine control possibilities while connected both through a wired LAN network, and throught the lab 5G network. in both scenarios very precise movements can be executed for examply stackin 2 cans on top of each other. In the LAN controled scenarios the acceleration cap and the update freqency do not result in changes to fine control if they are increased to their maximum range. When controled over 5G high freqency high accelelartion setting results in stutery movement. this is caused due to the fact that the latency jitter will cause slight diferences between the arival times of each packet and if the update freqency is high, each update only contains a small movement changes, thus for a high freqency those small movement can be received at an inconsitent timing which results in a stutery movement patter. This can be somewhat mitigated by decrasing the acceleration cap. However the most optimal control precision is achieved for frequecies around 15 Hz and acceleartion limited to 20 steps/sec^2. The only downside of limiting the accleration is the "floating effect" after the last update is received. This is caused due to the fact that the arm is slowly moving its final resting place and its movement is no longer affected by the newly comming position changes.
+Based on the testing it has been found that the acceleration cap is significantly better at limiting the arm stuters when being used on unstable 5G network, the maximum movement speed cap is less effective and has stronger floating effect than the accelartion cap if used. For this reasont it is recomended the keep the maximum movement speed set at a high value and only adjust the acceleratio cap and the update frequency
 
 * ROS2 forwarding on localhost - ROS2 to ROS2 RTT ~ 1 ms
 * 5G ROS2 to ROS2 RTT ~ 40 ms with jitter
@@ -152,11 +155,18 @@ To allows for control using the logitech gamepad, the ros2 joy package is used. 
 ## Future steps 
 
 * Slicing support
+The EURECOM network does not currently support 5G slicing, however this application capable of being utilized on multiple 5G slices, it is possible to deploy multiple modular gateways on a single ros2 instance, and each modular gateway can transmit diferent topics. thus diferent topics can be transmited at diferent QoS levels.
+
+
 * DiscoveryService NAT traversal using STUN
+The current discovery service is desinged for use in a lab enviroment where the entire 5G network shares a single LAN network. Thus it currently cannot easily handle diferent modular gateway being located behind NAT. This can be mitigated by implementing one of the recently popularised NAT traversal libraries such os ones utilising the STUN protocol. Due to the modular nature of all parts ot this system addig the NAT traversal capabilities would only require changes to the networking parts and the discovery service connected parts, with the rest staying unmodified
+
 * Further firmware and driver optimisation
   * Maximum movement execution time
   * Constant latency mode 
+There are many ways to optimise the Roarm firmware. One feature which could make meaningfull diference is addding a time limit for movement execution, this time limit could be calculated based on the update frequency and then sent by the serial_ctrl node to the roarm firmware. This would significantly mitigate the floating effect at the end of a movement. However it would introduce a discrepancy between  the virutal joint state requested the arm moves to and the actual joint states the arm stops at. For this reason a feedback loop would have to be introduced to forward the true ending state of the arm to the GUI.
 
+Aditional improvement that could be introduced, is creating a constant delay mode to the driver. This special regime would measure the latency and its jitter of the 5G network. then creating a time buffer which would acount for a certain percantage of packet delays (e.g. 90%) for example if the median latency was 40 ms, the buffer could be 80 ms long. This would meant that the arm would move with a higher latency. However robotic arm operators can train themselves to mitigate the latency if the enviroment remains static and the latency bellow a certain treshold. Research has shown that a higher latency and lower jitter results in significantly better arm controlability than lower latency and higher jitter 
 
 
 # Demo time
